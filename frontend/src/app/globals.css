@@ -14,36 +14,40 @@
     --border-prominent: oklch(0.68 0.025 245);
     --border-focus: oklch(0.45 0.12 245);
 
-    --text-primary: oklch(0.18 0.02 250);
-    --text-secondary: oklch(0.42 0.025 250);
-    --text-muted: oklch(0.58 0.02 250);
+    --text-primary: oklch(0.15 0.02 250);
+    --text-secondary: oklch(0.28 0.02 250);
+    --text-muted: oklch(0.38 0.025 250);
 
-    /* Cryptographic Semantic Tokens (Identical in both themes) */
-    --crypto-shor: oklch(0.55 0.23 25);
-    --crypto-shor-bg: oklch(0.55 0.23 25 / 0.12);
-    --crypto-shor-border: oklch(0.55 0.23 25 / 0.45);
+    /* Cryptographic Semantic Tokens (Tuned for light field WCAG AA >= 4.5:1) */
+    --crypto-shor: oklch(0.38 0.22 25);
+    --crypto-shor-bg: oklch(0.38 0.22 25 / 0.08);
+    --crypto-shor-border: oklch(0.38 0.22 25 / 0.35);
 
-    --crypto-broken: oklch(0.52 0.25 320);
-    --crypto-broken-bg: oklch(0.52 0.25 320 / 0.12);
-    --crypto-broken-border: oklch(0.52 0.25 320 / 0.5);
+    --crypto-broken: oklch(0.36 0.22 320);
+    --crypto-broken-bg: oklch(0.36 0.22 320 / 0.08);
+    --crypto-broken-border: oklch(0.36 0.22 320 / 0.35);
 
-    --crypto-grover: oklch(0.65 0.18 75);
-    --crypto-grover-bg: oklch(0.65 0.18 75 / 0.12);
-    --crypto-grover-border: oklch(0.65 0.18 75 / 0.45);
+    --crypto-grover: oklch(0.38 0.15 75);
+    --crypto-grover-bg: oklch(0.38 0.15 75 / 0.08);
+    --crypto-grover-border: oklch(0.38 0.15 75 / 0.35);
 
-    --crypto-safe-classical: oklch(0.55 0.14 230);
-    --crypto-safe-classical-bg: oklch(0.55 0.14 230 / 0.12);
-    --crypto-safe-classical-border: oklch(0.55 0.14 230 / 0.45);
+    --crypto-safe-classical: oklch(0.35 0.14 230);
+    --crypto-safe-classical-bg: oklch(0.35 0.14 230 / 0.08);
+    --crypto-safe-classical-border: oklch(0.35 0.14 230 / 0.35);
 
-    --crypto-pqc: oklch(0.58 0.16 185);
-    --crypto-pqc-bg: oklch(0.58 0.16 185 / 0.14);
-    --crypto-pqc-border: oklch(0.58 0.16 185 / 0.45);
+    --crypto-pqc: oklch(0.32 0.14 185);
+    --crypto-pqc-bg: oklch(0.32 0.14 185 / 0.08);
+    --crypto-pqc-border: oklch(0.32 0.14 185 / 0.35);
 
-    /* Perceptual Risk Band Ramp */
-    --band-critical: oklch(0.55 0.24 25);
-    --band-high: oklch(0.62 0.21 45);
-    --band-medium: oklch(0.70 0.17 75);
-    --band-low: oklch(0.62 0.14 150);
+    /* Perceptual Risk Band Ramp (Light Theme) */
+    --band-critical: oklch(0.38 0.22 25);
+    --band-critical-bg: oklch(0.38 0.22 25 / 0.08);
+    --band-high: oklch(0.40 0.18 45);
+    --band-high-bg: oklch(0.40 0.18 45 / 0.08);
+    --band-medium: oklch(0.38 0.15 75);
+    --band-medium-bg: oklch(0.38 0.15 75 / 0.08);
+    --band-low: oklch(0.32 0.14 150);
+    --band-low-bg: oklch(0.32 0.14 150 / 0.08);
 
     /* Lattice Motif */
     --lattice-line: oklch(0.85 0.01 245 / 0.45);
@@ -60,38 +64,42 @@
 
     --border-subtle: oklch(0.26 0.02 250);
     --border-prominent: oklch(0.38 0.03 250);
-    --border-focus: oklch(0.72 0.16 185);
+    --border-focus: oklch(0.78 0.15 185);
 
-    --text-primary: oklch(0.95 0.01 245);
-    --text-secondary: oklch(0.72 0.02 245);
-    --text-muted: oklch(0.52 0.018 245);
+    --text-primary: oklch(0.98 0.005 245);
+    --text-secondary: oklch(0.90 0.015 245);
+    --text-muted: oklch(0.82 0.015 245);
 
-    /* Cryptographic Semantic Tokens (Glow-tuned for dark field) */
-    --crypto-shor: oklch(0.64 0.23 25);
-    --crypto-shor-bg: oklch(0.64 0.23 25 / 0.15);
-    --crypto-shor-border: oklch(0.64 0.23 25 / 0.5);
+    /* Cryptographic Semantic Tokens (Glow-tuned for dark field WCAG AA >= 4.5:1) */
+    --crypto-shor: oklch(0.74 0.22 25);
+    --crypto-shor-bg: oklch(0.74 0.22 25 / 0.14);
+    --crypto-shor-border: oklch(0.74 0.22 25 / 0.45);
 
-    --crypto-broken: oklch(0.60 0.25 320);
-    --crypto-broken-bg: oklch(0.60 0.25 320 / 0.16);
-    --crypto-broken-border: oklch(0.60 0.25 320 / 0.55);
+    --crypto-broken: oklch(0.76 0.20 320);
+    --crypto-broken-bg: oklch(0.76 0.20 320 / 0.14);
+    --crypto-broken-border: oklch(0.76 0.20 320 / 0.45);
 
-    --crypto-grover: oklch(0.76 0.18 75);
-    --crypto-grover-bg: oklch(0.76 0.18 75 / 0.15);
-    --crypto-grover-border: oklch(0.76 0.18 75 / 0.5);
+    --crypto-grover: oklch(0.82 0.16 75);
+    --crypto-grover-bg: oklch(0.82 0.16 75 / 0.14);
+    --crypto-grover-border: oklch(0.82 0.16 75 / 0.45);
 
-    --crypto-safe-classical: oklch(0.70 0.13 230);
-    --crypto-safe-classical-bg: oklch(0.70 0.13 230 / 0.15);
-    --crypto-safe-classical-border: oklch(0.70 0.13 230 / 0.5);
+    --crypto-safe-classical: oklch(0.78 0.13 230);
+    --crypto-safe-classical-bg: oklch(0.78 0.13 230 / 0.14);
+    --crypto-safe-classical-border: oklch(0.78 0.13 230 / 0.45);
 
-    --crypto-pqc: oklch(0.74 0.16 185);
-    --crypto-pqc-bg: oklch(0.74 0.16 185 / 0.16);
-    --crypto-pqc-border: oklch(0.74 0.16 185 / 0.55);
+    --crypto-pqc: oklch(0.78 0.15 185);
+    --crypto-pqc-bg: oklch(0.78 0.15 185 / 0.14);
+    --crypto-pqc-border: oklch(0.78 0.15 185 / 0.45);
 
-    /* Perceptual Risk Band Ramp */
-    --band-critical: oklch(0.64 0.24 25);
-    --band-high: oklch(0.70 0.21 45);
-    --band-medium: oklch(0.78 0.17 75);
-    --band-low: oklch(0.74 0.14 150);
+    /* Perceptual Risk Band Ramp (Dark Theme) */
+    --band-critical: oklch(0.74 0.22 25);
+    --band-critical-bg: oklch(0.74 0.22 25 / 0.14);
+    --band-high: oklch(0.78 0.18 45);
+    --band-high-bg: oklch(0.78 0.18 45 / 0.14);
+    --band-medium: oklch(0.82 0.16 75);
+    --band-medium-bg: oklch(0.82 0.16 75 / 0.14);
+    --band-low: oklch(0.78 0.14 150);
+    --band-low-bg: oklch(0.78 0.14 150 / 0.14);
 
     /* Lattice Motif */
     --lattice-line: oklch(0.24 0.015 250 / 0.45);

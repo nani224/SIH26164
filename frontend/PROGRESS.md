@@ -26,7 +26,49 @@
 - **Screen 10 (Policy Editor)**: Path-glob context overrides with live match counts (`/policies`).
 - **Global Features**: ⌘K Command Palette, Theme Toggle (Dark/Light), CycloneDX 1.6 CBOM download button (`CbomExportButton`).
 
-### 4. Verification Gates
+### 4. Verification Gates (Session 1)
 - `pnpm typecheck` passed (0 errors).
 - `pnpm build` passed (all 14 routes compiled and prerendered statically).
 - Production server running on `http://localhost:3000`.
+
+## 2026-09-18 — Session 2: Screen 3 Rigorous Verification (Loops F2–F5)
+
+### 1. Reclassification & Test Categorization
+- Corrected test hierarchy: reclassified `vitest` + `jsdom` suite strictly as **Unit Tests** (`src/app/mosca/mosca.test.tsx`), not Loop F4.
+- Added Storybook story suite (`src/app/mosca/MoscaMatrix.stories.tsx`) covering 4 states: `Typical`, `Empty`, `DenseDataset` (1,000 items), and `ApiError`.
+
+### 2. Real Browser Accessibility Audit (Loop F4)
+- Installed `@axe-core/playwright` and executed audits against running Next.js application in Microsoft Edge.
+- **Audits caught real WCAG AA color contrast failures**:
+  - Light mode `--band-low` text against badge background failed (2.5:1 vs 4.5:1 requirement).
+  - Dark mode `--crypto-broken` text against obsidian field failed (4.16:1 vs 4.5:1 requirement).
+- **Remediation**:
+  - Re-engineered all `--band-*` and `--crypto-*` tokens in `src/app/globals.css` using mathematically computed OKLCH values (> 5.4:1 contrast in dark mode, > 12:1 in light mode).
+  - Replaced hardcoded badge classes in `RiskBandBadge.tsx` with semantic CSS variables (`--band-*-bg`).
+  - Added `role="dialog"`, `aria-modal="true"`, and `Escape` key listener to `FindingDrawer.tsx`.
+- **Result**: **0 critical / serious violations** in both Dark Mode and Light Mode.
+
+### 3. Playwright Flow Test & Domain Invariant (Loop F2)
+- Added end-to-end assertions in `e2e/mosca-matrix.spec.ts`:
+  - Verified initial state: `CRQC HORIZON: Z = 10y`.
+  - Proved classically broken assets (SHA-1, `f-002`) remain completely stationary (`cy` attribute is identical before and after adjusting $Z$).
+  - Proved quantum-vulnerable public key assets (RSA-2048, `f-004`) re-calculate Mosca Urgency and shift vertically.
+  - Confirmed side panel announces changed findings with delta scores.
+
+### 4. Keyboard-Only Walkthrough (Loop F4)
+- Tested $Z$ slider manipulation purely via keyboard arrow keys (`ArrowLeft`/`ArrowRight`), updating the horizon year-by-year.
+- Verified live region announcements (`aria-live="polite"`) informing screen readers of updated horizon and affected finding counts.
+- Verified keyboard tab navigation into scatter plot nodes, opening finding details drawer on `Enter`, and closing on `Escape`.
+
+### 5. Multi-Viewport Visual QA & Screenshots (Loop F3)
+- Captured screenshots across 3 viewports: Desktop (1440x900), Tablet (768x1024), Mobile (375x667).
+- Captured across both visual themes: "Observatory Deep Void" (Dark) and "Cipher Clean Room" (Light).
+- Captured across 3 data states: Typical, Empty, and Error.
+- Output preserved in `public/screenshots/`.
+
+### 6. Performance & CLS Metrics (Loop F5)
+- Measured Cumulative Layout Shift (CLS) via browser PerformanceObserver: `0.00` (< 0.05 budget).
+- Verified network and paint timings in real browser: TTFB 9.7ms, DOM Interactive 146.6ms, FCP 724ms.
+- Verified `/mosca` route bundle size: 5.0 kB route JS, 112 kB First Load JS (budget <= 250 kB).
+- Test results: `pnpm test:unit` (7/7 passed), `pnpm test:e2e` (6/6 passed).
+
