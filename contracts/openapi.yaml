@@ -1,0 +1,739 @@
+openapi: 3.1.0
+info:
+  title: ECDAT API
+  version: "0.1.0-phase0"
+  description: >
+    Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) API contract.
+    Phase 0: this contract is implemented by an in-memory stub (see
+    backend/api/), not a real detection engine. Examples on Finding/Scan/etc
+    are hand-built, internally consistent with the Mosca risk formula, and
+    explicitly NOT measured detector output (no engine exists yet).
+servers:
+  - url: /api/v1
+    description: Relative to backend host; full generated paths (used by contract_diff) are under /api/v1.
+
+paths:
+  /api/v1/health:
+    get:
+      operationId: health
+      summary: Liveness/readiness check
+      tags: [system]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /api/v1/scans:
+    post:
+      operationId: createScan
+      summary: Start a new scan
+      tags: [scans]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanCreate"
+      responses:
+        "201":
+          description: Scan created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scan"
+    get:
+      operationId: listScans
+      summary: List scans
+      tags: [scans]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Scan"
+
+  /api/v1/scans/{scan_id}:
+    get:
+      operationId: getScan
+      summary: Get a scan by id
+      tags: [scans]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/scans/{scan_id}/events:
+    x-websocket: true
+    description: >
+      WebSocket endpoint (not representable as a standard OpenAPI 3.1
+      operation). Emits ScanEvent JSON frames: {type: progress|finding|stage|done|error, eventId, ...}.
+      See components.schemas.ScanEvent.
+
+  /api/v1/scans/{scan_id}/findings:
+    get:
+      operationId: getFindings
+      summary: List/filter findings for a scan
+      tags: [findings]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+        - name: band
+          in: query
+          schema: { $ref: "#/components/schemas/RiskBand" }
+        - name: family
+          in: query
+          schema: { $ref: "#/components/schemas/Family" }
+        - name: surface
+          in: query
+          schema: { $ref: "#/components/schemas/Surface" }
+        - name: source
+          in: query
+          schema: { $ref: "#/components/schemas/FindingSource" }
+        - name: minConfidence
+          in: query
+          schema: { type: number, minimum: 0, maximum: 1 }
+        - name: needsReview
+          in: query
+          schema: { type: boolean }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [score, path, family] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingPage"
+
+  /api/v1/scans/{scan_id}/rescore:
+    post:
+      operationId: rescoreScan
+      summary: Recompute risk bands from stored factors (no re-detection)
+      tags: [findings]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RescoreRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescoreResult"
+
+  /api/v1/scans/{scan_id}/graph:
+    get:
+      operationId: getGraph
+      summary: System/file/asset graph for a scan
+      tags: [scans]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Graph"
+
+  /api/v1/scans/{scan_id}/cbom:
+    get:
+      operationId: getCbom
+      summary: CycloneDX 1.6 Cryptography BOM export
+      tags: [exports]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      responses:
+        "200":
+          description: CycloneDX 1.6 BOM
+          content:
+            application/json:
+              schema:
+                type: object
+                description: CycloneDX 1.6 BOM. See https://cyclonedx.org/docs/1.6/json/ for the full schema.
+
+  /api/v1/scans/{scan_id}/plan:
+    get:
+      operationId: getPlan
+      summary: Remediation plan for a scan
+      tags: [exports]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemediationPlan"
+
+  /api/v1/scans/{scan_id}/report.pdf:
+    get:
+      operationId: getReportPdf
+      summary: Executive PDF report [Proposed full implementation is Phase 9; Phase 0 returns a placeholder PDF]
+      tags: [exports]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      responses:
+        "200":
+          description: PDF report
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/findings/{finding_id}/triage:
+    patch:
+      operationId: patchFindingTriage
+      summary: Update triage status/note for a finding
+      tags: [findings]
+      parameters:
+        - name: finding_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriagePatch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/policies:
+    get:
+      operationId: listPolicies
+      summary: List policies
+      tags: [policies]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Policy"
+    put:
+      operationId: upsertPolicy
+      summary: Create or replace a policy (id taken from the body)
+      tags: [policies]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Policy"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Policy"
+
+  /api/v1/policies/{policy_id}:
+    get:
+      operationId: getPolicy
+      summary: Get a policy by id
+      tags: [policies]
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Policy"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: putPolicy
+      summary: Replace a policy at a specific id
+      tags: [policies]
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Policy"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Policy"
+
+  /api/v1/catalog/pqc:
+    get:
+      operationId: getPqcCatalog
+      summary: Reference catalog of standardized PQC algorithms (FIPS 203/204/205)
+      tags: [catalog]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PqcCatalogEntry"
+
+components:
+  parameters:
+    ScanId:
+      name: scan_id
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorDetail"
+
+  schemas:
+    ErrorDetail:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
+
+    FindingKind:
+      type: string
+      enum: [algorithm, certificate, key, protocol, library]
+    Surface:
+      type: string
+      enum: [source, binary, certificate, config, image, manifest]
+    Family:
+      type: string
+      enum:
+        [RSA, DSA, DH, ECDH, ECDSA, Ed25519, X25519, AES, ChaCha20, "3DES",
+         DES, RC4, Blowfish, MD5, "SHA-1", "SHA-2", "SHA-3", HMAC,
+         ML-KEM, ML-DSA, SLH-DSA]
+    CryptoFunction:
+      type: string
+      enum: [keygen, encrypt, decrypt, sign, verify, digest, tag, keyderive, unknown]
+    FindingSource:
+      type: string
+      enum:
+        [ast, ast-reference, ast-protocol-string, source-constant,
+         binary-symbol, binary-constant, binary-oid, x509-parser,
+         pem-parser, ssh-key-parser, config-parser, manifest]
+    TriageStatus:
+      type: string
+      enum: [open, accepted-risk, false-positive, fixed]
+    ScanStatus:
+      type: string
+      enum: [queued, ingesting, scanning, scoring, done, failed]
+    RiskBand:
+      type: string
+      enum: [critical, high, medium, low]
+    Exposure:
+      type: string
+      enum: [external, internal, isolated, test]
+    Criticality:
+      type: string
+      enum: [mission-critical, high, medium, low]
+    GraphNodeType:
+      type: string
+      enum: [system, file, asset]
+
+    Location:
+      type: object
+      required: [path]
+      properties:
+        path: { type: string }
+        line: { type: [integer, "null"] }
+        offset: { type: [integer, "null"] }
+        layer: { type: [string, "null"] }
+
+    RiskCost:
+      type: object
+      required: [pkBytesDelta, wireBytesDelta, opMsDelta]
+      properties:
+        pkBytesDelta: { type: integer }
+        wireBytesDelta: { type: integer }
+        opMsDelta: { type: number }
+
+    Recommendation:
+      type: object
+      required: [action, cost]
+      properties:
+        action: { type: string }
+        target: { type: [string, "null"] }
+        cost: { $ref: "#/components/schemas/RiskCost" }
+
+    Risk:
+      type: object
+      required:
+        [score, band, V, F, U, E, K, X, Y, Z, moscaMargin, reason,
+         classicallyBroken, hndl, needsReview]
+      properties:
+        score: { type: number, minimum: 0, maximum: 100 }
+        band: { $ref: "#/components/schemas/RiskBand" }
+        V: { type: number }
+        F: { type: number }
+        U: { type: number }
+        E: { type: number }
+        K: { type: number }
+        X: { type: number }
+        Y: { type: number }
+        Z: { type: number }
+        moscaMargin: { type: number }
+        reason: { type: string }
+        classicallyBroken: { type: boolean }
+        hndl: { type: boolean }
+        needsReview: { type: boolean }
+
+    Triage:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/TriageStatus" }
+        note: { type: [string, "null"] }
+
+    TriagePatch:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/TriageStatus" }
+        note: { type: [string, "null"] }
+
+    Finding:
+      type: object
+      required:
+        [id, kind, surface, family, displayName, function, location,
+         symbol, snippet, source, confidence, triage]
+      properties:
+        id: { type: string }
+        kind: { $ref: "#/components/schemas/FindingKind" }
+        surface: { $ref: "#/components/schemas/Surface" }
+        family:
+          oneOf:
+            - $ref: "#/components/schemas/Family"
+            - type: "null"
+        displayName: { type: string }
+        keySize: { type: [integer, "null"] }
+        mode: { type: [string, "null"] }
+        curve: { type: [string, "null"] }
+        function: { $ref: "#/components/schemas/CryptoFunction" }
+        location: { $ref: "#/components/schemas/Location" }
+        symbol: { type: string }
+        snippet: { type: string }
+        source: { $ref: "#/components/schemas/FindingSource" }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        risk:
+          oneOf:
+            - $ref: "#/components/schemas/Risk"
+            - type: "null"
+        recommendation:
+          oneOf:
+            - $ref: "#/components/schemas/Recommendation"
+            - type: "null"
+        triage: { $ref: "#/components/schemas/Triage" }
+      example:
+        id: finding_001
+        kind: algorithm
+        surface: source
+        family: RSA
+        displayName: RSA-2048 key generation
+        keySize: 2048
+        mode: null
+        curve: null
+        function: keygen
+        location: { path: src/main/java/com/example/auth/KeyService.java, line: 42, offset: null, layer: null }
+        symbol: KeyPairGenerator.generateKeyPair
+        snippet: "KeyPairGenerator gen = KeyPairGenerator.getInstance(\"RSA\"); gen.initialize(2048);"
+        source: ast
+        confidence: 0.92
+        risk:
+          score: 76.95
+          band: critical
+          V: 1.0
+          F: 0.9
+          U: 1.0
+          E: 0.95
+          K: 0.9
+          X: 12
+          Y: 8
+          Z: 10
+          moscaMargin: 10
+          reason: "Shor-vulnerable asymmetric keygen on an externally-exposed, mission-critical path; shelf life plus migration time exceeds the analyst's CRQC horizon."
+          classicallyBroken: false
+          hndl: true
+          needsReview: false
+        recommendation:
+          action: "Migrate to ML-KEM-768 for key establishment (hybrid with X25519 during transition)"
+          target: ML-KEM-768
+          cost: { pkBytesDelta: 928, wireBytesDelta: 832, opMsDelta: 0.05 }
+        triage: { status: open, note: null }
+
+    FindingPage:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Finding" }
+        cursor: { type: [string, "null"] }
+        total: { type: integer }
+
+    ScanStats:
+      type: object
+      required: [files, bytes, seconds, mbPerSec, errors, skippedPrefilter]
+      properties:
+        files: { type: integer }
+        bytes: { type: integer }
+        seconds: { type: number }
+        mbPerSec: { type: number }
+        errors: { type: integer }
+        skippedPrefilter: { type: integer }
+
+    BandCounts:
+      type: object
+      properties:
+        critical: { type: integer, default: 0 }
+        high: { type: integer, default: 0 }
+        medium: { type: integer, default: 0 }
+        low: { type: integer, default: 0 }
+
+    Scan:
+      type: object
+      required: [id, target, status, bands, policyId, crqcYears, startedAt]
+      properties:
+        id: { type: string }
+        target: { type: string }
+        status: { $ref: "#/components/schemas/ScanStatus" }
+        stats:
+          oneOf:
+            - $ref: "#/components/schemas/ScanStats"
+            - type: "null"
+        bands: { $ref: "#/components/schemas/BandCounts" }
+        policyId: { type: string }
+        crqcYears: { type: integer }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: [string, "null"], format: date-time }
+      example:
+        id: scan_stub_001
+        target: example-monorepo
+        status: done
+        stats: { files: 482, bytes: 18340221, seconds: 3.9, mbPerSec: 4.48, errors: 0, skippedPrefilter: 311 }
+        bands: { critical: 2, high: 1, medium: 2, low: 1 }
+        policyId: policy_default
+        crqcYears: 10
+        startedAt: "2026-09-17T12:00:00Z"
+        finishedAt: "2026-09-17T12:00:04Z"
+
+    ScanCreate:
+      type: object
+      properties:
+        path: { type: [string, "null"] }
+        policyId: { type: [string, "null"] }
+        crqcYears: { type: [integer, "null"] }
+
+    RescoreRequest:
+      type: object
+      properties:
+        crqcYears: { type: [integer, "null"] }
+        policyId: { type: [string, "null"] }
+
+    RescoreResult:
+      type: object
+      required: [bands, changed]
+      properties:
+        bands: { $ref: "#/components/schemas/BandCounts" }
+        changed:
+          type: array
+          items: { $ref: "#/components/schemas/Finding" }
+
+    Context:
+      type: object
+      required: [exposure, criticality, shelfLifeYears, migrationYears]
+      properties:
+        exposure: { $ref: "#/components/schemas/Exposure" }
+        criticality: { $ref: "#/components/schemas/Criticality" }
+        shelfLifeYears: { type: integer }
+        migrationYears: { type: integer }
+
+    ContextWithGlob:
+      allOf:
+        - $ref: "#/components/schemas/Context"
+        - type: object
+          required: [glob]
+          properties:
+            glob: { type: string }
+
+    Policy:
+      type: object
+      required: [id, name, crqcYears, default]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        crqcYears: { type: integer }
+        default: { $ref: "#/components/schemas/Context" }
+        contexts:
+          type: array
+          items: { $ref: "#/components/schemas/ContextWithGlob" }
+      example:
+        id: policy_default
+        name: Default NTRO baseline
+        crqcYears: 10
+        default: { exposure: internal, criticality: medium, shelfLifeYears: 5, migrationYears: 3 }
+        contexts:
+          - glob: "**/prod/**"
+            exposure: external
+            criticality: mission-critical
+            shelfLifeYears: 10
+            migrationYears: 5
+          - glob: "**/test/**"
+            exposure: test
+            criticality: low
+            shelfLifeYears: 1
+            migrationYears: 1
+
+    GraphNode:
+      type: object
+      required: [id, type, label, occurrences]
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/GraphNodeType" }
+        label: { type: string }
+        band:
+          oneOf:
+            - $ref: "#/components/schemas/RiskBand"
+            - type: "null"
+        score: { type: [number, "null"] }
+        occurrences: { type: integer }
+        parentId: { type: [string, "null"] }
+
+    GraphEdge:
+      type: object
+      required: [source, target]
+      properties:
+        source: { type: string }
+        target: { type: string }
+
+    Graph:
+      type: object
+      required: [nodes, edges]
+      properties:
+        nodes:
+          type: array
+          items: { $ref: "#/components/schemas/GraphNode" }
+        edges:
+          type: array
+          items: { $ref: "#/components/schemas/GraphEdge" }
+
+    RemediationPlanItem:
+      type: object
+      required: [findingId, band, displayName, location, action]
+      properties:
+        findingId: { type: string }
+        band: { $ref: "#/components/schemas/RiskBand" }
+        displayName: { type: string }
+        location: { $ref: "#/components/schemas/Location" }
+        action: { type: string }
+        target: { type: [string, "null"] }
+
+    RemediationPlan:
+      type: object
+      required: [scanId, generatedAt, items]
+      properties:
+        scanId: { type: string }
+        generatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/RemediationPlanItem" }
+
+    PqcCatalogEntry:
+      type: object
+      required: [family, displayName, standard, parameterSet, securityCategory, notes]
+      properties:
+        family: { $ref: "#/components/schemas/Family" }
+        displayName: { type: string }
+        standard: { type: string }
+        parameterSet: { type: string }
+        securityCategory: { type: integer }
+        publicKeyBytes: { type: [integer, "null"] }
+        ciphertextOrSignatureBytes: { type: [integer, "null"] }
+        notes: { type: string }
+      example:
+        family: ML-KEM
+        displayName: ML-KEM-768
+        standard: FIPS 203
+        parameterSet: ML-KEM-768
+        securityCategory: 3
+        publicKeyBytes: 1184
+        ciphertextOrSignatureBytes: 1088
+        notes: Recommended default KEM parameter set (roughly AES-192 equivalent).
+
+    HealthStatus:
+      type: object
+      required: [status, version, time]
+      properties:
+        status: { type: string, enum: [ok] }
+        version: { type: string }
+        time: { type: string, format: date-time }
+
+    ScanEvent:
+      type: object
+      description: WebSocket frame shape for /scans/{scan_id}/events
+      required: [type, eventId]
+      properties:
+        type: { type: string, enum: [progress, finding, stage, done, error] }
+        eventId: { type: string }
+        stage: { type: string }
+        percent: { type: number }
+        findingId: { type: string }
+        scanId: { type: string }
+        message: { type: string }
