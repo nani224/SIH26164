@@ -1,9 +1,11 @@
 # ECDAT Backend
 
 Backend for the Enterprise Cryptographic Discovery & Analysis Tool
-(SIH26164). **Phase 0 only** right now: a contract-exact FastAPI stub, no
-real detection engine, no persistence, no auth. See `PLAN.md` for what's
-next and `docs/decisions/backend/001-phase0-skeleton.md` for why.
+(SIH26164). **Phases 0-1 done**: a contract-exact FastAPI stub (still
+returning stub data — the engine isn't wired into the API yet, that's
+Phase 3) plus a real, working Python detection engine with a small starter
+bench harness. No persistence, no auth. See `PLAN.md` for what's next and
+`docs/decisions/backend/` for why things are built the way they are.
 
 ## Requirements
 
@@ -30,8 +32,9 @@ restart — there is no database yet (Phase 2).
 cd backend
 uv run ruff check .
 uv run mypy --strict .
-uv run pytest --cov=api --cov=engine --cov=scripts --cov-report=term-missing
+uv run pytest --cov=api --cov=engine --cov=scripts --cov=bench --cov-report=term-missing
 uv run python scripts/contract_diff.py
+uv run python bench/evaluate.py   # real precision/recall on the starter fixture set
 ```
 
 ## Env vars
@@ -51,8 +54,9 @@ no network access.
 
 ```
 backend/
-  engine/        # detection/risk/recommendation engine (Phase 1+; empty in Phase 0)
+  engine/        # detection/risk/recommendation engine (Python detector so far)
   api/           # FastAPI app, Pydantic models, in-memory stub data/store
+  bench/         # evaluate.py + starter fixtures (see bench/README.md)
   scripts/       # contract_diff.py (contract-keeper check)
   tests/
 contracts/

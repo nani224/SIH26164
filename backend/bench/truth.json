@@ -1,0 +1,31 @@
+{
+  "weak_hash.py": [
+    {"family": "MD5", "function": "digest", "line": 3},
+    {"family": "SHA-1", "function": "digest", "line": 4},
+    {"family": "SHA-2", "function": "digest", "line": 5},
+    {"family": "MD5", "function": "digest", "line": 6}
+  ],
+  "hmac_usage.py": [
+    {"family": "HMAC", "function": "tag", "line": 4},
+    {"family": "HMAC", "function": "tag", "line": 5}
+  ],
+  "rsa_keygen.py": [
+    {"family": "RSA", "function": "keygen", "line": 3},
+    {"family": "RSA", "function": "keygen", "line": 4}
+  ],
+  "ec_keygen.py": [
+    {"family": "ECDSA", "function": "keygen", "line": 3},
+    {"family": "ECDSA", "function": "keygen", "line": 4}
+  ],
+  "weak_ciphers.py": [
+    {"family": "3DES", "function": "encrypt", "line": 3},
+    {"family": "RC4", "function": "encrypt", "line": 4},
+    {"family": "Blowfish", "function": "encrypt", "line": 5}
+  ],
+  "safe_aes.py": [
+    {"family": "AES", "function": "encrypt", "line": 3},
+    {"family": "ChaCha20", "function": "encrypt", "line": 4}
+  ],
+  "no_crypto.py": [],
+  "pqc_mentions.py": []
+}
