@@ -1,0 +1,786 @@
+openapi: 3.1.0
+info:
+  title: ECDAT Cryptographic Analysis API
+  version: 1.0.0
+  description: Enterprise Cryptographic Discovery & Analysis Tool (SIH26164 NTRO)
+servers:
+  - url: http://localhost:8000
+    description: Local development backend
+
+paths:
+  /api/v1/health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, timestamp]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/v1/scans:
+    get:
+      summary: List past cryptographic scans
+      operationId: listScans
+      responses:
+        '200':
+          description: List of scans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Scan'
+    post:
+      summary: Launch a new scan
+      operationId: createScan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path:
+                  type: string
+                  description: Local filesystem path to scan
+                policyId:
+                  type: string
+                crqcYears:
+                  type: integer
+                  minimum: 5
+                  maximum: 15
+                  default: 10
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                policyId:
+                  type: string
+                crqcYears:
+                  type: integer
+                  default: 10
+      responses:
+        '202':
+          description: Scan accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scan'
+
+  /api/v1/scans/{id}:
+    get:
+      summary: Get scan details
+      operationId: getScan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scan details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scan'
+        '404':
+          description: Scan not found
+
+  /api/v1/scans/{id}/findings:
+    get:
+      summary: Query findings for a scan with filtering and pagination
+      operationId: getScanFindings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: band
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [critical, high, medium, low]
+        - name: family
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: surface
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: source
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: minConfidence
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+        - name: needsReview
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [score_desc, score_asc, confidence_asc, location_asc]
+      responses:
+        '200':
+          description: Paginated findings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Finding'
+                  total:
+                    type: integer
+                  nextCursor:
+                    type: string
+                    nullable: true
+
+  /api/v1/scans/{id}/rescore:
+    post:
+      summary: Re-score scan with new CRQC scenario horizon or policy
+      operationId: rescoreScan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                crqcYears:
+                  type: integer
+                  minimum: 5
+                  maximum: 15
+                policyId:
+                  type: string
+      responses:
+        '200':
+          description: Re-scoring result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bands, changedFindings]
+                properties:
+                  bands:
+                    $ref: '#/components/schemas/RiskBands'
+                  changedFindings:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, displayName, previousBand, newBand, previousScore, newScore]
+                      properties:
+                        id:
+                          type: string
+                        displayName:
+                          type: string
+                        previousBand:
+                          $ref: '#/components/schemas/RiskBand'
+                        newBand:
+                          $ref: '#/components/schemas/RiskBand'
+                        previousScore:
+                          type: number
+                        newScore:
+                          type: number
+
+  /api/v1/scans/{id}/graph:
+    get:
+      summary: Crypto estate hierarchy graph (System -> File -> Asset)
+      operationId: getScanGraph
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Graph structure
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodes, edges]
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GraphNode'
+                  edges:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GraphEdge'
+
+  /api/v1/scans/{id}/cbom:
+    get:
+      summary: Download CycloneDX 1.6 Cryptographic Bill of Materials (CBOM)
+      operationId: getScanCbom
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CycloneDX 1.6 CBOM with signature record
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bomFormat, specVersion, components, signature]
+                properties:
+                  bomFormat:
+                    type: string
+                    example: CycloneDX
+                  specVersion:
+                    type: string
+                    example: "1.6"
+                  serialNumber:
+                    type: string
+                  components:
+                    type: array
+                    items:
+                      type: object
+                  signature:
+                    type: object
+                    required: [algorithm, value]
+                    properties:
+                      algorithm:
+                        type: string
+                      value:
+                        type: string
+                      publicKey:
+                        type: string
+
+  /api/v1/scans/{id}/plan:
+    get:
+      summary: Remediation migration plan
+      operationId: getScanPlan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Remediation plan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RemediationPlanItem'
+
+  /api/v1/scans/{id}/report.pdf:
+    get:
+      summary: Executive summary report in PDF [Proposed until backend ships it]
+      operationId: getScanReportPdf
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Binary PDF stream
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '501':
+          description: Not yet implemented
+
+  /api/v1/findings/{id}/triage:
+    patch:
+      summary: Triage a cryptographic finding
+      operationId: triageFinding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: '#/components/schemas/TriageStatus'
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Updated finding
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Finding'
+
+  /api/v1/policies:
+    get:
+      summary: List all assessment policies
+      operationId: listPolicies
+      responses:
+        '200':
+          description: List of policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Policy'
+    post:
+      summary: Create new assessment policy
+      operationId: createPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Policy'
+      responses:
+        '201':
+          description: Policy created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+
+  /api/v1/policies/{id}:
+    get:
+      summary: Get policy by ID
+      operationId: getPolicy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Policy details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+    put:
+      summary: Update existing policy
+      operationId: updatePolicy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Policy'
+      responses:
+        '200':
+          description: Policy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+
+  /api/v1/catalog/pqc:
+    get:
+      summary: PQC algorithm specification catalog (size and latency)
+      operationId: getPqcCatalog
+      responses:
+        '200':
+          description: Catalog of classical and PQC replacement specifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PqcCatalogItem'
+
+components:
+  schemas:
+    RiskBand:
+      type: string
+      enum: [critical, high, medium, low]
+
+    RiskBands:
+      type: object
+      required: [critical, high, medium, low]
+      properties:
+        critical:
+          type: integer
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+
+    ScanStatus:
+      type: string
+      enum: [queued, ingesting, scanning, scoring, done, failed]
+
+    ScanStats:
+      type: object
+      required: [files, bytes, seconds, mbPerSec, errors, skippedPrefilter]
+      properties:
+        files:
+          type: integer
+        bytes:
+          type: integer
+        seconds:
+          type: number
+        mbPerSec:
+          type: number
+        errors:
+          type: integer
+        skippedPrefilter:
+          type: integer
+
+    Scan:
+      type: object
+      required: [id, target, status, stats, bands, crqcYears, startedAt]
+      properties:
+        id:
+          type: string
+        target:
+          type: string
+        status:
+          $ref: '#/components/schemas/ScanStatus'
+        stats:
+          $ref: '#/components/schemas/ScanStats'
+        bands:
+          $ref: '#/components/schemas/RiskBands'
+        policyId:
+          type: string
+        crqcYears:
+          type: integer
+          default: 10
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    FindingLocation:
+      type: object
+      required: [path, line]
+      properties:
+        path:
+          type: string
+        line:
+          type: integer
+        offset:
+          type: integer
+        layer:
+          type: string
+
+    FindingRisk:
+      type: object
+      required: [score, band, V, F, U, E, K, X, Y, Z, moscaMargin, reason, classicallyBroken, hndl, needsReview]
+      properties:
+        score:
+          type: number
+        band:
+          $ref: '#/components/schemas/RiskBand'
+        V:
+          type: number
+          description: Vulnerability weight
+        F:
+          type: number
+          description: Cryptographic Function weight
+        U:
+          type: number
+          description: Mosca Urgency weight
+        E:
+          type: number
+          description: System Exposure weight
+        K:
+          type: number
+          description: Business Criticality weight
+        X:
+          type: number
+          description: Data shelf life in years
+        Y:
+          type: number
+          description: Migration time in years
+        Z:
+          type: number
+          description: Years until Cryptanalytically Relevant Quantum Computer
+        moscaMargin:
+          type: number
+          description: X + Y - Z
+        reason:
+          type: string
+        classicallyBroken:
+          type: boolean
+        hndl:
+          type: boolean
+          description: Harvest Now Decrypt Later risk
+        needsReview:
+          type: boolean
+          description: True when confidence < 0.75
+
+    RecommendationCost:
+      type: object
+      required: [pkBytesDelta, wireBytesDelta, opMsDelta]
+      properties:
+        pkBytesDelta:
+          type: integer
+        wireBytesDelta:
+          type: integer
+        opMsDelta:
+          type: number
+
+    Recommendation:
+      type: object
+      required: [action, target, cost]
+      properties:
+        action:
+          type: string
+        target:
+          type: string
+        cost:
+          $ref: '#/components/schemas/RecommendationCost'
+
+    TriageStatus:
+      type: string
+      enum: [open, accepted-risk, false-positive, fixed]
+
+    Triage:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/TriageStatus'
+        note:
+          type: string
+
+    Finding:
+      type: object
+      required: [id, kind, surface, family, displayName, location, source, confidence, risk, recommendation, triage]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+        surface:
+          type: string
+        family:
+          type: string
+        displayName:
+          type: string
+        keySize:
+          type: integer
+        mode:
+          type: string
+        curve:
+          type: string
+        function:
+          type: string
+        location:
+          $ref: '#/components/schemas/FindingLocation'
+        symbol:
+          type: string
+        snippet:
+          type: string
+        source:
+          type: string
+        confidence:
+          type: number
+        risk:
+          $ref: '#/components/schemas/FindingRisk'
+        recommendation:
+          $ref: '#/components/schemas/Recommendation'
+        triage:
+          $ref: '#/components/schemas/Triage'
+
+    RemediationPlanItem:
+      type: object
+      required: [location, line, asset, score, band, reason, mosca_margin, confidence, action, target]
+      properties:
+        location:
+          type: string
+        line:
+          type: integer
+        asset:
+          type: string
+        score:
+          type: number
+        band:
+          $ref: '#/components/schemas/RiskBand'
+        reason:
+          type: string
+        mosca_margin:
+          type: number
+        confidence:
+          type: number
+        action:
+          type: string
+        target:
+          type: string
+
+    GraphNode:
+      type: object
+      required: [id, name, type, occurrences, semanticClass, riskScore]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [system, file, asset]
+        occurrences:
+          type: integer
+        semanticClass:
+          type: string
+          enum: [shor, classically-broken, grover, quantum-safe-classical, pqc]
+        riskScore:
+          type: number
+        details:
+          type: object
+
+    GraphEdge:
+      type: object
+      required: [source, target, relationship]
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+        relationship:
+          type: string
+
+    PolicyContext:
+      type: object
+      required: [exposure, criticality, shelfLifeYears, migrationYears]
+      properties:
+        exposure:
+          type: string
+          enum: [external, internal, isolated, test]
+        criticality:
+          type: string
+          enum: [mission-critical, high, medium, low]
+        shelfLifeYears:
+          type: number
+        migrationYears:
+          type: number
+
+    PolicyRule:
+      allOf:
+        - $ref: '#/components/schemas/PolicyContext'
+        - type: object
+          required: [glob]
+          properties:
+            glob:
+              type: string
+
+    Policy:
+      type: object
+      required: [id, name, crqcYears, default, contexts]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        crqcYears:
+          type: integer
+          default: 10
+        default:
+          $ref: '#/components/schemas/PolicyContext'
+        contexts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyRule'
+
+    PqcCatalogItem:
+      type: object
+      required: [alg, class, pk_bytes, ct_or_sig_bytes, keygen_ms]
+      properties:
+        alg:
+          type: string
+        class:
+          type: string
+        pk_bytes:
+          type: integer
+        ct_or_sig_bytes:
+          type: integer
+        keygen_ms:
+          type: number
+        op1:
+          type: string
+        op1_ms:
+          type: number
+        op2:
+          type: string
+        op2_ms:
+          type: number
