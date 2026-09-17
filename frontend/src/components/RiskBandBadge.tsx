@@ -10,25 +10,25 @@ interface RiskBandBadgeProps {
 export function RiskBandBadge({ band, score, showScore = true }: RiskBandBadgeProps) {
   const styles: Record<RiskBand, { bg: string; text: string; border: string; glow: string }> = {
     critical: {
-      bg: 'bg-[var(--crypto-shor-bg)]',
+      bg: 'bg-[var(--band-critical-bg)]',
       text: 'text-[var(--band-critical)]',
       border: 'border-[var(--band-critical)]',
       glow: 'glow-critical',
     },
     high: {
-      bg: 'bg-[oklch(0.62_0.21_45_/_0.12)]',
+      bg: 'bg-[var(--band-high-bg)]',
       text: 'text-[var(--band-high)]',
       border: 'border-[var(--band-high)]',
       glow: 'glow-high',
     },
     medium: {
-      bg: 'bg-[var(--crypto-grover-bg)]',
+      bg: 'bg-[var(--band-medium-bg)]',
       text: 'text-[var(--band-medium)]',
       border: 'border-[var(--band-medium)]',
       glow: '',
     },
     low: {
-      bg: 'bg-[oklch(0.62_0.14_150_/_0.12)]',
+      bg: 'bg-[var(--band-low-bg)]',
       text: 'text-[var(--band-low)]',
       border: 'border-[var(--band-low)]',
       glow: '',
