@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Theme: Light "Cipher Clean Room" */
+    --color-scheme: light;
+    --surface-base: oklch(0.97 0.008 245);
+    --surface-raised: oklch(0.93 0.012 245);
+    --surface-card: oklch(0.99 0.004 245);
+    --surface-card-hover: oklch(0.95 0.01 245);
+    --surface-overlay: oklch(0.98 0.006 245 / 0.88);
+
+    --border-subtle: oklch(0.86 0.012 245);
+    --border-prominent: oklch(0.68 0.025 245);
+    --border-focus: oklch(0.45 0.12 245);
+
+    --text-primary: oklch(0.18 0.02 250);
+    --text-secondary: oklch(0.42 0.025 250);
+    --text-muted: oklch(0.58 0.02 250);
+
+    /* Cryptographic Semantic Tokens (Identical in both themes) */
+    --crypto-shor: oklch(0.55 0.23 25);
+    --crypto-shor-bg: oklch(0.55 0.23 25 / 0.12);
+    --crypto-shor-border: oklch(0.55 0.23 25 / 0.45);
+
+    --crypto-broken: oklch(0.52 0.25 320);
+    --crypto-broken-bg: oklch(0.52 0.25 320 / 0.12);
+    --crypto-broken-border: oklch(0.52 0.25 320 / 0.5);
+
+    --crypto-grover: oklch(0.65 0.18 75);
+    --crypto-grover-bg: oklch(0.65 0.18 75 / 0.12);
+    --crypto-grover-border: oklch(0.65 0.18 75 / 0.45);
+
+    --crypto-safe-classical: oklch(0.55 0.14 230);
+    --crypto-safe-classical-bg: oklch(0.55 0.14 230 / 0.12);
+    --crypto-safe-classical-border: oklch(0.55 0.14 230 / 0.45);
+
+    --crypto-pqc: oklch(0.58 0.16 185);
+    --crypto-pqc-bg: oklch(0.58 0.16 185 / 0.14);
+    --crypto-pqc-border: oklch(0.58 0.16 185 / 0.45);
+
+    /* Perceptual Risk Band Ramp */
+    --band-critical: oklch(0.55 0.24 25);
+    --band-high: oklch(0.62 0.21 45);
+    --band-medium: oklch(0.70 0.17 75);
+    --band-low: oklch(0.62 0.14 150);
+
+    /* Lattice Motif */
+    --lattice-line: oklch(0.85 0.01 245 / 0.45);
+  }
+
+  .dark {
+    /* Theme: Dark "Observatory Deep Void" */
+    --color-scheme: dark;
+    --surface-base: oklch(0.12 0.015 250);
+    --surface-raised: oklch(0.15 0.018 250);
+    --surface-card: oklch(0.18 0.022 250);
+    --surface-card-hover: oklch(0.22 0.025 250);
+    --surface-overlay: oklch(0.16 0.02 250 / 0.88);
+
+    --border-subtle: oklch(0.26 0.02 250);
+    --border-prominent: oklch(0.38 0.03 250);
+    --border-focus: oklch(0.72 0.16 185);
+
+    --text-primary: oklch(0.95 0.01 245);
+    --text-secondary: oklch(0.72 0.02 245);
+    --text-muted: oklch(0.52 0.018 245);
+
+    /* Cryptographic Semantic Tokens (Glow-tuned for dark field) */
+    --crypto-shor: oklch(0.64 0.23 25);
+    --crypto-shor-bg: oklch(0.64 0.23 25 / 0.15);
+    --crypto-shor-border: oklch(0.64 0.23 25 / 0.5);
+
+    --crypto-broken: oklch(0.60 0.25 320);
+    --crypto-broken-bg: oklch(0.60 0.25 320 / 0.16);
+    --crypto-broken-border: oklch(0.60 0.25 320 / 0.55);
+
+    --crypto-grover: oklch(0.76 0.18 75);
+    --crypto-grover-bg: oklch(0.76 0.18 75 / 0.15);
+    --crypto-grover-border: oklch(0.76 0.18 75 / 0.5);
+
+    --crypto-safe-classical: oklch(0.70 0.13 230);
+    --crypto-safe-classical-bg: oklch(0.70 0.13 230 / 0.15);
+    --crypto-safe-classical-border: oklch(0.70 0.13 230 / 0.5);
+
+    --crypto-pqc: oklch(0.74 0.16 185);
+    --crypto-pqc-bg: oklch(0.74 0.16 185 / 0.16);
+    --crypto-pqc-border: oklch(0.74 0.16 185 / 0.55);
+
+    /* Perceptual Risk Band Ramp */
+    --band-critical: oklch(0.64 0.24 25);
+    --band-high: oklch(0.70 0.21 45);
+    --band-medium: oklch(0.78 0.17 75);
+    --band-low: oklch(0.74 0.14 150);
+
+    /* Lattice Motif */
+    --lattice-line: oklch(0.24 0.015 250 / 0.45);
+  }
+
+  body {
+    background-color: var(--surface-base);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+    letter-spacing: -0.01em;
+    min-height: 100vh;
+  }
+}
+
+/* 45-degree diagonal cross-hatch pattern for Classically Broken Cryptography */
+.hatch-broken {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    var(--crypto-broken-border) 4px,
+    var(--crypto-broken-border) 6px
+  );
+}
+
+.hatch-broken-dense {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    var(--crypto-broken-border) 2px,
+    var(--crypto-broken-border) 3px
+  );
+}
+
+/* Faint ML-KEM lattice grid background motif */
+.lattice-bg {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, var(--lattice-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--lattice-line) 1px, transparent 1px);
+}
+
+/* Technical tabular numbers */
+.num-tabular {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Monospace font for hex, addresses, and code snippets */
+.font-mono-code {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Hairline borders */
+.border-hairline {
+  border-width: 1px;
+  border-color: var(--border-subtle);
+}
+
+.border-hairline-prominent {
+  border-width: 1px;
+  border-color: var(--border-prominent);
+}
+
+/* Danger glow based on risk score */
+.glow-critical {
+  box-shadow: 0 0 16px -2px oklch(0.62 0.23 25 / 0.35);
+}
+
+.glow-high {
+  box-shadow: 0 0 12px -2px oklch(0.68 0.21 45 / 0.3);
+}
+
+/* Needs review dashed border indicator */
+.needs-review-dashed {
+  border-style: dashed;
+  border-width: 1.5px;
+  border-color: var(--band-medium);
+}
