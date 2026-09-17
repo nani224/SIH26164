@@ -11,29 +11,33 @@
     "codegen:api": "openapi-typescript ../contracts/openapi.yaml -o src/types/api.generated.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.66.0",
+    "@tanstack/react-virtual": "^3.13.0",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/d3": "^7.4.3",
+    "@types/three": "^0.186.0",
+    "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
+    "d3": "^7.9.0",
+    "framer-motion": "^12.4.7",
+    "lucide-react": "^0.475.0",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "framer-motion": "^12.4.7",
-    "@tanstack/react-query": "^5.66.0",
-    "@tanstack/react-virtual": "^3.13.0",
-    "zustand": "^5.0.3",
-    "lucide-react": "^0.475.0",
-    "clsx": "^2.1.1",
     "tailwind-merge": "^3.0.1",
-    "d3": "^7.9.0",
-    "@types/d3": "^7.4.3"
+    "three": "^0.186.0",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
+    "@tailwindcss/postcss": "^4.0.6",
     "@types/node": "^22.13.4",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
-    "tailwindcss": "^4.0.6",
-    "@tailwindcss/postcss": "^4.0.6",
-    "postcss": "^8.5.2",
+    "msw": "^2.7.0",
     "openapi-typescript": "^7.6.1",
-    "msw": "^2.7.0"
+    "postcss": "^8.5.2",
+    "tailwindcss": "^4.0.6",
+    "typescript": "^5.7.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
