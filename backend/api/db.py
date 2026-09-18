@@ -9,6 +9,8 @@ connection would get its own separate empty database.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -16,7 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, col, create_engine, select
 
 from api import stub_data
 from api.db_models import AuditLogRecord, FindingRecord, PolicyRecord, ScanRecord
@@ -51,10 +53,70 @@ def session_scope() -> Iterator[Session]:
         yield session
 
 
+def compute_audit_record_hash(
+    *, action: str, entity_type: str, entity_id: str, detail: dict[str, Any], prev_hash: str
+) -> str:
+    detail_str = json.dumps(detail, sort_keys=True)
+    payload = f"{action}|{entity_type}|{entity_id}|{detail_str}|{prev_hash}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def log_audit(
     session: Session, *, action: str, entity_type: str, entity_id: str, detail: dict[str, Any] | None = None
-) -> None:
-    session.add(AuditLogRecord(action=action, entity_type=entity_type, entity_id=entity_id, detail=detail or {}))
+) -> AuditLogRecord:
+    last_rec = session.exec(select(AuditLogRecord).order_by(col(AuditLogRecord.id).desc())).first()
+    prev_hash = last_rec.record_hash if (last_rec and last_rec.record_hash) else "0" * 64
+    d = detail or {}
+    rec_hash = compute_audit_record_hash(
+        action=action, entity_type=entity_type, entity_id=entity_id, detail=d, prev_hash=prev_hash
+    )
+    rec = AuditLogRecord(
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        detail=d,
+        prev_hash=prev_hash,
+        record_hash=rec_hash,
+    )
+    session.add(rec)
+    return rec
+
+
+def verify_audit_log_integrity(session: Session) -> tuple[bool, str | None]:
+    """Verify cryptographic hash-chaining of the entire audit log.
+
+    Returns (True, None) if the chain is strictly intact.
+    Returns (False, reason) if tampering, broken hash, or insertion is detected.
+    """
+    records = session.exec(select(AuditLogRecord).order_by(col(AuditLogRecord.id).asc())).all()
+    if not records:
+        return True, None
+
+    expected_prev = "0" * 64
+    for i, rec in enumerate(records):
+        if rec.prev_hash != expected_prev:
+            return (
+                False,
+                f"Broken chain at record id={rec.id} (index {i}): "
+                f"prev_hash={rec.prev_hash} != expected {expected_prev}",
+            )
+
+        calc_hash = compute_audit_record_hash(
+            action=rec.action,
+            entity_type=rec.entity_type,
+            entity_id=rec.entity_id,
+            detail=rec.detail or {},
+            prev_hash=rec.prev_hash,
+        )
+        if rec.record_hash != calc_hash:
+            return (
+                False,
+                f"Tampered record at id={rec.id}: stored hash={rec.record_hash} != computed {calc_hash}",
+            )
+
+        expected_prev = rec.record_hash
+
+    return True, None
 
 
 # --- Finding <-> FindingRecord -------------------------------------------------

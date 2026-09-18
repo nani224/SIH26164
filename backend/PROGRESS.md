@@ -1,5 +1,20 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 10: Security Hardening, Audit Log Hash-Chaining & Air-Gap Verification
+
+Completed enterprise security hardening, tamper-evident audit logging, and automated air-gap verification:
+- Cryptographic hash-chaining on `AuditLogRecord` (`api/db.py`, `api/db_models.py`):
+  - Every mutation links to the predecessor via SHA-256 hash chaining anchored at genesis `"0"*64`.
+  - Added `verify_audit_log_integrity(session)` validating uninterrupted hash chains and detecting any record modifications, insertions, or deletions.
+- Sliding-window rate limiting middleware (`api/rate_limiter.py`, `api/main.py`):
+  - In-memory thread-safe rate limiter protecting mutating API endpoints (`POST`, `PATCH`, `PUT`, `DELETE`).
+  - Emits compliant HTTP 429 responses with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers.
+- Air-gap validation tool (`scripts/verify_airgap.py`, `tests/test_airgap.py`):
+  - Static AST inspection verifying zero banned network, telemetry, or external AI/LLM modules in runtime code.
+  - Verifies explicit version constraints on all runtime and development dependencies in `pyproject.toml`.
+- ADR 010 documented in `docs/decisions/backend/010-phase10-security-hardening.md`.
+- Gates: `ruff`, `mypy --strict`, `pytest` (112 passed), `contract_diff.py`, and `verify_airgap.py` all clean.
+
 ## 2026-09-18 — Phase 9: CycloneDX 1.6 CBOM Export & Multi-Page Executive PDF Report
 
 Implemented complete exports and executive reporting suite:

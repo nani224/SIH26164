@@ -107,6 +107,8 @@ class AuditLogRecord(SQLModel, table=True):
     entity_type: str
     entity_id: str
     detail: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    prev_hash: str = Field(default="0" * 64)
+    record_hash: str = Field(default="")
 
 
 class ScanEventRecord(SQLModel, table=True):

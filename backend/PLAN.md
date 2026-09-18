@@ -1,6 +1,6 @@
 # ECDAT Backend — Plan
 
-## Status: Phases 0-5 complete, Phases 6-10 pending
+## Status: All Phases 0-10 complete!
 
 ## Phase 0 — Contract & Skeleton (this session)
 - [x] Repo layout (backend/{engine,api,scripts,tests}, contracts/, docs/decisions/{backend,frontend}/, frontend/.gitkeep)
@@ -143,8 +143,13 @@ job. What's real:
 - [x] ADR 009 documented in `docs/decisions/backend/009-phase9-reports-and-cbom.md`
 - [x] Full test suite in `tests/test_report_pdf.py` (5/5 passed, 105 backend tests total)
 
-## Phase 10 Roadmap
-- [ ] Phase 10: Security Hardening & Production Polish (sliding window rate limiter, air-gap validation script, audit log hash-chaining)
+## Phase 10 — Security Hardening & Production Polish (done, this session)
+- [x] Cryptographic audit log hash-chaining (`api/db.py`, `api/db_models.py`): SHA-256 chained audit entries with genesis block
+- [x] Audit integrity verification engine (`verify_audit_log_integrity`) detecting tampering, insertion, or deletions
+- [x] Sliding-window rate limiting middleware (`api/rate_limiter.py`): in-memory sliding window for mutating API endpoints
+- [x] Air-gap verification script (`scripts/verify_airgap.py`): AST validation of zero banned network/telemetry/LLM packages and pinned dependencies
+- [x] Automated test suites in `tests/test_audit_chain.py`, `tests/test_rate_limiter.py`, and `tests/test_airgap.py` (7/7 passed, 112 backend tests total)
+- [x] ADR 010 documented in `docs/decisions/backend/010-phase10-security-hardening.md`
 
-## Next task
-1. Phase 10: Tamper-evident audit log hash-chaining, rate limiter middleware, and air-gap verification script.
+## Status: All Phases 0-10 Complete!
+All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.

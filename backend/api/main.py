@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from api import db
+from api.rate_limiter import RateLimitMiddleware
 from api.routes import catalog, findings, health, policies, scans
 
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
@@ -35,6 +36,8 @@ app = FastAPI(
     description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — Phase 2 persistence.",
     lifespan=lifespan,
 )
+
+app.add_middleware(RateLimitMiddleware)
 
 for router in (health.router, scans.router, findings.router, policies.router, catalog.router):
     app.include_router(router, prefix="/api/v1")
