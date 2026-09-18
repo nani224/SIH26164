@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
-import { mockScans, mockFindings } from '../../mocks/data';
+import { fetchScan, fetchScanFindings } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { CbomExportButton } from '../../components/CbomExportButton';
@@ -21,21 +22,74 @@ import {
   Network,
   Clock,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OverviewPage() {
   const router = useRouter();
   const { activeScanId, openDrawer } = useAppStore();
-  const scan = mockScans.find((s) => s.id === activeScanId) || mockScans[0];
+
+  const {
+    data: scan,
+    isLoading: scanLoading,
+    error: scanError,
+    refetch: refetchScan,
+  } = useQuery({
+    queryKey: ['scan', activeScanId],
+    queryFn: () => fetchScan(activeScanId),
+  });
+
+  const {
+    data: findingsData,
+    isLoading: findingsLoading,
+  } = useQuery({
+    queryKey: ['findings', activeScanId],
+    queryFn: () => fetchScanFindings(activeScanId),
+  });
+
+  const findings = useMemo(() => findingsData?.items ?? [], [findingsData]);
 
   // Derive urgent counts
-  const hndlCount = useMemo(() => mockFindings.filter((f) => f.risk.hndl).length, []);
-  const brokenCount = useMemo(() => mockFindings.filter((f) => f.risk.classicallyBroken).length, []);
+  const hndlCount = useMemo(() => findings.filter((f) => f.risk.hndl).length, [findings]);
+  const brokenCount = useMemo(() => findings.filter((f) => f.risk.classicallyBroken).length, [findings]);
   const topRisks = useMemo(
-    () => [...mockFindings].sort((a, b) => b.risk.score - a.risk.score).slice(0, 5),
-    []
+    () => [...findings].sort((a, b) => b.risk.score - a.risk.score).slice(0, 5),
+    [findings]
   );
+
+  if (scanLoading || findingsLoading) {
+    return (
+      <div className="space-y-6 font-mono p-8 text-center">
+        <div className="inline-flex items-center gap-3 px-4 py-3 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--text-secondary)]">
+          <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
+          <span className="text-xs">ACQUIRING TELEMETRY FROM CIPHER OBSERVATORY ENGINE...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (scanError || !scan) {
+    return (
+      <div className="space-y-6 font-mono p-8 text-center">
+        <div className="max-w-md mx-auto p-6 rounded border border-[var(--band-critical)] bg-[var(--surface-card)] text-left">
+          <div className="flex items-center gap-2 text-[var(--band-critical)] font-bold text-sm mb-2">
+            <AlertTriangle className="w-5 h-5" />
+            <span>Telemetry Link Disconnected</span>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] mb-4">
+            {scanError instanceof Error ? scanError.message : 'Unable to load scan details.'}
+          </p>
+          <button
+            onClick={() => refetchScan()}
+            className="px-3 py-1.5 rounded bg-[var(--crypto-pqc)] text-[var(--surface-base)] text-xs font-bold hover:opacity-90"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 font-mono">
@@ -73,7 +127,7 @@ export default function OverviewPage() {
           <div className="text-2xl font-bold text-[var(--band-critical)] mt-2 num-tabular">
             {scan.bands.critical}
           </div>
-          <span className="text-[10px] text-[var(--text-muted)] mt-1">Score $\ge 60$</span>
+          <span className="text-[10px] text-[var(--text-muted)] mt-1">Score ≥ 60</span>
         </div>
 
         {/* High */}
@@ -139,139 +193,139 @@ export default function OverviewPage() {
         <div>
           <span className="text-[10px] text-[var(--text-muted)] uppercase">Analyzed Volume</span>
           <div className="font-bold text-[var(--text-primary)] text-base mt-1 num-tabular">
-            {(scan.stats.bytes / 1024 / 1024).toFixed(2)} MB
+            {(scan.stats.bytes / (1024 * 1024)).toFixed(2)} MB
           </div>
         </div>
         <div>
-          <span className="text-[10px] text-[var(--text-muted)] uppercase">Scanner Speed</span>
+          <span className="text-[10px] text-[var(--text-muted)] uppercase">Throughput</span>
           <div className="font-bold text-[var(--crypto-pqc)] text-base mt-1 num-tabular">
-            {scan.stats.mbPerSec.toFixed(1)} MB/s
+            {scan.stats.mbPerSec} MB/s
           </div>
         </div>
         <div>
           <span className="text-[10px] text-[var(--text-muted)] uppercase">Prefilter Skips</span>
-          <div className="font-bold text-[var(--text-muted)] text-base mt-1 num-tabular">
-            {scan.stats.skippedPrefilter} Non-crypto
+          <div className="font-bold text-[var(--text-secondary)] text-base mt-1 num-tabular">
+            {scan.stats.skippedPrefilter} files
           </div>
         </div>
       </div>
 
-      {/* Two Column Layout: Top-5 Urgent Risks + Direct Console Links */}
+      {/* Top 5 Urgent Risks & Actionable Next Steps */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Top Urgent Risks */}
-        <div className="lg:col-span-2 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-            <span className="font-bold text-xs text-[var(--text-primary)] uppercase flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-[var(--crypto-shor)]" />
-              <span>Highest Priority Cryptographic Findings (Click to Inspect)</span>
-            </span>
+        {/* Urgent Findings List */}
+        <div className="lg:col-span-2 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-4">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[var(--crypto-shor)]" />
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                Highest Urgency Cryptographic Assets
+              </h2>
+            </div>
             <Link
               href="/inventory"
               className="text-xs text-[var(--crypto-pqc)] hover:underline flex items-center gap-1"
             >
-              <span>View All 10,000+</span>
+              <span>Full Inventory</span>
               <ExternalLink className="w-3 h-3" />
             </Link>
           </div>
 
-          <div className="space-y-2">
-            {topRisks.map((f) => {
-              const cls = classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken);
-              return (
-                <div
-                  key={f.id}
-                  onClick={() => openDrawer(f)}
-                  className="p-3 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all cursor-pointer flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex items-center gap-3">
-                    <CryptoBadge
-                      semanticClass={cls}
-                      displayName={f.displayName}
-                      needsReview={f.risk.needsReview}
-                      size="sm"
-                    />
-                    <div className="truncate max-w-sm">
-                      <div className="text-[var(--text-primary)] font-semibold truncate">
-                        {f.location.path}:{f.location.line}
-                      </div>
-                      <div className="text-[11px] text-[var(--text-muted)] truncate">
-                        {f.risk.reason}
-                      </div>
-                    </div>
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {topRisks.map((f) => (
+              <div
+                key={f.id}
+                onClick={() => openDrawer(f)}
+                className="py-3 flex items-center justify-between gap-3 hover:bg-[var(--surface-raised)] px-2 rounded cursor-pointer transition-colors"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="pt-0.5">
+                    <RiskBandBadge band={f.risk.band} score={f.risk.score} size="sm" />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <RiskBandBadge band={f.risk.band} score={f.risk.score} />
-                      <div className="text-[10px] text-[var(--text-muted)] mt-0.5 num-tabular">
-                        M = {f.risk.moscaMargin}y
-                      </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-xs text-[var(--text-primary)]">
+                        {f.displayName}
+                      </span>
+                      <CryptoBadge
+                        cryptoClass={classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken)}
+                        label={f.family}
+                        size="sm"
+                      />
+                      {f.risk.hndl && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-[var(--crypto-shor-bg)] text-[var(--crypto-shor)] font-bold">
+                          HNDL
+                        </span>
+                      )}
                     </div>
+                    <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
+                      {f.location.path}:{f.location.line} · {f.symbol}
+                    </p>
                   </div>
                 </div>
-              );
-            })}
+                <div className="text-right flex-shrink-0">
+                  <div className="text-xs font-bold text-[var(--text-primary)] num-tabular">
+                    Score {f.risk.score.toFixed(1)}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-muted)]">
+                    Margin: {f.risk.moscaMargin > 0 ? `+${f.risk.moscaMargin}y` : `${f.risk.moscaMargin}y`}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Right Col: Interactive Modules Launcher */}
-        <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl p-5 space-y-3 text-xs">
-          <div className="font-bold uppercase tracking-wider text-[var(--text-primary)] border-b border-[var(--border-subtle)] pb-2 flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-[var(--crypto-pqc)]" />
-            <span>Interactive Analysis Tools</span>
+        {/* Quick Route Cards */}
+        <div className="space-y-4">
+          <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-4">
+            <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase flex items-center gap-2 mb-2">
+              <Layers className="w-4 h-4 text-[var(--crypto-pqc)]" />
+              <span>Domain Visualizations</span>
+            </h3>
+            <p className="text-[11px] text-[var(--text-muted)] mb-3">
+              Investigate cryptographic exposure across attack surfaces, system topology, and migration horizon.
+            </p>
+            <div className="space-y-2 text-xs">
+              <Link
+                href="/mosca"
+                className="flex items-center justify-between p-2 rounded bg-[var(--surface-raised)] hover:border-[var(--border-prominent)] border border-[var(--border-subtle)] transition-colors"
+              >
+                <span>Mosca Quantum Horizon Scatter</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+              </Link>
+              <Link
+                href="/graph"
+                className="flex items-center justify-between p-2 rounded bg-[var(--surface-raised)] hover:border-[var(--border-prominent)] border border-[var(--border-subtle)] transition-colors"
+              >
+                <span>3D Spatial Estate Topology</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+              </Link>
+              <Link
+                href="/heatmap"
+                className="flex items-center justify-between p-2 rounded bg-[var(--surface-raised)] hover:border-[var(--border-prominent)] border border-[var(--border-subtle)] transition-colors"
+              >
+                <span>Surface × Family Threat Matrix</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+              </Link>
+              <Link
+                href="/certificates"
+                className="flex items-center justify-between p-2 rounded bg-[var(--surface-raised)] hover:border-[var(--border-prominent)] border border-[var(--border-subtle)] transition-colors"
+              >
+                <span>X.509 Certificate Expiry Horizon</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+              </Link>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Link
-              href="/mosca"
-              className="p-3 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:border-[var(--crypto-pqc)] transition-colors block group"
-            >
-              <div className="flex items-center justify-between text-[var(--text-primary)] font-bold">
-                <span className="text-[var(--crypto-pqc)]">Mosca Quantum Matrix</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-              </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                Draggable CRQC horizon line ($Z$), dynamic re-banding, and quantum migration urgency.
-              </p>
-            </Link>
-
-            <Link
-              href="/inventory"
-              className="p-3 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:border-[var(--crypto-safe-classical)] transition-colors block group"
-            >
-              <div className="flex items-center justify-between text-[var(--text-primary)] font-bold">
-                <span className="text-[var(--crypto-safe-classical)]">High-Density Inventory</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-              </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                Virtualized 60 fps catalog with multi-facet filters across 10,000+ discoveries.
-              </p>
-            </Link>
-
-            <Link
-              href="/graph"
-              className="p-3 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:border-[var(--crypto-grover)] transition-colors block group"
-            >
-              <div className="flex items-center justify-between text-[var(--text-primary)] font-bold">
-                <span className="text-[var(--crypto-grover)]">3D Crypto Estate Graph</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-              </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                Spatial node clustering (System $\to$ File $\to$ Asset) with risk bloom shaders.
-              </p>
-            </Link>
-
-            <Link
-              href="/plan"
-              className="p-3 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:border-[var(--crypto-pqc)] transition-colors block group"
-            >
-              <div className="flex items-center justify-between text-[var(--text-primary)] font-bold">
-                <span className="text-[var(--crypto-pqc)]">Remediation Migration Plan</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-              </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                System-grouped target transitions with wire-size and CPU op latency deltas.
-              </p>
-            </Link>
+          <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-4">
+            <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase flex items-center gap-2 mb-2">
+              <FileCheck className="w-4 h-4 text-[var(--crypto-safe-classical)]" />
+              <span>Compliance & Reporting</span>
+            </h3>
+            <p className="text-[11px] text-[var(--text-muted)] mb-3">
+              Standard-format CycloneDX 1.6 Cryptographic Bill of Materials (CBOM) export.
+            </p>
+            <CbomExportButton scanId={scan.id} />
           </div>
         </div>
       </div>

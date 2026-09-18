@@ -7,7 +7,12 @@ export function MswProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function initMsw() {
-      // In air-gapped / standalone frontend development, enable MSW
+      // In air-gapped / standalone frontend development, enable MSW unless explicitly disabled
+      if (process.env.NEXT_PUBLIC_ENABLE_MSW === 'false') {
+        setReady(true);
+        return;
+      }
+
       if (typeof window !== 'undefined') {
         const { worker } = await import('../mocks/browser');
         if (worker) {

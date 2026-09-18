@@ -5,9 +5,10 @@ interface RiskBandBadgeProps {
   band: RiskBand;
   score?: number;
   showScore?: boolean;
+  size?: 'sm' | 'md';
 }
 
-export function RiskBandBadge({ band, score, showScore = true }: RiskBandBadgeProps) {
+export function RiskBandBadge({ band, score, showScore = true, size = 'md' }: RiskBandBadgeProps) {
   const styles: Record<RiskBand, { bg: string; text: string; border: string; glow: string }> = {
     critical: {
       bg: 'bg-[var(--band-critical-bg)]',
@@ -40,7 +41,8 @@ export function RiskBandBadge({ band, score, showScore = true }: RiskBandBadgePr
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] font-mono uppercase tracking-wider',
+        'inline-flex items-center gap-1.5 rounded border font-mono uppercase tracking-wider',
+        size === 'sm' ? 'px-1.5 py-0 text-[10px]' : 'px-2 py-0.5 text-[11px]',
         current.bg,
         current.text,
         current.border,

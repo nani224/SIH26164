@@ -1,24 +1,35 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MoscaMatrixView } from './MoscaMatrixView';
 import { mockFindings } from '../../mocks/data';
 import * as axe from 'axe-core';
 
+function renderWithClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
 describe('Screen 3: Mosca Quantum Risk Matrix (Loop F2 Full States & Unit Pass)', () => {
   it('State 1: Typical — renders scatter plot, Z line, and domain controls', () => {
-    render(<MoscaMatrixView findings={mockFindings} initialZ={10} />);
+    renderWithClient(<MoscaMatrixView findings={mockFindings} initialZ={10} />);
     expect(screen.getByText(/Mosca Horizon Assessment/i)).toBeInTheDocument();
     expect(screen.getByText(/CRQC HORIZON: Z = 10y/i)).toBeInTheDocument();
     expect(screen.getByText(/X25519/i)).toBeInTheDocument();
   });
 
   it('State 2: Empty — renders clean empty posture state with guidance', () => {
-    render(<MoscaMatrixView findings={[]} initialZ={10} />);
+    renderWithClient(<MoscaMatrixView findings={[]} initialZ={10} />);
     expect(screen.getByText(/No Cryptographic Assets Discovered/i)).toBeInTheDocument();
   });
 
   it('State 3: Error — renders high-contrast failure panel with retry button', () => {
-    render(
+    renderWithClient(
       <MoscaMatrixView
         findings={[]}
         initialZ={10}
@@ -34,36 +45,54 @@ describe('Screen 3: Mosca Quantum Risk Matrix (Loop F2 Full States & Unit Pass)'
       ...mockFindings[i % mockFindings.length],
       id: `dense-${i}`,
     }));
-    const { container } = render(<MoscaMatrixView findings={dense} initialZ={10} />);
+    const { container } = renderWithClient(<MoscaMatrixView findings={dense} initialZ={10} />);
     expect(container.querySelectorAll('circle').length).toBeGreaterThan(100);
   });
 
-  it('proves the domain invariant: moving Z re-ranks quantum assets while classically broken stay fixed', () => {
-    render(<MoscaMatrixView findings={mockFindings} initialZ={10} />);
+  it('proves the domain invariant: moving Z re-ranks quantum assets while classically broken stay fixed', async () => {
+    const mockRescore = vi.fn().mockResolvedValue({
+      bands: { critical: 2, high: 1, medium: 1, low: 0 },
+      changedFindings: [
+        {
+          id: 'f-001',
+          displayName: 'RSA-2048',
+          previousBand: 'high',
+          newBand: 'critical',
+          previousScore: 68.0,
+          newScore: 88.0,
+        },
+      ],
+    });
+
+    renderWithClient(<MoscaMatrixView findings={mockFindings} initialZ={10} onZRescore={mockRescore} />);
     const slider = screen.getByLabelText(/CRQC Horizon in years/i) as HTMLInputElement;
 
     // Shift Z to 5 years (aggressive CRQC horizon)
-    fireEvent.change(slider, { target: { value: '5' } });
+    await act(async () => {
+      fireEvent.change(slider, { target: { value: '5' } });
+    });
     expect(screen.getByText(/CRQC HORIZON: Z = 5y/i)).toBeInTheDocument();
 
     // Verify invariant rule reminder in DOM
     expect(screen.getByText(/remain fixed at U = 1/i)).toBeInTheDocument();
   });
 
-  it('supports full keyboard walkthrough: Arrow keys on slider and screen-reader announcements', () => {
-    render(<MoscaMatrixView findings={mockFindings} initialZ={10} />);
+  it('supports full keyboard walkthrough: Arrow keys on slider and screen-reader announcements', async () => {
+    renderWithClient(<MoscaMatrixView findings={mockFindings} initialZ={10} />);
     const slider = screen.getByLabelText(/CRQC Horizon in years/i) as HTMLInputElement;
 
     slider.focus();
     expect(document.activeElement).toBe(slider);
 
-    fireEvent.change(slider, { target: { value: '8' } });
+    await act(async () => {
+      fireEvent.change(slider, { target: { value: '8' } });
+    });
     expect(screen.getByText(/CRQC HORIZON: Z = 8y/i)).toBeInTheDocument();
     expect(screen.getByText(/CRQC horizon updated to 8 years/i)).toBeInTheDocument();
   });
 
   it('structural DOM accessibility passes axe checks in jsdom (Unit Level)', async () => {
-    const { container } = render(<MoscaMatrixView findings={mockFindings} initialZ={10} />);
+    const { container } = renderWithClient(<MoscaMatrixView findings={mockFindings} initialZ={10} />);
     const results = await axe.run(container, {
       rules: {
         'color-contrast': { enabled: false }, // Explicitly marked: Real paint contrast requires browser engine
