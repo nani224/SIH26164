@@ -20,12 +20,12 @@ test.describe('Screen 3: Mosca Quantum Risk Matrix E2E & Real Browser Accessibil
     const sha1Circle = page.locator('[data-testid="scatter-node-f-002"] circle').first();
     const sha1InitialCy = await sha1Circle.getAttribute('cy');
 
-    // RSA-2048 (f-004) is Shor vulnerable public-key
-    const rsaCircle = page.locator('[data-testid="scatter-node-f-004"] circle').first();
-    const rsaInitialCy = await rsaCircle.getAttribute('cy');
+    // AES-128-GCM (f-005) is Grover quantum-sensitive asset
+    const aesCircle = page.locator('[data-testid="scatter-node-f-005"] circle').first();
+    const aesInitialCy = await aesCircle.getAttribute('cy');
 
     expect(sha1InitialCy).not.toBeNull();
-    expect(rsaInitialCy).not.toBeNull();
+    expect(aesInitialCy).not.toBeNull();
 
     // 3. Adjust Z slider from 10y to 5y
     const slider = page.getByLabel('CRQC Horizon in years');
@@ -43,10 +43,10 @@ test.describe('Screen 3: Mosca Quantum Risk Matrix E2E & Real Browser Accessibil
 
     // 6. Verify side panel announces changed findings from server rescore
     await expect(page.locator('text=Scenario Horizon Shifts')).toBeVisible();
-    await expect(page.locator('text=RSA-2048').first()).toBeVisible();
+    await expect(page.locator('text=AES-128-GCM').first()).toBeVisible();
 
-    // 7. Invariant Assertion: Shor quantum-vulnerable assets re-calculate Urgency and shift Y
-    await expect(rsaCircle).not.toHaveAttribute('cy', rsaInitialCy!);
+    // 7. Invariant Assertion: Quantum-sensitive assets re-calculate Urgency and shift Y
+    await expect(aesCircle).not.toHaveAttribute('cy', aesInitialCy!);
 
     // 8. Verify screen-reader live region announced the change
     const liveRegion = page.locator('[aria-live="polite"]').first();
