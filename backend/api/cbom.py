@@ -105,6 +105,7 @@ def build_cbom(scan: Scan, findings: list[Finding]) -> dict[str, Any]:
         for finding in findings
     ]
 
+    risk_score = max((f.risk.score for f in findings if f.risk), default=0.0)
     return {
         "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
         "bomFormat": "CycloneDX",
@@ -115,12 +116,13 @@ def build_cbom(scan: Scan, findings: list[Finding]) -> dict[str, Any]:
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "tools": {
                 "components": [
-                    {"type": "application", "name": "ecdat", "version": "0.1.0-phase0"},
+                    {"type": "application", "name": "ecdat", "version": "0.1.0"},
                 ],
             },
             "properties": [
-                {"name": "ecdat:phase", "value": "0-stub"},
                 {"name": "ecdat:scanId", "value": scan.id},
+                {"name": "ecdat:policyId", "value": scan.policyId},
+                {"name": "ecdat:riskScore", "value": f"{risk_score:.1f}"},
             ],
         },
         "components": components,

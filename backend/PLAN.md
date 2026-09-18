@@ -133,10 +133,18 @@ job. What's real:
 - [x] ADR 008 documented in `docs/decisions/backend/008-phase8-pqc-catalog.md`
 - [x] Full test suite in `tests/test_pqc_catalog.py` (4/4 passed, 100 backend tests total)
 
-## Phases 9-10 Roadmap
-- [ ] Phase 9: Exports & Reports (CycloneDX 1.6 CBOM export, PDF executive summary with real findings)
-- [ ] Phase 10: Security Hardening & Production Polish (rate limiting, air-gap validation, audit log verification)
+## Phase 9 — Exports & Reports (done, this session)
+- [x] CycloneDX 1.6 Cryptographic BOM export (`api/cbom.py`, `GET /api/v1/scans/{id}/cbom`) with metadata enrichment
+- [x] On-the-fly integrity verification header `X-CBOM-SHA256` matching sha256 of the exported CBOM payload
+- [x] Strict schema validation against vendored `bom-1.6.schema.json` for both stub and real-scanned AST findings
+- [x] Pure-Python zero-dependency multi-page Executive PDF generator (`api/pdf_report.py`, `GET /api/v1/scans/{id}/report.pdf`)
+- [x] 3-page executive layout: Executive Scorecard, Detailed Mosca Factors & Top Vulnerabilities Table, and PQC Remediation Plan
+- [x] Cryptographic air-gap SHA-256 attestation stamp on report
+- [x] ADR 009 documented in `docs/decisions/backend/009-phase9-reports-and-cbom.md`
+- [x] Full test suite in `tests/test_report_pdf.py` (5/5 passed, 105 backend tests total)
 
-## Next 2 tasks
-1. Phase 9: CycloneDX 1.6 strict validation and multi-page executive PDF report generation.
-2. Phase 10: Tamper-evident audit log hash-chaining and air-gap verification script.
+## Phase 10 Roadmap
+- [ ] Phase 10: Security Hardening & Production Polish (sliding window rate limiter, air-gap validation script, audit log hash-chaining)
+
+## Next task
+1. Phase 10: Tamper-evident audit log hash-chaining, rate limiter middleware, and air-gap verification script.

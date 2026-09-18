@@ -1,5 +1,19 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 9: CycloneDX 1.6 CBOM Export & Multi-Page Executive PDF Report
+
+Implemented complete exports and executive reporting suite:
+- Upgraded CycloneDX 1.6 Cryptographic BOM (`api/cbom.py`, `GET /api/v1/scans/{id}/cbom`) with metadata enrichment (`ecdat:scanId`, `ecdat:policyId`, `ecdat:riskScore`).
+- Added on-the-fly computed SHA-256 header `X-CBOM-SHA256` for instant tamper detection.
+- Verified strict validation against the vendored CycloneDX 1.6 JSON schema for both seed and live AST scan findings.
+- Built a zero-dependency, pure-Python multi-page PDF 1.4 report generator (`api/pdf_report.py`, `GET /api/v1/scans/{id}/report.pdf`) without external C libraries (Cairo/Pango).
+- 3-page publication layout:
+  - Page 1: Executive Scorecard with large Mosca score, risk band badges, breakdown metric cards, and threat context.
+  - Page 2: Detailed Mosca risk factor formulation and top vulnerable findings table.
+  - Page 3: NIST FIPS 203/204/205 PQC migration roadmap and cryptographic air-gap integrity stamp.
+- ADR 009 documented in `docs/decisions/backend/009-phase9-reports-and-cbom.md`.
+- Gates: `ruff`, `mypy --strict`, `pytest` (105 passed), and `contract_diff.py` all clean.
+
 ## 2026-09-18 — Phase 8: PQC Catalog & Algorithm Agility Metrics
 
 Implemented authoritative NIST FIPS 203/204/205 PQC catalog and deterministic agility delta metrics:

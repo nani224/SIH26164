@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import tempfile
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -35,7 +37,7 @@ from api.models import (
     ScanCreate,
     ScanStatus,
 )
-from api.pdf_stub import build_stub_report_pdf
+from api.pdf_report import build_executive_report_pdf
 from engine.ingest import (
     IngestError,
     async_compute_stream_hash_and_save,
@@ -186,9 +188,13 @@ async def get_graph(scan_id: str) -> Graph:
 
 
 @router.get("/scans/{scan_id}/cbom")
-async def get_cbom(scan_id: str) -> dict[str, Any]:
+async def get_cbom(scan_id: str, response: Response) -> dict[str, Any]:
     scan = _get_scan_or_404(scan_id)
-    return build_cbom(scan, store.list_findings(scan_id))
+    findings = store.list_findings(scan_id)
+    cbom = build_cbom(scan, findings)
+    cbom_bytes = json.dumps(cbom, sort_keys=True).encode("utf-8")
+    response.headers["X-CBOM-SHA256"] = hashlib.sha256(cbom_bytes).hexdigest()
+    return cbom
 
 
 @router.get("/scans/{scan_id}/plan", response_model=RemediationPlan)
@@ -214,9 +220,13 @@ async def get_plan(scan_id: str) -> RemediationPlan:
 
 @router.get("/scans/{scan_id}/report.pdf")
 async def get_report_pdf(scan_id: str) -> Response:
-    _get_scan_or_404(scan_id)
-    pdf_bytes = build_stub_report_pdf(scan_id)
-    return Response(content=pdf_bytes, media_type="application/pdf")
+    scan = _get_scan_or_404(scan_id)
+    findings = store.list_findings(scan_id)
+    pdf_bytes = build_executive_report_pdf(scan, findings)
+    headers = {
+        "Content-Disposition": f'inline; filename="ecdat-report-{scan_id}.pdf"',
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
 _MAX_EVENTS_PER_SEC = 10
