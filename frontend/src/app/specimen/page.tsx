@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAppStore } from '../../lib/store';
+import { fetchScanFindings, fetchScans } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
-import { mockFindings, mockScans } from '../../mocks/data';
 import { classifyAlgorithm, type CryptoSemanticClass, type RiskBand } from '../../types/crypto';
 import {
   ShieldAlert,
@@ -20,13 +22,24 @@ import {
 } from 'lucide-react';
 
 export default function SpecimenPage() {
+  const { activeScanId } = useAppStore();
+  const { data: scans } = useQuery({
+    queryKey: ['scans'],
+    queryFn: fetchScans,
+  });
+  const { data: findingsData } = useQuery({
+    queryKey: ['findings', activeScanId],
+    queryFn: () => fetchScanFindings(activeScanId),
+  });
+  const findings = findingsData?.items ?? [];
+
   // Scenario state: Z horizon slider (5 to 15 years, default 10)
   const [crqcZ, setCrqcZ] = useState<number>(10);
   const [selectedFamily, setSelectedFamily] = useState<string>('all');
 
   // Interactive Mosca recalculation demonstrating domain invariants
   const calculatedFindings = useMemo(() => {
-    return mockFindings.map((f) => {
+    return findings.map((f) => {
       let u = f.risk.U;
       let score = f.risk.score;
       let band: RiskBand = f.risk.band;
@@ -86,7 +99,7 @@ export default function SpecimenPage() {
           <div className="flex items-center gap-2 bg-[var(--surface-card)] border border-[var(--border-subtle)] p-3 rounded font-mono text-xs">
             <div>
               <div className="text-[10px] text-[var(--text-muted)] uppercase">Active Scan Target</div>
-              <div className="font-semibold text-[var(--text-primary)]">{mockScans[0].target}</div>
+              <div className="font-semibold text-[var(--text-primary)]">{scans?.[0]?.target ?? activeScanId}</div>
             </div>
           </div>
         </div>

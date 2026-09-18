@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../lib/store';
-import { mockFindings } from '../mocks/data';
+import { fetchScanFindings } from '../lib/api';
 import {
   Search,
   Layers,
@@ -22,8 +23,15 @@ import {
 
 export function CommandPalette() {
   const router = useRouter();
-  const { isCommandPaletteOpen, setCommandPaletteOpen, openDrawer } = useAppStore();
+  const { isCommandPaletteOpen, setCommandPaletteOpen, openDrawer, activeScanId } = useAppStore();
   const [query, setQuery] = useState('');
+
+  const { data: findingsData } = useQuery({
+    queryKey: ['findings', activeScanId],
+    queryFn: () => fetchScanFindings(activeScanId),
+    enabled: isCommandPaletteOpen,
+  });
+  const findings = findingsData?.items ?? [];
 
   // Keyboard shortcut listener: Cmd+K or Ctrl+K
   useEffect(() => {
@@ -60,7 +68,7 @@ export function CommandPalette() {
     r.label.toLowerCase().includes(query.toLowerCase())
   );
 
-  const matchedFindings = mockFindings.filter((f) =>
+  const matchedFindings = findings.filter((f) =>
     f.displayName.toLowerCase().includes(query.toLowerCase()) ||
     f.family.toLowerCase().includes(query.toLowerCase()) ||
     f.location.path.toLowerCase().includes(query.toLowerCase())

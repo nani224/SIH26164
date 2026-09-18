@@ -72,7 +72,7 @@ export default function InventoryPage() {
     return list;
   }, [rawFindings]);
 
-  // Preset filter logic
+  // Preset and facet filter logic
   const filtered = useMemo(() => {
     return virtualRows.filter((f) => {
       if (activePreset === 'hndl' && !f.risk.hndl) return false;
@@ -85,9 +85,25 @@ export default function InventoryPage() {
           f.displayName.includes('[Proposed]');
         if (!isProposed) return false;
       }
+      if (selectedSurface !== 'all' && f.surface !== selectedSurface) return false;
+      if (selectedBand !== 'all' && f.risk.band !== selectedBand) return false;
+      if (selectedFamily !== 'all') {
+        const fam = classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken);
+        if (fam !== selectedFamily) return false;
+      }
+      if (onlyNeedsReview && !f.risk.needsReview) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          f.displayName.toLowerCase().includes(q) ||
+          f.family.toLowerCase().includes(q) ||
+          f.location.path.toLowerCase().includes(q) ||
+          (f.symbol && f.symbol.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
       return true;
     });
-  }, [virtualRows, activePreset]);
+  }, [virtualRows, activePreset, selectedSurface, selectedBand, selectedFamily, onlyNeedsReview, searchQuery]);
 
   // Virtualizer setup for 60 fps table scrolling
   const parentRef = useRef<HTMLDivElement>(null);
@@ -163,6 +179,7 @@ export default function InventoryPage() {
         {/* Surface Filter */}
         <select
           value={selectedSurface}
+          aria-label="Filter by attack surface"
           onChange={(e) => setSelectedSurface(e.target.value)}
           className="bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]"
         >
@@ -177,6 +194,7 @@ export default function InventoryPage() {
         {/* Band Filter */}
         <select
           value={selectedBand}
+          aria-label="Filter by risk band"
           onChange={(e) => setSelectedBand(e.target.value)}
           className="bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]"
         >
@@ -190,6 +208,7 @@ export default function InventoryPage() {
         {/* Semantic Family Filter */}
         <select
           value={selectedFamily}
+          aria-label="Filter by semantic family"
           onChange={(e) => setSelectedFamily(e.target.value)}
           className="bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]"
         >
@@ -240,7 +259,10 @@ export default function InventoryPage() {
           {/* Virtualized Body */}
           <div
             ref={parentRef}
-            className="h-[520px] overflow-y-auto divide-y divide-[var(--border-subtle)] select-none"
+            tabIndex={0}
+            role="region"
+            aria-label="Cryptographic inventory assets table"
+            className="h-[520px] overflow-y-auto divide-y divide-[var(--border-subtle)] select-none focus:outline-none focus:ring-1 focus:ring-[var(--crypto-pqc)]"
           >
             {filtered.length === 0 ? (
               <div className="p-12 text-center text-[var(--text-muted)]">
@@ -249,13 +271,17 @@ export default function InventoryPage() {
             ) : (
               <div
                 style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  height: `${rowVirtualizer.getTotalSize() || filtered.length * 48}px`,
                   width: '100%',
                   position: 'relative',
                 }}
               >
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                {(rowVirtualizer.getVirtualItems().length > 0
+                  ? rowVirtualizer.getVirtualItems()
+                  : filtered.slice(0, 20).map((_, index) => ({ index, start: index * 48, size: 48, key: index }))
+                ).map((virtualRow) => {
                   const f = filtered[virtualRow.index];
+                  if (!f) return null;
                   const isProposed =
                     f.kind === 'hardware-module' ||
                     f.kind === 'cloud-service' ||
