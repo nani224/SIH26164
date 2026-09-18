@@ -21,3 +21,25 @@
 - Outbound HTTPS to raw.githubusercontent.com works through the
   environment's proxy without any special handling — useful for vendoring
   spec files with a recorded SHA-256.
+
+## 2026-09-17 — Phase 1
+
+- Current `tree-sitter` (0.26.0) + `tree-sitter-python` (0.25.0) API,
+  verified by running it (training data on tree-sitter's Python bindings
+  is stale — the API has changed across 0.2x releases):
+  `tree_sitter.Language(tree_sitter_python.language())`,
+  `tree_sitter.Parser(lang)`, `tree_sitter.Query(lang, query_str)`,
+  `tree_sitter.QueryCursor(query).matches(root_node)` ->
+  `list[tuple[int, dict[str, list[Node]]]]`. `Node.sexp()` no longer
+  exists; walk `.children` manually instead.
+- `keyword_argument` nodes expose `name`/`value` via `child_by_field_name`
+  — confirmed empirically before relying on it in `engine/source_python.py`.
+- Python's `fnmatch.fnmatch` treats `*` as `.*` (matches `/`), so
+  `"**/prod/**"`-style globs from `Policy.contexts[].glob` work well
+  enough without a purpose-built gitignore-style matcher — good enough for
+  Phase 1, worth revisiting if a glob edge case bites later.
+- Writing detection semantics (which `module.attr(...)` pairs matter) in
+  plain Python after a single broad tree-sitter query, rather than
+  encoding per-pattern logic into tree-sitter query predicates, kept the
+  detector both easier to test and easier to extend — recommend the same
+  approach for the next language.

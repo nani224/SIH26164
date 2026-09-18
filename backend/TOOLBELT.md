@@ -24,6 +24,8 @@ Versions below are what `uv sync` resolved into `uv.lock` on 2026-09-17
 | types-jsonschema | 4.26.0.20260518 | pypi | Apache-2.0 | mypy stubs |
 | jsonschema | 4.26.0 | pypi | MIT | Validate stub CBOM against vendored CycloneDX 1.6 schema |
 | openapi-spec-validator | 0.9.0 | pypi | Apache-2.0 | Validate contracts/openapi.yaml is real OpenAPI 3.1 |
+| tree-sitter | 0.26.0 | pypi | MIT | AST parsing core, per brief |
+| tree-sitter-python | 0.25.0 | pypi | MIT | Python grammar (compiled into wheel — see ADR 003, no separate vendoring needed) |
 
 ## Vendored spec files (build-time download, pinned by hash)
 
@@ -39,10 +41,17 @@ committed at `backend/tests/fixtures/cyclonedx/`:
 Used only by `tests/test_cbom.py` at test time (offline once vendored) —
 never fetched at runtime, satisfying the air-gap rule.
 
-## Not yet adopted (Phase 1+ toolbelt, per the brief)
+## Deliberately not adopted
 
-tree-sitter-language-pack, pyelftools, LIEF, pefile, liboqs/liboqs-python,
-cyclonedx-python-lib, SQLModel, arq/Redis, bandit, semgrep, pip-audit,
-gitleaks, grype/trivy, schemathesis, locust/k6, py-spy, bubblewrap/nsjail.
-None of these are used in Phase 0; listed here so the next session doesn't
-have to re-derive the plan.
+`tree-sitter-language-pack` — bundles many grammars but fetches them at
+runtime on first use, violating the air-gap rule. Use official
+per-language `tree-sitter-<lang>` PyPI packages instead (see ADR 003);
+each ships its grammar compiled into the wheel, pinned via `uv.lock`, no
+runtime fetch.
+
+## Not yet adopted (Phase 2+ toolbelt, per the brief)
+
+pyelftools, LIEF, pefile, liboqs/liboqs-python, cyclonedx-python-lib,
+SQLModel, arq/Redis, bandit, semgrep, pip-audit, gitleaks, grype/trivy,
+schemathesis, locust/k6, py-spy, bubblewrap/nsjail. None of these are used
+yet; listed here so the next session doesn't have to re-derive the plan.

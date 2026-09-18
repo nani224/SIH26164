@@ -1,5 +1,83 @@
 # ECDAT Backend — Progress
 
+## 2026-09-17 — Phase 1: Engine Packaging
+
+Built a real Python detection engine per `PLAN.md`'s Phase 1 scope:
+`engine/scanner.py` (walk + orchestrate), `engine/source_python.py` +
+`engine/queries/python_crypto.scm` (tree-sitter detector: hashlib digests,
+hmac.new incl. underlying-hash resolution, RSA/EC keygen via
+`cryptography`, weak/symmetric cipher construction), `engine/families.py`
++ `engine/factors.py` (new V/F/E/K/X/Y/Z derivation feeding the Phase 0
+formula — see ADR 002), `engine/recommend.py` (family -> PQC
+recommendation). Added a `bench/` harness (`evaluate.py` + `truth.json` +
+`fixtures/`) that produces the repo's first **real measured** number.
+
+Explicitly not done this pass (see `PLAN.md`): the Loop B1 DEV/HOLD corpus
+from real unseen projects (only synthetic starter fixtures exist), other
+languages, and wiring the engine into the API (`POST /scans` still returns
+Phase 0 stub data — that's Phase 3).
+
+### Gate output (real, run from `backend/`)
+
+```
+$ uv run ruff check .
+All checks passed!
+
+$ uv run mypy --strict .
+Success: no issues found in 38 source files
+
+$ uv run pytest --cov=api --cov=engine --cov=scripts --cov=bench --cov-report=term-missing --cov-fail-under=85
+...
+TOTAL                        957     61    94%
+Required test coverage of 85% reached. Total coverage: 93.63%
+57 passed, 3 warnings in 2.91s
+
+$ uv run python scripts/contract_diff.py
+No contract drift.
+
+$ uv run python bench/evaluate.py
+precision=1.0 recall=1.0 f1=1.0
+truth=15 detected=15 tp=15
+```
+
+This precision/recall is the **first real measured number in this repo**
+(Phase 0's `CLAUDE.md` said "None yet"). It is Phase 1's small synthetic
+starter fixture set (8 files, 15 usages) — not the brief's Layer A/B
+corpus. See `bench/README.md` for why, and `tests/test_bench_evaluate.py`
+for the regression floor this sets.
+
+### Manual verification
+
+Ran `engine.source_python.detect()` directly against a hand-written
+snippet exercising all 6 rule branches (md5, hashlib.new, hmac.new+SHA-1,
+RSA keygen with key_size kwarg, EC keygen with curve, AES/3DES ciphers)
+and confirmed every field (family, function, key_size, curve,
+underlying_hash_family) before writing the fixture set — see
+`backend/LEARNINGS.md` for the tree-sitter API details confirmed this way.
+
+### Loops run
+
+None of B1/B3-B6 apply yet (no real corpus, no fuzz targets, no API
+change, no perf surface, no new external-facing security surface). A
+Loop-B2-style property check exists from Phase 0
+(`tests/test_risk_formula.py`) and still passes unchanged since the
+formula itself didn't change this phase — only what feeds it did.
+
+### BLOCKED items
+
+None.
+
+### Contract changes / PROPOSALS decisions
+
+None — Phase 1 doesn't touch `contracts/openapi.yaml` by design (verified
+via `contract_diff.py`, unchanged from Phase 0).
+
+### Next 3 tasks
+
+See `PLAN.md` "Next 3 tasks": (1) a real hand-labelled DEV/HOLD corpus,
+(2) Phase 2 persistence (SQLModel), (3) Phase 3 wiring the engine into
+`POST /scans` + extending Python detection coverage.
+
 ## 2026-09-17 — Phase 0: Contract & Skeleton
 
 Repo (`nani224/SIH26164`) was verified empty at session start (GitHub API:

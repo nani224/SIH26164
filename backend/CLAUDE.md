@@ -32,12 +32,18 @@ claim something works unless you ran it and saw the output.
 
 ## Measured floor
 
-**None yet.** As of Phase 0 (this repo's initial state), there is no
-detection engine and no bench corpus — see
-`docs/decisions/backend/001-phase0-skeleton.md`. Do not repeat the brief's
-example numbers (precision 1.000, recall 0.986, 4.9-17.3 MB/s, etc.) as if
-they were measured here. Once Loop B1/B2/B5 actually run in this repo,
-record real numbers here and treat them as the floor never to regress.
+**Phase 1 starter fixtures only** (`bench/fixtures/`, 8 files, 15 labelled
+Python crypto usages — see `bench/README.md`): precision 1.000, recall
+1.000, F1 1.000, measured 2026-09-17 via `uv run python bench/evaluate.py`.
+
+This is **not** the brief's Layer A/B corpus or a Loop B1 DEV/HOLD result
+— those don't exist yet (no real third-party projects have been sourced or
+labelled). Do not repeat the brief's original example numbers (precision
+1.000, recall 0.986 on "70 usages", 4.9-17.3 MB/s, etc.) as if they were
+measured in this repo — they weren't. Treat the number above as the floor
+for `bench/fixtures/` specifically: `tests/test_bench_evaluate.py` fails if
+it regresses. Once a real DEV/HOLD corpus exists (Loop B1), replace this
+section with that result instead.
 
 ## Gates (paste real output every time)
 
