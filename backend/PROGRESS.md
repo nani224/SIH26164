@@ -1,5 +1,72 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 3: Real API
+
+Wired `engine.scanner.scan()` into `POST /scans`: it now scans the given
+server-side `path` with the real Python detector and persists real,
+risk-scored findings via `api/store.py` (new `store.create_scan_from_result`
++ `store.resolve_policy`, replacing the always-empty stub `create_scan`).
+`payload.crqcYears` now genuinely overrides the scoring horizon for that
+scan (a policy copy with the override is what gets passed to
+`engine.factors.derive_risk`), not just a stored-but-unused metadata field.
+Missing/nonexistent `path` -> 400; an `OSError` during scanning ->
+`status=failed` rather than a 500. The API contract is unchanged — this
+phase changes route *behavior*, not shapes — verified with
+`scripts/contract_diff.py`.
+
+### Gate output (real, run from `backend/`)
+
+```
+$ uv run ruff check .
+All checks passed!
+
+$ uv run mypy --strict .
+Success: no issues found in 42 source files
+
+$ uv run pytest --cov=api --cov=engine --cov=scripts --cov=bench --cov-report=term-missing --cov-fail-under=85
+...
+TOTAL                       1140     64    94%
+Required test coverage of 85% reached. Total coverage: 94.39%
+71 passed, 3 warnings in 3.24s
+
+$ uv run python scripts/contract_diff.py
+No contract drift.
+```
+
+### Manual verification
+
+Booted a real `uvicorn` server, wrote a real file with `hashlib.sha1(...)`,
+and:
+- `POST /scans {"path": "/tmp/e2e_scan_target"}` -> real `stats.files=1`,
+  a real `bands.medium=1`, not the old canned empty stub.
+- `GET /scans/{id}/findings` -> one real finding: family `SHA-1`, a
+  genuine risk score (18.0, band `medium`, `classicallyBroken: true`),
+  and a real recommendation (`SHA-2-256`).
+- `GET /scans/{id}/cbom` -> 1 CycloneDX component, matching the finding.
+- `POST /scans {"path": "/does/not/exist"}` -> 400.
+- `POST /scans {}` (no path) -> 400.
+
+### Loops run
+
+None of B1/B3-B6 apply. No formula/factor change this phase (only real
+wiring) — `tests/test_risk_formula.py` and `tests/test_factors.py` still
+pass unchanged.
+
+### BLOCKED items
+
+None.
+
+### Contract changes / PROPOSALS decisions
+
+None — verified via `contract_diff.py`.
+
+### Next 3 tasks
+
+See `PLAN.md`: (1) a real hand-labelled DEV/HOLD corpus (Loop B1) plus
+extending Python detection coverage, (2) Phase 4 real-time WS scan
+progress backed by the real engine run, (3) Phase 5 rescore performance
+budget now that `POST /scans` can actually produce large finding sets.
+
 ## 2026-09-18 — Phase 2: Persistence
 
 Replaced `api/store.py`'s in-memory dicts with SQLModel + SQLite

@@ -5,6 +5,7 @@ from sqlmodel import select
 from api import db, store
 from api.db_models import AuditLogRecord
 from api.models import Context, Criticality, Exposure, Policy, ScanCreate, Triage, TriageStatus
+from engine.models import ScanResult
 
 
 def test_finding_mutation_survives_a_refetch() -> None:
@@ -31,7 +32,8 @@ def test_replace_finding_missing_id_raises_keyerror() -> None:
 
 
 def test_audit_log_records_scan_creation() -> None:
-    scan = store.create_scan(ScanCreate(path="/tmp/audit-test"))
+    payload = ScanCreate(path="/tmp/audit-test")
+    scan = store.create_scan_from_result(payload, ScanResult(), store.resolve_policy(payload))
     with db.session_scope() as session:
         rows = session.exec(
             select(AuditLogRecord).where(AuditLogRecord.entity_id == scan.id)
@@ -72,7 +74,8 @@ def test_audit_log_records_policy_put() -> None:
 
 
 def test_new_scan_starts_with_no_findings() -> None:
-    scan = store.create_scan(ScanCreate(path="/tmp/empty-scan"))
+    payload = ScanCreate(path="/tmp/empty-scan")
+    scan = store.create_scan_from_result(payload, ScanResult(), store.resolve_policy(payload))
     assert store.list_findings(scan.id) == []
 
 
