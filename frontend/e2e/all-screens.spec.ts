@@ -125,7 +125,7 @@ test.describe('ECDAT 10-Screen E2E Verification Matrix', () => {
             }
           }
         });
-        observer.observe({ type: 'layout-shift', buffered: true });
+        observer.observe({ type: 'layout-shift', buffered: false });
         setTimeout(() => {
           observer.disconnect();
           resolve(clsScore);

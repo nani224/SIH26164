@@ -60,10 +60,53 @@ export default function OverviewPage() {
 
   if (scanLoading || findingsLoading) {
     return (
-      <div className="space-y-6 font-mono p-8 text-center">
-        <div className="inline-flex items-center gap-3 px-4 py-3 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--text-secondary)]">
-          <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
-          <span className="text-xs">ACQUIRING TELEMETRY FROM CIPHER OBSERVATORY ENGINE...</span>
+      <div className="space-y-6 font-mono animate-pulse">
+        {/* Top Bar Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-subtle)] pb-4 min-h-[72px]">
+          <div>
+            <div className="h-3 w-48 bg-[var(--surface-raised)] rounded mb-2" />
+            <div className="h-6 w-72 bg-[var(--surface-raised)] rounded" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-32 bg-[var(--surface-raised)] rounded" />
+          </div>
+        </div>
+
+        {/* Primary Threat Bento Grid Skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 min-h-[110px]">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-3.5 rounded-lg h-[100px] flex flex-col justify-between">
+              <div className="h-3 w-16 bg-[var(--surface-raised)] rounded" />
+              <div className="h-8 w-12 bg-[var(--surface-raised)] rounded" />
+              <div className="h-2 w-20 bg-[var(--surface-raised)] rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Ingestion & Performance Telemetry Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[var(--surface-raised)] border border-[var(--border-subtle)] p-4 rounded-lg min-h-[82px]">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-2.5 w-20 bg-[var(--surface-card)] rounded" />
+              <div className="h-6 w-16 bg-[var(--surface-card)] rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Lower section Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[350px]">
+          <div className="lg:col-span-2 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-4 h-[350px]">
+            <div className="h-4 w-40 bg-[var(--surface-raised)] rounded mb-4" />
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-10 bg-[var(--surface-raised)] rounded" />
+              ))}
+            </div>
+          </div>
+          <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-4 h-[350px]">
+            <div className="h-4 w-32 bg-[var(--surface-raised)] rounded mb-4" />
+            <div className="h-48 bg-[var(--surface-raised)] rounded" />
+          </div>
         </div>
       </div>
     );
