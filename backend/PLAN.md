@@ -107,14 +107,23 @@ job. What's real:
       (4,000 classically broken, 6,000 quantum-sensitive); measured round-trip: **105–135ms** (well under 200ms SLA)
 - [x] ADR 005 documented in `docs/decisions/backend/005-phase5-rescore-performance.md`
 
-## Phases 6-10 Roadmap
-- [ ] Phase 6: Sandboxed Ingest (streaming multipart upload with 2GB cap, zip-slip / symlink protection, sandboxed process execution)
+## Phase 6 — Sandboxed Ingest (done, this session)
+- [x] OpenAPI 3.1 contract: `POST /api/v1/scans/upload` multipart/form-data schema with `bundleHash` on `Scan`
+- [x] Sandboxed ingest engine (`engine/ingest.py`): streaming 64KB chunked processing with SHA-256 computation and 2GB cap
+- [x] Zip-Slip & directory traversal defense: pre-extraction validation disallowing relative traversal and verifying canonical sandboxed destination
+- [x] Symlink escape defense: target link verification rejecting external/system symlink targets
+- [x] Decompression bomb protection: 5GB uncompressed ceiling and 50,000 file count limit
+- [x] Ephemeral isolated extraction sandbox and end-to-end AST scan integration
+- [x] ADR 006 documented in `docs/decisions/backend/006-phase6-sandboxed-ingest.md`
+- [x] Full test suite in `tests/test_ingest_sandbox.py` and `tests/test_scans_upload.py`
+
+## Phases 7-10 Roadmap
 - [ ] Phase 7: Engine Expansion & Loop B1 Holdout Evaluation (multi-language support, >=150 labelled usages across >=3 unseen projects)
 - [ ] Phase 8: PQC Catalog & Algorithm Agility Re-measurement (benchmarking real post-quantum algorithms against classical baseline, cost deltas)
 - [ ] Phase 9: Exports & Reports (CycloneDX 1.6 CBOM export, PDF executive summary with real findings)
 - [ ] Phase 10: Security Hardening & Production Polish (rate limiting, air-gap validation, audit log verification)
 
 ## Next 3 tasks
-1. Phase 6: Separate PR for `contract: multipart upload schema` in `contracts/openapi.yaml`, followed by sandboxed streaming ingest (`POST /scans/upload`).
-2. Implement zip-slip, directory traversal, and symlink protection with strict quotas (max file count, uncompressed size limit).
-3. Phase 7: Grow Loop B1 holdout evaluation harness and add queries for second language (e.g. Go or Java) or bare `hashlib.X` calls.
+1. Phase 7: Engine expansion for bare `hashlib.X` calls and multi-language AST support (e.g. Go crypto).
+2. Phase 7: Expand `bench/real_world` holdout evaluation harness with ground truth labels.
+3. Phase 8: PQC Catalog standard FIPS 203/204/205 parameters and cost models.

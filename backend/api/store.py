@@ -41,12 +41,14 @@ def create_scan_from_result(
     *,
     scan_status: ScanStatus = ScanStatus.DONE,
     events: list[tuple[str, dict[str, object]]] | None = None,
+    bundle_hash: str | None = None,
+    target_override: str | None = None,
 ) -> Scan:
     scan_id = f"scan_{uuid.uuid4().hex[:12]}"
     now = datetime.now(UTC)
     scan = Scan(
         id=scan_id,
-        target=payload.path or "uploaded-artifact",
+        target=target_override or payload.path or "uploaded-artifact",
         status=scan_status,
         stats=result.stats,
         bands=band_counts(result.findings),
@@ -54,6 +56,7 @@ def create_scan_from_result(
         crqcYears=policy.crqcYears,
         startedAt=now,
         finishedAt=now,
+        bundleHash=bundle_hash,
     )
     all_events = list(events or [])
     final_type = "error" if scan_status == ScanStatus.FAILED else "done"

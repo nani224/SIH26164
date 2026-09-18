@@ -38,6 +38,7 @@ class ScanRecord(SQLModel, table=True):
     crqc_years: int
     started_at: datetime
     finished_at: datetime | None = None
+    bundle_hash: str | None = None
 
 
 class FindingRecord(SQLModel, table=True):

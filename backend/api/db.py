@@ -139,6 +139,7 @@ def scan_to_record(scan: Scan) -> ScanRecord:
         errors=stats.errors if stats else None, skipped_prefilter=stats.skippedPrefilter if stats else None,
         bands=scan.bands.model_dump(), policy_id=scan.policyId, crqc_years=scan.crqcYears,
         started_at=scan.startedAt, finished_at=scan.finishedAt,
+        bundle_hash=scan.bundleHash,
     )
 
 
@@ -161,6 +162,7 @@ def record_to_scan(rec: ScanRecord) -> Scan:
         id=rec.id, target=rec.target, status=rec.status,  # type: ignore[arg-type]
         stats=stats, bands=BandCounts(**rec.bands), policyId=rec.policy_id, crqcYears=rec.crqc_years,
         startedAt=_as_utc(rec.started_at) or rec.started_at, finishedAt=_as_utc(rec.finished_at),
+        bundleHash=rec.bundle_hash,
     )
 
 

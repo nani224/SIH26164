@@ -222,6 +222,7 @@ class Scan(BaseModel):
     crqcYears: int
     startedAt: datetime
     finishedAt: datetime | None = None
+    bundleHash: str | None = None
 
 
 class ScanCreate(BaseModel):

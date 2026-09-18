@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import tempfile
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import (
     APIRouter,
+    File,
+    Form,
     HTTPException,
     Query,
     Response,
+    UploadFile,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -31,6 +36,11 @@ from api.models import (
     ScanStatus,
 )
 from api.pdf_stub import build_stub_report_pdf
+from engine.ingest import (
+    IngestError,
+    async_compute_stream_hash_and_save,
+    safe_extract_archive,
+)
 from engine.models import ScanResult
 from engine.scanner import scan as run_scan
 
@@ -67,6 +77,56 @@ async def create_scan(payload: ScanCreate) -> Scan:
     return store.create_scan_from_result(
         payload, result, policy, scan_status=scan_status, events=collected_events
     )
+
+
+@router.post("/scans/upload", response_model=Scan, status_code=201)
+async def upload_scan(
+    file: UploadFile = File(...),  # noqa: B008
+    policyId: str | None = Form(None),  # noqa: B008
+    crqcYears: int | None = Form(10),  # noqa: B008
+) -> Scan:
+    filename = file.filename or "uploaded.zip"
+    payload = ScanCreate(path=filename, policyId=policyId, crqcYears=crqcYears)
+    policy = store.resolve_policy(payload)
+    collected_events: list[tuple[str, dict[str, Any]]] = []
+
+    def on_event(event_type: str, event_payload: dict[str, Any]) -> None:
+        collected_events.append((event_type, event_payload))
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        archive_dest = tmp_path / Path(filename).name
+        extract_dir = tmp_path / "sandbox"
+
+        async def chunk_stream() -> AsyncIterator[bytes]:
+            while True:
+                chunk = await file.read(64 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+
+        try:
+            bundle_hash, _ = await async_compute_stream_hash_and_save(chunk_stream(), archive_dest)
+            safe_extract_archive(archive_dest, extract_dir)
+        except IngestError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        try:
+            result = run_scan(extract_dir, policy, on_event=on_event)
+            scan_status = ScanStatus.DONE
+        except OSError:
+            result = ScanResult()
+            scan_status = ScanStatus.FAILED
+
+        return store.create_scan_from_result(
+            payload,
+            result,
+            policy,
+            scan_status=scan_status,
+            events=collected_events,
+            bundle_hash=bundle_hash,
+            target_override=filename,
+        )
 
 
 @router.get("/scans", response_model=list[Scan])

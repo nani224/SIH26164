@@ -12,6 +12,7 @@ dependencies = [
     "tree-sitter>=0.26.0",
     "tree-sitter-python>=0.25.0",
     "sqlmodel>=0.0.42",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]

@@ -1,5 +1,18 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 6: Sandboxed Streaming Ingest (`POST /scans/upload`)
+
+Implemented streaming multipart upload archive ingestion with full hostile traversal defenses:
+- OpenAPI 3.1 contract update: added `POST /api/v1/scans/upload` (`multipart/form-data`) and `bundleHash` to `Scan` schema, documented in `contracts/CHANGELOG.md` (`0.3.0-phase6-ingest`). Zero contract drift verified.
+- `engine/ingest.py`: on-the-fly streaming SHA-256 calculation, 2GB upload limit, and safe archive extraction for `.zip` and `.tar.*`.
+- Security defenses:
+  - Zip-Slip / path traversal prevention rejecting relative `..`, absolute paths, and verifying canonical sandbox destination.
+  - Symlink escape prevention inspecting link targets to disallow escapes or system directory references.
+  - Decompression bomb quotas enforcing 5GB uncompressed size limit and 50,000 maximum file count.
+- Route integration in `api/routes/scans.py` extracting into ephemeral sandbox directories, running AST detection, and attaching computed `bundleHash`.
+- ADR 006 documented in `docs/decisions/backend/006-phase6-sandboxed-ingest.md`.
+- Gates: `ruff`, `mypy --strict`, `pytest` (90 passed), and `contract_diff.py` all clean.
+
 ## 2026-09-18 — Phase 5: Rescore Performance Budget (<200ms SLA for 10,000 findings)
 
 Implemented in-database bulk vectorized Common Table Expression (CTE) UPDATE + RETURNING in `api/store.py` (`rescore_scan_findings`).
