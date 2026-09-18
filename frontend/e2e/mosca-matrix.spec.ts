@@ -41,13 +41,12 @@ test.describe('Screen 3: Mosca Quantum Risk Matrix E2E & Real Browser Accessibil
     const sha1PostCy = await sha1Circle.getAttribute('cy');
     expect(sha1PostCy).toBe(sha1InitialCy); // SHA-1 MUST NOT MOVE
 
-    // 6. Invariant Assertion: Shor quantum-vulnerable assets re-calculate Urgency and shift Y
-    const rsaPostCy = await rsaCircle.getAttribute('cy');
-    expect(rsaPostCy).not.toBe(rsaInitialCy); // RSA-2048 MUST SHIFT
-
-    // 7. Verify side panel announces changed findings
+    // 6. Verify side panel announces changed findings from server rescore
     await expect(page.locator('text=Scenario Horizon Shifts')).toBeVisible();
     await expect(page.locator('text=RSA-2048').first()).toBeVisible();
+
+    // 7. Invariant Assertion: Shor quantum-vulnerable assets re-calculate Urgency and shift Y
+    await expect(rsaCircle).not.toHaveAttribute('cy', rsaInitialCy!);
 
     // 8. Verify screen-reader live region announced the change
     const liveRegion = page.locator('[aria-live="polite"]').first();
