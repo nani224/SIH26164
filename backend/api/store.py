@@ -43,8 +43,9 @@ def create_scan_from_result(
     events: list[tuple[str, dict[str, object]]] | None = None,
     bundle_hash: str | None = None,
     target_override: str | None = None,
+    scan_id_override: str | None = None,
 ) -> Scan:
-    scan_id = f"scan_{uuid.uuid4().hex[:12]}"
+    scan_id = scan_id_override or f"scan_{uuid.uuid4().hex[:12]}"
     now = datetime.now(UTC)
     scan = Scan(
         id=scan_id,
@@ -63,6 +64,14 @@ def create_scan_from_result(
     all_events.append((final_type, {"scanId": scan_id, "findingCount": len(result.findings)}))
 
     with db.session_scope() as session:
+        existing_scan = session.get(ScanRecord, scan_id)
+        if existing_scan is not None:
+            existing_findings = session.exec(select(FindingRecord).where(FindingRecord.scan_id == scan_id)).all()
+            for ef in existing_findings:
+                session.delete(ef)
+            session.delete(existing_scan)
+            session.commit()
+
         session.add(db.scan_to_record(scan))
         for finding in result.findings:
             session.add(db.finding_to_record(finding, scan_id=scan_id))

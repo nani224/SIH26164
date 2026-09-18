@@ -14,3 +14,5 @@ build/
 uv.lock.bak
 *.db
 *.db-journal
+backend/bench/demo_corpus/
+

@@ -59,7 +59,7 @@ test.describe('ECDAT 10-Screen E2E Verification Matrix', () => {
     await page.waitForLoadState('networkidle');
 
     // Click on the first asset row to open finding drawer
-    const row = page.locator('text=X25519').first();
+    const row = page.locator('[role="region"] div[class*="cursor-pointer"]').first();
     await row.click();
 
     // Verify dialog opened

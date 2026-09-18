@@ -35,7 +35,7 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["bench/fixtures", "bench/real_world/samples"]
+extend-exclude = ["bench/fixtures", "bench/real_world/samples", "bench/demo_corpus"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -44,7 +44,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.12"
 strict = true
 mypy_path = "."
-exclude = ["^bench/fixtures/", "^bench/real_world/samples/"]
+exclude = ["^bench/fixtures/", "^bench/real_world/samples/", "^bench/demo_corpus/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

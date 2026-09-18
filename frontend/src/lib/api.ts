@@ -20,6 +20,7 @@ export interface RescoreResult {
     previousScore: number;
     newScore: number;
   }>;
+  changed?: Finding[];
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -66,7 +67,24 @@ export async function rescoreScan(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return handleResponse<RescoreResult>(res);
+  const data = await handleResponse<any>(res);
+  const changedList =
+    data.changedFindings ||
+    (Array.isArray(data.changed)
+      ? data.changed.map((f: any) => ({
+          id: f.id,
+          displayName: f.displayName,
+          previousBand: f.risk?.band || 'low',
+          newBand: f.risk?.band || 'low',
+          previousScore: f.risk?.score || 0,
+          newScore: f.risk?.score || 0,
+        }))
+      : []);
+  return {
+    bands: data.bands,
+    changedFindings: changedList,
+    changed: data.changed || [],
+  };
 }
 
 export async function fetchScanGraph(id: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
@@ -81,7 +99,8 @@ export async function fetchScanCbom(id: string): Promise<any> {
 
 export async function fetchScanPlan(id: string): Promise<RemediationPlanItem[]> {
   const res = await fetch(`${API_BASE}/api/v1/scans/${id}/plan`);
-  return handleResponse<RemediationPlanItem[]>(res);
+  const data = await handleResponse<any>(res);
+  return Array.isArray(data) ? data : (data.items || []);
 }
 
 export async function fetchPolicies(): Promise<Policy[]> {
@@ -116,13 +135,15 @@ export async function createScan(
   data: { path?: string; policyId?: string; crqcYears?: number } | FormData
 ): Promise<Scan> {
   let options: RequestInit = { method: 'POST' };
-  if (data instanceof FormData) {
+  let url = `${API_BASE}/api/v1/scans`;
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    url = `${API_BASE}/api/v1/scans/upload`;
     options.body = data;
   } else {
     options.headers = { 'Content-Type': 'application/json' };
     options.body = JSON.stringify(data);
   }
-  const res = await fetch(`${API_BASE}/api/v1/scans`, options);
+  const res = await fetch(url, options);
   return handleResponse<Scan>(res);
 }
 

@@ -30,6 +30,7 @@ export default function ScanLauncherPage() {
     size: 28450190,
     hash: '8f92a31d4e7b6c501192e4ab912cd3ef681b4029415c48b78990e1f721ab3091',
   });
+  const [actualFileObj, setActualFileObj] = useState<File | null>(null);
   const [targetPath, setTargetPath] = useState('/opt/ntro/deployments/core-mesh');
   const [selectedPolicy, setSelectedPolicy] = useState('policy-default-defense');
   const [isScanning, setIsScanning] = useState(false);
@@ -37,13 +38,17 @@ export default function ScanLauncherPage() {
   const [counters, setCounters] = useState({ files: 0, bytes: 0, findings: 0 });
 
   const createScanMutation = useMutation({
-    mutationFn: (data: { path: string; policyId: string; crqcYears: number }) => createScan(data),
+    mutationFn: (data: { path: string; policyId: string; crqcYears: number } | FormData) => createScan(data),
     onSuccess: (newScan) => {
       setActiveScanId(newScan.id);
       setCounters({
-        files: newScan.stats.files,
-        bytes: newScan.stats.bytes,
-        findings: newScan.bands.critical + newScan.bands.high + newScan.bands.medium + newScan.bands.low,
+        files: newScan.stats?.files || 0,
+        bytes: newScan.stats?.bytes || 0,
+        findings:
+          (newScan.bands?.critical || 0) +
+          (newScan.bands?.high || 0) +
+          (newScan.bands?.medium || 0) +
+          (newScan.bands?.low || 0),
       });
       setScanStage('done');
       setIsScanning(false);
@@ -59,11 +64,19 @@ export default function ScanLauncherPage() {
     setScanStage('ingesting');
     setCounters({ files: 0, bytes: 0, findings: 0 });
 
-    createScanMutation.mutate({
-      path: targetPath,
-      policyId: selectedPolicy,
-      crqcYears: crqcZ,
-    });
+    if (actualFileObj) {
+      const formData = new FormData();
+      formData.append('file', actualFileObj);
+      if (selectedPolicy) formData.append('policyId', selectedPolicy);
+      formData.append('crqcYears', String(crqcZ));
+      createScanMutation.mutate(formData);
+    } else {
+      createScanMutation.mutate({
+        path: targetPath,
+        policyId: selectedPolicy,
+        crqcYears: crqcZ,
+      });
+    }
   };
 
   return (
@@ -95,6 +108,7 @@ export default function ScanLauncherPage() {
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
+                  setActualFileObj(file);
                   setSelectedFile({
                     name: file.name,
                     size: file.size,

@@ -147,7 +147,7 @@ export default function OverviewPage() {
             {scan.target}
           </h1>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Scan ID: {scan.id} · Completed in {scan.stats.seconds}s · Policy: {scan.policyId}
+            Scan ID: {scan.id} · Completed in {scan.stats?.seconds ?? 0}s · Policy: {scan.policyId}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -230,25 +230,25 @@ export default function OverviewPage() {
         <div>
           <span className="text-[10px] text-[var(--text-muted)] uppercase">Ingested Files</span>
           <div className="font-bold text-[var(--text-primary)] text-base mt-1 num-tabular">
-            {scan.stats.files.toLocaleString()}
+            {(scan.stats?.files ?? 0).toLocaleString()}
           </div>
         </div>
         <div>
           <span className="text-[10px] text-[var(--text-muted)] uppercase">Analyzed Volume</span>
           <div className="font-bold text-[var(--text-primary)] text-base mt-1 num-tabular">
-            {(scan.stats.bytes / (1024 * 1024)).toFixed(2)} MB
+            {((scan.stats?.bytes ?? 0) / (1024 * 1024)).toFixed(2)} MB
           </div>
         </div>
         <div>
           <span className="text-[10px] text-[var(--text-muted)] uppercase">Throughput</span>
           <div className="font-bold text-[var(--crypto-pqc)] text-base mt-1 num-tabular">
-            {scan.stats.mbPerSec} MB/s
+            {scan.stats?.mbPerSec ?? 0} MB/s
           </div>
         </div>
         <div>
           <span className="text-[10px] text-[var(--text-muted)] uppercase">Prefilter Skips</span>
           <div className="font-bold text-[var(--text-secondary)] text-base mt-1 num-tabular">
-            {scan.stats.skippedPrefilter} files
+            {scan.stats?.skippedPrefilter ?? 0} files
           </div>
         </div>
       </div>

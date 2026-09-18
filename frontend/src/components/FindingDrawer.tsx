@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../lib/store';
+import { triageFinding } from '../lib/api';
 import { CryptoBadge } from './CryptoBadge';
 import { RiskBandBadge } from './RiskBandBadge';
 import { classifyAlgorithm, type Finding } from '../types/crypto';
@@ -50,13 +51,9 @@ export function FindingDrawer() {
   const handleTriageSave = async () => {
     setIsSaving(true);
     try {
-      await fetch(`/api/v1/findings/${finding.id}/triage`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: activeStatus,
-          note: triageNote || finding.triage.note,
-        }),
+      await triageFinding(finding.id, {
+        status: activeStatus,
+        note: triageNote || finding.triage.note,
       });
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 2000);

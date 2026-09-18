@@ -1,0 +1,48 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecdat-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ECDAT_AIRGAP=1
+      - DATABASE_URL=sqlite:///./ecdat.db
+    volumes:
+      - ecdat-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/api/v1/health\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ecdat-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_ENABLE_MSW=false
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      api:
+        condition: service_started
+
+  # Optional Redis cache service
+  redis:
+    image: redis:7-alpine
+    container_name: ecdat-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    profiles:
+      - redis
+
+volumes:
+  ecdat-data:

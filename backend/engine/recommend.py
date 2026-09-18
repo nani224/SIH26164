@@ -75,4 +75,11 @@ def recommend(detection: Detection) -> Recommendation | None:
             cost=RiskCost(pkBytesDelta=0, wireBytesDelta=0, opMsDelta=0.0),
         )
 
+    if family == Family.AES and (detection.key_size is None or detection.key_size < 256):
+        return Recommendation(
+            action="Verify key size >= 256 bits or migrate to AES-256-GCM / Post-Quantum hybrid cipher",
+            target="AES-256-GCM",
+            cost=RiskCost(pkBytesDelta=0, wireBytesDelta=0, opMsDelta=0.0),
+        )
+
     return None

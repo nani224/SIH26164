@@ -47,9 +47,10 @@ export default function MigrationPlanPage() {
   // Group plan items by top-level path / module
   const groupedPlan = useMemo(() => {
     if (!planItems) return [];
-    const groups = new Map<string, RemediationPlanItem[]>();
-    planItems.forEach((item) => {
-      const topDir = item.location.split('/')[0] || 'root';
+    const groups = new Map<string, any[]>();
+    planItems.forEach((item: any) => {
+      const locPath = typeof item.location === 'string' ? item.location : item.location?.path || 'root';
+      const topDir = locPath.includes('/') ? locPath.split('/')[0] : 'core';
       const current = groups.get(topDir) || [];
       current.push(item);
       groups.set(topDir, current);
@@ -136,45 +137,55 @@ export default function MigrationPlanPage() {
 
               {/* Finding Items Table */}
               <div className="divide-y divide-[var(--border-subtle)]">
-                {group.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 flex items-center justify-between gap-4 hover:bg-[var(--surface-raised)] transition-colors"
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="pt-0.5">
-                        <RiskBandBadge band={item.band} score={item.score} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-xs text-[var(--text-primary)]">
-                            {item.asset}
-                          </span>
-                          <CryptoBadge
-                            semanticClass={classifyAlgorithm(item.asset, item.asset)}
-                            displayName={item.asset}
-                            size="sm"
-                          />
-                        </div>
-                        <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
-                          {item.location}:{item.line}
-                        </p>
-                        <p className="text-[10px] text-[var(--crypto-pqc)] mt-1">
-                          ↳ Target: <strong>{item.target}</strong> ({item.action})
-                        </p>
-                      </div>
-                    </div>
+                {group.items.map((item: any, idx) => {
+                  const assetName = item.displayName || item.asset || 'Cryptographic finding';
+                  const locPath = typeof item.location === 'string' ? item.location : item.location?.path || '';
+                  const locLine = typeof item.location === 'object' ? item.location?.line : item.line;
+                  const score = item.score !== undefined ? Number(item.score) : 60;
+                  const margin = item.mosca_margin ?? item.moscaMargin;
 
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-bold text-[var(--text-primary)] num-tabular">
-                        Score {item.score.toFixed(1)}
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3.5 flex items-center justify-between gap-4 hover:bg-[var(--surface-raised)] transition-colors"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="pt-0.5">
+                          <RiskBandBadge band={item.band || 'high'} score={score} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs text-[var(--text-primary)]">
+                              {assetName}
+                            </span>
+                            <CryptoBadge
+                              cryptoClass={classifyAlgorithm(item.family || 'RSA', assetName)}
+                              label={item.family || 'RSA'}
+                              size="sm"
+                            />
+                          </div>
+                          <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
+                            {locPath}{locLine ? `:${locLine}` : ''}
+                          </p>
+                          <p className="text-[10px] text-[var(--crypto-pqc)] mt-1">
+                            ↳ Target: <strong>{item.target}</strong> ({item.action})
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-[var(--text-muted)]">
-                        Mosca Margin: {item.mosca_margin > 0 ? `+${item.mosca_margin}y` : `${item.mosca_margin}y`}
+
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xs font-bold text-[var(--text-primary)] num-tabular">
+                          Score {score.toFixed(1)}
+                        </div>
+                        {margin !== undefined && (
+                          <div className="text-[10px] text-[var(--text-muted)]">
+                            Mosca Margin: {margin > 0 ? `+${margin}y` : `${margin}y`}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}

@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, col, create_engine, select
+from sqlmodel import Session, SQLModel, col, create_engine, select, text
 
 from api import stub_data
 from api.db_models import AuditLogRecord, FindingRecord, PolicyRecord, ScanRecord
@@ -248,6 +248,12 @@ def record_to_policy(rec: PolicyRecord) -> Policy:
 
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE scans ADD COLUMN bundle_hash VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
     with session_scope() as session:
         _seed_if_empty(session)
 

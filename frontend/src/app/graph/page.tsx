@@ -16,6 +16,20 @@ export default function CryptoEstateGraphPage() {
   const [use3D, setUse3D] = useState(true);
   const [hoveredNode, setHoveredNode] = useState<{ node: GraphNode; x: number; y: number } | null>(null);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (mediaQuery.matches) {
+        setUse3D(false);
+      }
+      const handler = (e: MediaQueryListEvent) => {
+        if (e.matches) setUse3D(false);
+      };
+      mediaQuery.addEventListener?.('change', handler);
+      return () => mediaQuery.removeEventListener?.('change', handler);
+    }
+  }, []);
+
   const { data: graphData, isLoading: isGraphLoading, error: graphError } = useQuery({
     queryKey: ['graph', activeScanId],
     queryFn: () => fetchScanGraph(activeScanId),
@@ -100,13 +114,16 @@ export default function CryptoEstateGraphPage() {
       const z = ((idx % 7) - 3) * 2;
 
       // Color mapping: Functional risk instrumentation
+      const raw = node as any;
+      const cls = raw.semanticClass || (raw.band === 'critical' ? 'shor' : raw.band === 'high' ? 'classically-broken' : raw.band === 'medium' ? 'grover' : 'quantum-safe-classical');
       let colorHex = 0xf43f5e; // Shor red
-      if (node.semanticClass === 'classically-broken') colorHex = 0xd946ef; // magenta
-      else if (node.semanticClass === 'pqc') colorHex = 0x2dd4bf; // lattice teal
-      else if (node.semanticClass === 'grover') colorHex = 0xf59e0b; // amber
-      else if (node.semanticClass === 'quantum-safe-classical') colorHex = 0x38bdf8; // steel blue
+      if (cls === 'classically-broken') colorHex = 0xd946ef; // magenta
+      else if (cls === 'pqc') colorHex = 0x2dd4bf; // lattice teal
+      else if (cls === 'grover') colorHex = 0xf59e0b; // amber
+      else if (cls === 'quantum-safe-classical') colorHex = 0x38bdf8; // steel blue
 
-      const scale = node.riskScore >= 60 ? 1.3 : 0.9;
+      const score = raw.score ?? raw.riskScore ?? 50;
+      const scale = score >= 60 ? 1.3 : 0.9;
       matrix.makeScale(scale, scale, scale);
       matrix.setPosition(x, y, z);
       instancedMesh.setMatrixAt(idx, matrix);
@@ -252,7 +269,10 @@ export default function CryptoEstateGraphPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-auto">
               {graphData?.nodes.slice(0, 9).map((node) => {
-                const band: RiskBand = node.riskScore >= 60 ? 'critical' : node.riskScore >= 35 ? 'high' : node.riskScore >= 15 ? 'medium' : 'low';
+                const raw = node as any;
+                const nodeScore = raw.score ?? raw.riskScore ?? 0;
+                const band: RiskBand = (raw.band as RiskBand) || (nodeScore >= 60 ? 'critical' : nodeScore >= 35 ? 'high' : nodeScore >= 15 ? 'medium' : 'low');
+                const nodeLabel = raw.label || raw.name || 'Crypto Component';
                 return (
                   <div
                     key={node.id}
@@ -260,13 +280,13 @@ export default function CryptoEstateGraphPage() {
                   >
                     <div className="min-w-0 pr-2">
                       <span className="text-xs font-bold text-[var(--text-primary)] truncate block">
-                        {node.name}
+                        {nodeLabel}
                       </span>
                       <span className="text-[10px] text-[var(--text-muted)] truncate block uppercase">
                         Type: {node.type} · {node.occurrences} instances
                       </span>
                     </div>
-                    <RiskBandBadge band={band} score={node.riskScore} />
+                    <RiskBandBadge band={band} score={nodeScore} />
                   </div>
                 );
               })}
@@ -281,21 +301,24 @@ export default function CryptoEstateGraphPage() {
 
         {/* Hover Tooltip Overlay */}
         {hoveredNode && (() => {
-          const band: RiskBand = hoveredNode.node.riskScore >= 60 ? 'critical' : hoveredNode.node.riskScore >= 35 ? 'high' : hoveredNode.node.riskScore >= 15 ? 'medium' : 'low';
+          const raw = hoveredNode.node as any;
+          const nodeScore = raw.score ?? raw.riskScore ?? 0;
+          const band: RiskBand = (raw.band as RiskBand) || (nodeScore >= 60 ? 'critical' : nodeScore >= 35 ? 'high' : nodeScore >= 15 ? 'medium' : 'low');
+          const nodeLabel = raw.label || raw.name || 'Crypto Component';
           return (
             <div
               style={{ left: hoveredNode.x + 16, top: hoveredNode.y + 16 }}
               className="absolute z-30 pointer-events-none p-3 rounded-lg border border-[var(--border-prominent)] bg-[var(--surface-overlay)] backdrop-blur-md shadow-lg text-xs max-w-xs space-y-1.5 font-mono"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-[var(--text-primary)] truncate">{hoveredNode.node.name}</span>
-                <RiskBandBadge band={band} score={hoveredNode.node.riskScore} />
+                <span className="font-bold text-[var(--text-primary)] truncate">{nodeLabel}</span>
+                <RiskBandBadge band={band} score={nodeScore} />
               </div>
               <div className="text-[10px] text-[var(--text-muted)] truncate">
                 Type: {hoveredNode.node.type}
               </div>
               <div className="text-[10px] text-[var(--text-muted)]">
-                Occurrences: {hoveredNode.node.occurrences} · Class: {hoveredNode.node.semanticClass}
+                Occurrences: {hoveredNode.node.occurrences}
               </div>
             </div>
           );

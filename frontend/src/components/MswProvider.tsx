@@ -3,15 +3,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 export function MswProvider({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const shouldBypass =
+    process.env.NODE_ENV === 'production' ||
+    process.env.NEXT_PUBLIC_ENABLE_MSW !== 'true' ||
+    (typeof window !== 'undefined' && (window as any).__DISABLE_MSW__);
+
+  const [ready, setReady] = useState(shouldBypass);
 
   useEffect(() => {
     async function initMsw() {
-      // In air-gapped / standalone frontend development, enable MSW unless explicitly disabled
-      if (
-        process.env.NEXT_PUBLIC_ENABLE_MSW === 'false' ||
-        (typeof window !== 'undefined' && (window as any).__DISABLE_MSW__)
-      ) {
+      // In production builds or when MSW is not explicitly enabled, bypass completely
+      if (shouldBypass) {
         setReady(true);
         return;
       }
@@ -32,7 +34,7 @@ export function MswProvider({ children }: { children: ReactNode }) {
     }
 
     initMsw();
-  }, []);
+  }, [shouldBypass]);
 
   if (!ready) {
     return (

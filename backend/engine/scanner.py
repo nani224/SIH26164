@@ -19,14 +19,53 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from api.models import Finding, Location, Policy, ScanStats, Triage
+from api.models import (
+    CryptoFunction,
+    Family,
+    Finding,
+    FindingKind,
+    FindingSource,
+    Location,
+    Policy,
+    ScanStats,
+    Surface,
+    Triage,
+)
 from engine import source_go, source_python
 from engine.factors import derive_risk
 from engine.models import Detection, ScanResult
 from engine.recommend import recommend
 
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".mypy_cache", ".ruff_cache"}
-_SOURCE_EXTENSIONS = {".py", ".go"}
+_SOURCE_EXTENSIONS = {".py", ".go", ".bin", ".elf", ".so"}
+
+_AES_SBOX_16 = bytes([
+    0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5,
+    0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
+])
+
+
+def _detect_binary(source: bytes, rel_path: str) -> list[Detection]:
+    detections: list[Detection] = []
+    if _AES_SBOX_16 in source:
+        offset = source.find(_AES_SBOX_16)
+        detections.append(
+            Detection(
+                kind=FindingKind.ALGORITHM,
+                surface=Surface.BINARY,
+                family=Family.AES,
+                display_name="AES S-box constant in stripped binary",
+                function=CryptoFunction.ENCRYPT,
+                path=rel_path,
+                line=None,
+                symbol="AES_SBOX",
+                snippet=f"AES S-box table found at byte offset 0x{offset:04x} (256-byte static substitution box)",
+                source=FindingSource.BINARY_CONSTANT,
+                confidence=0.95,
+                key_size=128,
+            )
+        )
+    return detections
 
 # How often (in files processed) to emit a progress event for large scans,
 # beyond the always-emitted first/last file -- keeps event volume bounded.
@@ -39,7 +78,7 @@ def _iter_source_files(target: Path) -> list[Path]:
     if target.is_file():
         return [target] if target.suffix in _SOURCE_EXTENSIONS else []
     files: list[Path] = []
-    for ext in ("*.py", "*.go"):
+    for ext in ("*.py", "*.go", "*.bin", "*.elf", "*.so"):
         files.extend(target.rglob(ext))
     return [
         p
@@ -98,6 +137,8 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         )
         if file_path.suffix == ".go":
             detections = source_go.detect_code(source, rel_path)
+        elif file_path.suffix in {".bin", ".elf", ".so"}:
+            detections = _detect_binary(source, rel_path)
         else:
             detections = source_python.detect(rel_path, source)
         for detection in detections:

@@ -63,7 +63,7 @@ export default function InventoryPage() {
           id: i === 0 ? base.id : `${base.id}-rep-${i}`,
           location: {
             ...base.location,
-            line: base.location.line + i * 12,
+            line: (base.location.line || 1) + i * 12,
             path: i === 0 ? base.location.path : `pkg/subsystem_${i}/${base.location.path}`,
           },
         });
