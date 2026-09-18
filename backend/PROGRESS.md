@@ -1,5 +1,19 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 8: PQC Catalog & Algorithm Agility Metrics
+
+Implemented authoritative NIST FIPS 203/204/205 PQC catalog and deterministic agility delta metrics:
+- Authoritative NIST specifications in `engine/pqc.py`:
+  - FIPS 203: ML-KEM-512 (Cat 1), ML-KEM-768 (Cat 3), ML-KEM-1024 (Cat 5)
+  - FIPS 204: ML-DSA-44 (Cat 2), ML-DSA-65 (Cat 3), ML-DSA-87 (Cat 5)
+  - FIPS 205: SLH-DSA-SHA2-128s, SLH-DSA-SHAKE-128s (Cat 1)
+  - Parameter sets define public key size, wire/ciphertext overhead, operation latency, and standards status.
+- Upgraded `engine/recommend.py` to route to standardized PQC algorithms based on cryptographic function and security level (e.g. RSA >= 3072 upgrading to ML-KEM-1024; RSA/ECDSA signers to ML-DSA-65/87).
+- Deterministic agility cost delta calculation (`compute_cost_delta`) evaluating key size ratios, wire overhead, and CPU delta to return `RiskCost` (`low`, `medium`, `high`).
+- Dynamic catalog generation from `NIST_PQC_CATALOG` serving `GET /api/v1/catalog/pqc`.
+- ADR 008 documented in `docs/decisions/backend/008-phase8-pqc-catalog.md`.
+- Gates: `ruff`, `mypy --strict`, `pytest` (100 passed), and `contract_diff.py` all clean.
+
 ## 2026-09-18 — Phase 7: Engine Expansion & Multi-Language Detection
 
 Expanded the AST engine with multi-language detection and real-world attribute analysis:

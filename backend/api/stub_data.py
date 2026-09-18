@@ -40,6 +40,7 @@ from api.models import (
     Triage,
     TriageStatus,
 )
+from engine.pqc import NIST_PQC_CATALOG
 
 DEFAULT_POLICY = Policy(
     id="policy_default",
@@ -291,40 +292,7 @@ _GRAPH_EDGES = [
     GraphEdge(source="file_keyservice", target="asset_rsa2048"),
 ]
 
-def _pqc(
-    family: str, display_name: str, standard: str, param_set: str, category: int,
-    pk_bytes: int, ct_or_sig_bytes: int, notes: str,
-) -> PqcCatalogEntry:
-    return PqcCatalogEntry(
-        family=Family(family),
-        displayName=display_name,
-        standard=standard,
-        parameterSet=param_set,
-        securityCategory=category,
-        publicKeyBytes=pk_bytes,
-        ciphertextOrSignatureBytes=ct_or_sig_bytes,
-        notes=notes,
-    )
-
-
-PQC_CATALOG: list[PqcCatalogEntry] = [
-    _pqc("ML-KEM", "ML-KEM-512", "FIPS 203", "ML-KEM-512", 1, 800, 768,
-         "Lowest security category KEM parameter set."),
-    _pqc("ML-KEM", "ML-KEM-768", "FIPS 203", "ML-KEM-768", 3, 1184, 1088,
-         "Recommended default KEM parameter set (roughly AES-192 equivalent)."),
-    _pqc("ML-KEM", "ML-KEM-1024", "FIPS 203", "ML-KEM-1024", 5, 1568, 1568,
-         "Highest security category KEM parameter set."),
-    _pqc("ML-DSA", "ML-DSA-44", "FIPS 204", "ML-DSA-44", 2, 1312, 2420,
-         "Lowest security category signature parameter set."),
-    _pqc("ML-DSA", "ML-DSA-65", "FIPS 204", "ML-DSA-65", 3, 1952, 3309,
-         "Recommended default signature parameter set."),
-    _pqc("ML-DSA", "ML-DSA-87", "FIPS 204", "ML-DSA-87", 5, 2592, 4627,
-         "Highest security category signature parameter set."),
-    _pqc("SLH-DSA", "SLH-DSA-SHA2-128s", "FIPS 205", "SLH-DSA-SHA2-128s", 1, 32, 7856,
-         "Hash-based signature; small keys, large ('s' = small) signatures, slower signing."),
-    _pqc("SLH-DSA", "SLH-DSA-SHA2-192f", "FIPS 205", "SLH-DSA-SHA2-192f", 3, 48, 35664,
-         "Hash-based signature; 'f' = fast variant, larger signatures."),
-]
+PQC_CATALOG: list[PqcCatalogEntry] = [spec.to_catalog_entry() for spec in NIST_PQC_CATALOG]
 
 
 def list_findings() -> list[Finding]:

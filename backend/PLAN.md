@@ -125,12 +125,18 @@ job. What's real:
 - [x] Real-world benchmark expansion in `bench/real_world/` with `go_crypto_sample.go` (precision 1.000, recall 1.000, F1 1.000 across 7 real usages)
 - [x] ADR 007 documented in `docs/decisions/backend/007-phase7-multi-language-detection.md`
 
-## Phases 8-10 Roadmap
-- [ ] Phase 8: PQC Catalog & Algorithm Agility Re-measurement (standard NIST FIPS 203/204/205 specs and agility deltas)
+## Phase 8 — PQC Catalog & Algorithm Agility Metrics (done, this session)
+- [x] Standardized NIST PQC specifications (`engine/pqc.py`): FIPS 203 ML-KEM, FIPS 204 ML-DSA, FIPS 205 SLH-DSA
+- [x] Context-sensitive agility cost calculations matching wire, key size, and op performance deltas
+- [x] Standard-aligned recommendation generator in `engine/recommend.py`
+- [x] Integration with `GET /api/v1/catalog/pqc` endpoint
+- [x] ADR 008 documented in `docs/decisions/backend/008-phase8-pqc-catalog.md`
+- [x] Full test suite in `tests/test_pqc_catalog.py` (4/4 passed, 100 backend tests total)
+
+## Phases 9-10 Roadmap
 - [ ] Phase 9: Exports & Reports (CycloneDX 1.6 CBOM export, PDF executive summary with real findings)
 - [ ] Phase 10: Security Hardening & Production Polish (rate limiting, air-gap validation, audit log verification)
 
-## Next 3 tasks
-1. Phase 8: PQC Catalog standard FIPS 203/204/205 parameters and cost models.
-2. Phase 9: CycloneDX 1.6 strict validation and multi-page executive PDF report generation.
-3. Phase 10: Tamper-evident audit log hash-chaining and air-gap verification script.
+## Next 2 tasks
+1. Phase 9: CycloneDX 1.6 strict validation and multi-page executive PDF report generation.
+2. Phase 10: Tamper-evident audit log hash-chaining and air-gap verification script.
