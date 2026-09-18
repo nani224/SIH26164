@@ -17,24 +17,21 @@ from fastapi import (
 
 from api import store, stub_data
 from api.cbom import build_cbom
-from api.filtering import band_counts, filter_findings, paginate
+from api.filtering import filter_findings, paginate
 from api.models import (
     ErrorDetail,
-    Finding,
     FindingPage,
     Graph,
     RemediationPlan,
     RemediationPlanItem,
     RescoreRequest,
     RescoreResult,
-    RiskBand,
     Scan,
     ScanCreate,
     ScanStatus,
 )
 from api.pdf_stub import build_stub_report_pdf
 from engine.models import ScanResult
-from engine.risk import rescore as rescore_formula
 from engine.scanner import scan as run_scan
 
 router = APIRouter()
@@ -112,37 +109,14 @@ async def get_findings(
 
 
 @router.post("/scans/{scan_id}/rescore", response_model=RescoreResult)
-async def rescore_scan(scan_id: str, payload: RescoreRequest) -> RescoreResult:
-    _get_scan_or_404(scan_id)
-    changed: list[Finding] = []
-    for finding in store.list_findings(scan_id):
-        if finding.risk is None:
-            continue
-        new_z = payload.crqcYears if payload.crqcYears is not None else finding.risk.Z
-        score, u, band = rescore_formula(
-            v=finding.risk.V,
-            f=finding.risk.F,
-            e=finding.risk.E,
-            k=finding.risk.K,
-            x=finding.risk.X,
-            y=finding.risk.Y,
-            z=new_z,
-            classically_broken=finding.risk.classicallyBroken,
-        )
-        if band != finding.risk.band or score != finding.risk.score:
-            updated_risk = finding.risk.model_copy(
-                update={
-                    "score": score,
-                    "U": u,
-                    "band": RiskBand(band),
-                    "Z": new_z,
-                    "moscaMargin": finding.risk.X + finding.risk.Y - new_z,
-                }
-            )
-            updated = finding.model_copy(update={"risk": updated_risk})
-            store.replace_finding(finding.id, updated, action="finding.rescore")
-            changed.append(updated)
-    return RescoreResult(bands=band_counts(store.list_findings(scan_id)), changed=changed)
+async def rescore_scan(scan_id: str, payload: RescoreRequest) -> Response:
+    bands, content_bytes = store.rescore_scan_findings(scan_id, payload.crqcYears)
+    if bands is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+    return Response(
+        content=content_bytes,
+        media_type="application/json",
+    )
 
 
 @router.get("/scans/{scan_id}/graph", response_model=Graph)

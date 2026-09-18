@@ -89,7 +89,9 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
             errors += 1
             continue
         total_bytes += len(source)
-        rel_path = str(file_path.relative_to(target)) if target.is_dir() else file_path.name
+        rel_path = (
+            file_path.relative_to(target).as_posix() if target.is_dir() else file_path.name
+        )
         for detection in source_python.detect(rel_path, source):
             finding = _to_finding(detection, policy)
             findings.append(finding)

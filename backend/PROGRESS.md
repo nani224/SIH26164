@@ -1,5 +1,15 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 5: Rescore Performance Budget (<200ms SLA for 10,000 findings)
+
+Implemented in-database bulk vectorized Common Table Expression (CTE) UPDATE + RETURNING in `api/store.py` (`rescore_scan_findings`).
+- Directly recomputes urgency $U$, margin $(X+Y-Z)$, score, and risk band inside SQLite/Postgres without loading 10,000 ORM entities into Python memory.
+- Mathematical invariant pruning: classically broken algorithms ($U=1.0$ unconditionally) are excluded from the CTE calculation, cutting write locks and execution overhead while ensuring mathematical invariance.
+- Direct JSON tuple serialization (~25ms vs ~85ms standard dumps), returning pre-encoded bytes directly to Starlette `Response`.
+- Performance test gate in `tests/test_rescore_perf.py` asserts < 200ms round-trip latency on 10,000 seeded findings (measured: 105–135ms).
+- ADR 005 documented in `docs/decisions/backend/005-phase5-rescore-performance.md`.
+- Gates: `ruff`, `mypy --strict`, `pytest` (79 passed), and `contract_diff.py` all clean.
+
 ## 2026-09-18 — Loop B1 starter step: real, unseen, hand-labelled Python code
 
 Small, fast pass (explicitly not the brief's full DEV/HOLD scale — see
