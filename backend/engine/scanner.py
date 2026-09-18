@@ -20,12 +20,13 @@ from pathlib import Path
 from typing import Any
 
 from api.models import Finding, Location, Policy, ScanStats, Triage
-from engine import source_python
+from engine import source_go, source_python
 from engine.factors import derive_risk
 from engine.models import Detection, ScanResult
 from engine.recommend import recommend
 
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".mypy_cache", ".ruff_cache"}
+_SOURCE_EXTENSIONS = {".py", ".go"}
 
 # How often (in files processed) to emit a progress event for large scans,
 # beyond the always-emitted first/last file -- keeps event volume bounded.
@@ -34,12 +35,15 @@ _PROGRESS_EVERY_N_FILES = 25
 EventCallback = Callable[[str, dict[str, Any]], None]
 
 
-def _iter_python_files(target: Path) -> list[Path]:
+def _iter_source_files(target: Path) -> list[Path]:
     if target.is_file():
-        return [target] if target.suffix == ".py" else []
+        return [target] if target.suffix in _SOURCE_EXTENSIONS else []
+    files: list[Path] = []
+    for ext in ("*.py", "*.go"):
+        files.extend(target.rglob(ext))
     return [
         p
-        for p in sorted(target.rglob("*.py"))
+        for p in sorted(files)
         if not any(part in _SKIP_DIRS for part in p.parts)
     ]
 
@@ -72,7 +76,7 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
             on_event(event_type, payload)
 
     start = time.monotonic()
-    files = _iter_python_files(target)
+    files = _iter_source_files(target)
     emit("stage", stage="ingesting")
 
     total_bytes = 0
@@ -92,7 +96,11 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         rel_path = (
             file_path.relative_to(target).as_posix() if target.is_dir() else file_path.name
         )
-        for detection in source_python.detect(rel_path, source):
+        if file_path.suffix == ".go":
+            detections = source_go.detect_code(source, rel_path)
+        else:
+            detections = source_python.detect(rel_path, source)
+        for detection in detections:
             finding = _to_finding(detection, policy)
             findings.append(finding)
             by_surface[finding.surface.value] = by_surface.get(finding.surface.value, 0) + 1

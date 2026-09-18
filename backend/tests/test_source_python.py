@@ -78,3 +78,11 @@ def test_unrelated_calls_are_not_flagged() -> None:
 def test_bare_identifier_calls_are_not_flagged() -> None:
     src = b"print(x)\nlen(y)\n"
     assert detect("t.py", src) == []
+
+
+def test_bare_attribute_reference_detected() -> None:
+    src = b"signer = Signer(digest_method=hashlib.sha256)\nalgo = hashlib.md5\n"
+    detections = detect("t.py", src)
+    assert len(detections) == 2
+    assert detections[0].family == Family.SHA_2
+    assert detections[1].family == Family.MD5

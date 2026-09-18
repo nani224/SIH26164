@@ -117,13 +117,20 @@ job. What's real:
 - [x] ADR 006 documented in `docs/decisions/backend/006-phase6-sandboxed-ingest.md`
 - [x] Full test suite in `tests/test_ingest_sandbox.py` and `tests/test_scans_upload.py`
 
-## Phases 7-10 Roadmap
-- [ ] Phase 7: Engine Expansion & Loop B1 Holdout Evaluation (multi-language support, >=150 labelled usages across >=3 unseen projects)
-- [ ] Phase 8: PQC Catalog & Algorithm Agility Re-measurement (benchmarking real post-quantum algorithms against classical baseline, cost deltas)
+## Phase 7 — Engine Expansion & Multi-Language Detection (done, this session)
+- [x] Go crypto AST detector (`engine/source_go.py`, `engine/queries/go_crypto.scm`):
+      `crypto/rsa`, `crypto/ecdsa`, `crypto/aes`, `crypto/des`, `crypto/md5`, `crypto/sha1`, `crypto/sha256`, `crypto/sha512`, `crypto/hmac`, `crypto/ed25519`
+- [x] Python bare attribute reference detection: `hashlib.X` references passed to functions/variables without direct calls
+- [x] Router multi-language support in `engine/scanner.py` handling both `.py` and `.go`
+- [x] Real-world benchmark expansion in `bench/real_world/` with `go_crypto_sample.go` (precision 1.000, recall 1.000, F1 1.000 across 7 real usages)
+- [x] ADR 007 documented in `docs/decisions/backend/007-phase7-multi-language-detection.md`
+
+## Phases 8-10 Roadmap
+- [ ] Phase 8: PQC Catalog & Algorithm Agility Re-measurement (standard NIST FIPS 203/204/205 specs and agility deltas)
 - [ ] Phase 9: Exports & Reports (CycloneDX 1.6 CBOM export, PDF executive summary with real findings)
 - [ ] Phase 10: Security Hardening & Production Polish (rate limiting, air-gap validation, audit log verification)
 
 ## Next 3 tasks
-1. Phase 7: Engine expansion for bare `hashlib.X` calls and multi-language AST support (e.g. Go crypto).
-2. Phase 7: Expand `bench/real_world` holdout evaluation harness with ground truth labels.
-3. Phase 8: PQC Catalog standard FIPS 203/204/205 parameters and cost models.
+1. Phase 8: PQC Catalog standard FIPS 203/204/205 parameters and cost models.
+2. Phase 9: CycloneDX 1.6 strict validation and multi-page executive PDF report generation.
+3. Phase 10: Tamper-evident audit log hash-chaining and air-gap verification script.

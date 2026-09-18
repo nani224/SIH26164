@@ -6,5 +6,10 @@
   ],
   "cryptography_rsa_recipe.py": [
     {"family": "RSA", "function": "keygen", "line": 3}
+  ],
+  "go_crypto_sample.go": [
+    {"family": "RSA", "function": "keygen", "line": 12},
+    {"family": "SHA-2", "function": "digest", "line": 16},
+    {"family": "AES", "function": "encrypt", "line": 22}
   ]
 }

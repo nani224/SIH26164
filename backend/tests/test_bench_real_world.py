@@ -13,4 +13,4 @@ def test_real_world_sample_detected_correctly() -> None:
     assert result["recall"] == 1.0
     assert result["false_positives"] == []
     assert result["false_negatives"] == []
-    assert result["truth_count"] == 4
+    assert result["truth_count"] == 7

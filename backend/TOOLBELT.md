@@ -26,6 +26,7 @@ Versions below are what `uv sync` resolved into `uv.lock` on 2026-09-17
 | openapi-spec-validator | 0.9.0 | pypi | Apache-2.0 | Validate contracts/openapi.yaml is real OpenAPI 3.1 |
 | tree-sitter | 0.26.0 | pypi | MIT | AST parsing core, per brief |
 | tree-sitter-python | 0.25.0 | pypi | MIT | Python grammar (compiled into wheel — see ADR 003, no separate vendoring needed) |
+| tree-sitter-go | 0.25.0 | pypi | MIT | Go grammar for Phase 7 multi-language AST detection |
 | sqlmodel | 0.0.42 | pypi | MIT | Persistence (scans/findings/policies/audit_log), per brief's stack |
 | python-multipart | 0.0.32 | pypi | Apache-2.0 | Streaming multipart upload support for Phase 6 |
 

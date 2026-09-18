@@ -1,5 +1,15 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 7: Engine Expansion & Multi-Language Detection
+
+Expanded the AST engine with multi-language detection and real-world attribute analysis:
+- Added Go standard library crypto AST detector (`engine/source_go.py`, `engine/queries/go_crypto.scm`) using pinned `tree-sitter-go==0.25.0` wheel (air-gapped, zero runtime network calls), detecting RSA, ECDSA, AES, 3DES, DES, MD5, SHA-1, SHA-2, and HMAC.
+- Added Python bare attribute reference detection in `engine/source_python.py` (`engine/queries/python_crypto.scm`), allowing detection of `hashlib.X` arguments passed into functions or constructors without calling.
+- Integrated multi-language file routing in `engine/scanner.py` supporting both `.py` and `.go`.
+- Added `bench/real_world/samples/go_crypto_sample.go` and verified precision 1.000, recall 1.000, F1 1.000 in `bench/real_world/evaluate.py`.
+- ADR 007 documented in `docs/decisions/backend/007-phase7-multi-language-detection.md`.
+- Gates: `ruff`, `mypy --strict`, `pytest` (95 passed), and `contract_diff.py` all clean.
+
 ## 2026-09-18 — Phase 6: Sandboxed Streaming Ingest (`POST /scans/upload`)
 
 Implemented streaming multipart upload archive ingestion with full hostile traversal defenses:

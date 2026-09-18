@@ -88,6 +88,36 @@ def detect(path: str, source: bytes) -> list[Detection]:
 
 
 def _classify(path: str, captures: dict[str, list[tree_sitter.Node]]) -> Detection | None:
+    attr_node_list = captures.get("attr.node")
+    if attr_node_list:
+        attr_node = attr_node_list[0]
+        parent = attr_node.parent
+        if parent is not None and parent.type == "call" and parent.child_by_field_name("function") == attr_node:
+            return None
+        # If enclosed within an hmac.new call, hmac already captures the underlying hash
+        ancestor = attr_node.parent
+        while ancestor is not None and ancestor.type != "module":
+            if ancestor.type == "call":
+                fn_node = ancestor.child_by_field_name("function")
+                if fn_node and _text(fn_node).startswith("hmac."):
+                    return None
+            ancestor = ancestor.parent
+        obj_nodes = captures.get("attr.object")
+        attr_name_nodes = captures.get("attr.name")
+        if not obj_nodes or not attr_name_nodes:
+            return None
+        obj, attr = _text(obj_nodes[0]), _text(attr_name_nodes[0])
+        if obj == "hashlib" and attr in _HASHLIB_DIGEST_FAMILY:
+            line = attr_node.start_point[0] + 1
+            snippet = _text(attr_node)[:200]
+            attr_common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST)
+            return Detection(
+                kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=_HASHLIB_DIGEST_FAMILY[attr],
+                display_name=f"hashlib.{attr} reference", function=CryptoFunction.DIGEST,
+                symbol=f"hashlib.{attr}", confidence=0.85, **attr_common,
+            )
+        return None
+
     call_nodes = captures.get("call.node")
     args_nodes = captures.get("call.args")
     if not call_nodes or not args_nodes:

@@ -73,3 +73,14 @@ def test_scan_without_callback_still_works(tmp_path: Path) -> None:
     (tmp_path / "a.py").write_text('import hashlib\nhashlib.md5(b"x")\n')
     result = scan(tmp_path, _POLICY)  # no on_event -- must not raise
     assert len(result.findings) == 1
+
+
+def test_scan_go_files(tmp_path: Path) -> None:
+    (tmp_path / "main.go").write_text(
+        'package main\nimport "crypto/sha256"\nfunc run() { _ = sha256.New() }\n'
+    )
+    result = scan(tmp_path, _POLICY)
+    assert result.stats.files == 1
+    assert len(result.findings) == 1
+    assert result.findings[0].family == "SHA-2"
+    assert result.findings[0].location.path == "main.go"

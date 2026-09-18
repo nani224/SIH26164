@@ -14,3 +14,7 @@
 (call
   function: (identifier) @call.name
   arguments: (argument_list) @call.args) @call.node
+
+(attribute
+  object: (identifier) @attr.object
+  attribute: (identifier) @attr.name) @attr.node
