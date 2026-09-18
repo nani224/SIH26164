@@ -8,7 +8,7 @@ import { fetchScanFindings } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { CbomExportButton } from '../../components/CbomExportButton';
-import { classifyAlgorithm, type Finding } from '../../types/crypto';
+import { classifyAlgorithm } from '../../types/crypto';
 import {
   ListFilter,
   Search,
@@ -48,55 +48,36 @@ export default function InventoryPage() {
       }),
   });
 
-  const rawFindings = useMemo(() => findingsData?.items ?? [], [findingsData]);
-
-  // Expand into virtual dataset for 10k+ rows capability test if needed
-  const virtualRows = useMemo(() => {
-    if (rawFindings.length === 0) return [];
-    // If under 100 items, replicate across realistic paths up to 1,200 for virtualization proof
-    const list: Finding[] = [];
-    const multiplier = rawFindings.length < 50 ? 120 : 1;
-    for (let i = 0; i < multiplier; i++) {
-      rawFindings.forEach((base, idx) => {
-        list.push({
-          ...base,
-          id: i === 0 ? base.id : `${base.id}-rep-${i}`,
-          location: {
-            ...base.location,
-            line: (base.location.line || 1) + i * 12,
-            path: i === 0 ? base.location.path : `pkg/subsystem_${i}/${base.location.path}`,
-          },
-        });
-      });
-    }
-    return list;
-  }, [rawFindings]);
+  // Findings straight from the API -- no synthetic duplication. This used
+  // to fabricate up to 120 fake copies of every real finding (fake ids,
+  // fake paths) whenever a real scan had fewer than 50 results, "to prove
+  // virtualization works" -- but that meant every real scan under 50
+  // findings showed fabricated rows mixed into real data, and a search
+  // match on the one real row got buried among 119 fakes. Virtualizer
+  // capability belongs in a dedicated perf test with synthetic data (see
+  // MoscaMatrix's dense-dataset test), not baked into the page that also
+  // renders real backend results.
+  const virtualRows = useMemo(() => findingsData?.items ?? [], [findingsData]);
 
   // Preset and facet filter logic
   const filtered = useMemo(() => {
     return virtualRows.filter((f) => {
-      if (activePreset === 'hndl' && !f.risk.hndl) return false;
-      if (activePreset === 'broken' && !f.risk.classicallyBroken) return false;
-      if (activePreset === 'review' && !f.risk.needsReview) return false;
-      if (activePreset === 'proposed') {
-        const isProposed =
-          f.kind === 'hardware-module' ||
-          f.kind === 'cloud-service' ||
-          f.displayName.includes('[Proposed]');
-        if (!isProposed) return false;
-      }
+      if (activePreset === 'hndl' && !f.risk?.hndl) return false;
+      if (activePreset === 'broken' && !f.risk?.classicallyBroken) return false;
+      if (activePreset === 'review' && !f.risk?.needsReview) return false;
+      if (activePreset === 'proposed' && !f.displayName.includes('[Proposed]')) return false;
       if (selectedSurface !== 'all' && f.surface !== selectedSurface) return false;
-      if (selectedBand !== 'all' && f.risk.band !== selectedBand) return false;
+      if (selectedBand !== 'all' && f.risk?.band !== selectedBand) return false;
       if (selectedFamily !== 'all') {
-        const fam = classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken);
+        const fam = classifyAlgorithm(f.family, f.displayName, f.risk?.classicallyBroken);
         if (fam !== selectedFamily) return false;
       }
-      if (onlyNeedsReview && !f.risk.needsReview) return false;
+      if (onlyNeedsReview && !f.risk?.needsReview) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matches =
           f.displayName.toLowerCase().includes(q) ||
-          f.family.toLowerCase().includes(q) ||
+          (f.family ?? '').toLowerCase().includes(q) ||
           f.location.path.toLowerCase().includes(q) ||
           (f.symbol && f.symbol.toLowerCase().includes(q));
         if (!matches) return false;
@@ -282,10 +263,7 @@ export default function InventoryPage() {
                 ).map((virtualRow) => {
                   const f = filtered[virtualRow.index];
                   if (!f) return null;
-                  const isProposed =
-                    f.kind === 'hardware-module' ||
-                    f.kind === 'cloud-service' ||
-                    f.displayName.includes('[Proposed]');
+                  const isProposed = f.displayName.includes('[Proposed]');
 
                   return (
                     <div
@@ -307,8 +285,8 @@ export default function InventoryPage() {
                           {f.displayName}
                         </span>
                         <CryptoBadge
-                          cryptoClass={classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken)}
-                          label={f.family}
+                          cryptoClass={classifyAlgorithm(f.family, f.displayName, f.risk?.classicallyBroken)}
+                          label={f.family ?? undefined}
                           size="sm"
                         />
                         {isProposed && (
@@ -338,13 +316,13 @@ export default function InventoryPage() {
 
                       {/* Score */}
                       <div className="col-span-1 text-right font-bold num-tabular text-[var(--text-primary)]">
-                        {f.risk.score.toFixed(1)}
+                        {f.risk ? f.risk.score.toFixed(1) : '—'}
                       </div>
 
                       {/* Risk Band */}
                       <div className="col-span-2 flex items-center justify-end gap-1.5">
-                        <RiskBandBadge band={f.risk.band} score={f.risk.score} size="sm" />
-                        {f.risk.needsReview && (
+                        {f.risk && <RiskBandBadge band={f.risk.band} score={f.risk.score} size="sm" />}
+                        {f.risk?.needsReview && (
                           <span
                             title="Confidence < 0.75: Needs human review"
                             className="text-[9px] px-1 py-0.2 rounded border border-dashed border-[var(--band-medium)] text-[var(--band-medium)] font-bold"

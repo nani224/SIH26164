@@ -5,14 +5,16 @@ export type Finding = Schemas['Finding'];
 export type Scan = Schemas['Scan'];
 export type ScanStats = Schemas['ScanStats'];
 export type RiskBand = Schemas['RiskBand'];
-export type RiskBands = Schemas['RiskBands'];
+// Contract names these BandCounts/Context/ContextWithGlob/PqcCatalogEntry;
+// keep the frontend's own names as aliases so call sites don't churn.
+export type RiskBands = Schemas['BandCounts'];
 export type Policy = Schemas['Policy'];
-export type PolicyContext = Schemas['PolicyContext'];
-export type PolicyRule = Schemas['PolicyRule'];
+export type PolicyContext = Schemas['Context'];
+export type PolicyRule = Schemas['ContextWithGlob'];
 export type RemediationPlanItem = Schemas['RemediationPlanItem'];
 export type GraphNode = Schemas['GraphNode'];
 export type GraphEdge = Schemas['GraphEdge'];
-export type PqcCatalogItem = Schemas['PqcCatalogItem'];
+export type PqcCatalogItem = Schemas['PqcCatalogEntry'];
 
 /**
  * Strict Cryptographic Semantic Classes (Prompt 1, Section 7)
@@ -25,8 +27,8 @@ export type CryptoSemanticClass =
   | 'quantum-safe-classical' // Quantum-safe classical (AES-256, SHA-2/3) -> Steel Blue
   | 'pqc'; // Post-quantum (ML-KEM, ML-DSA, SLH-DSA) -> Lattice Teal
 
-export function classifyAlgorithm(family: string, displayName: string, classicallyBroken?: boolean): CryptoSemanticClass {
-  const norm = (family + ' ' + displayName).toUpperCase();
+export function classifyAlgorithm(family: string | null, displayName: string, classicallyBroken?: boolean): CryptoSemanticClass {
+  const norm = ((family ?? '') + ' ' + displayName).toUpperCase();
   if (classicallyBroken || norm.includes('MD5') || norm.includes('SHA-1') || norm.includes('SHA1') || norm.includes('DES') || norm.includes('RC4') || norm.includes('ECB')) {
     return 'classically-broken';
   }

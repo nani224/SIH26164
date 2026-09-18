@@ -11,8 +11,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health check */
-        get: operations["getHealth"];
+        /** Liveness/readiness check */
+        get: operations["health"];
         put?: never;
         post?: never;
         delete?: never;
@@ -28,10 +28,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List past cryptographic scans */
+        /** List scans */
         get: operations["listScans"];
         put?: never;
-        /** Launch a new scan */
+        /** Start a new scan */
         post: operations["createScan"];
         delete?: never;
         options?: never;
@@ -39,14 +39,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scans/{id}": {
+    "/api/v1/scans/upload": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get scan details */
+        get?: never;
+        put?: never;
+        /** Upload an archive (.zip, .tar, .tar.gz, .tgz) for sandboxed extraction and scanning */
+        post: operations["uploadScan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scans/{scan_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a scan by id */
         get: operations["getScan"];
         put?: never;
         post?: never;
@@ -56,24 +73,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scans/{id}/findings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Query findings for a scan with filtering and pagination */
-        get: operations["getScanFindings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/scans/{id}/rescore": {
+    "/api/v1/scans/{scan_id}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -82,7 +82,40 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Re-score scan with new CRQC scenario horizon or policy */
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scans/{scan_id}/findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List/filter findings for a scan */
+        get: operations["getFindings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scans/{scan_id}/rescore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recompute risk bands from stored factors (no re-detection) */
         post: operations["rescoreScan"];
         delete?: never;
         options?: never;
@@ -90,15 +123,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scans/{id}/graph": {
+    "/api/v1/scans/{scan_id}/graph": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Crypto estate hierarchy graph (System -> File -> Asset) */
-        get: operations["getScanGraph"];
+        /** System/file/asset graph for a scan */
+        get: operations["getGraph"];
         put?: never;
         post?: never;
         delete?: never;
@@ -107,15 +140,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scans/{id}/cbom": {
+    "/api/v1/scans/{scan_id}/cbom": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Download CycloneDX 1.6 Cryptographic Bill of Materials (CBOM) */
-        get: operations["getScanCbom"];
+        /** CycloneDX 1.6 Cryptography BOM export */
+        get: operations["getCbom"];
         put?: never;
         post?: never;
         delete?: never;
@@ -124,15 +157,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scans/{id}/plan": {
+    "/api/v1/scans/{scan_id}/plan": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Remediation migration plan */
-        get: operations["getScanPlan"];
+        /** Remediation plan for a scan */
+        get: operations["getPlan"];
         put?: never;
         post?: never;
         delete?: never;
@@ -141,15 +174,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scans/{id}/report.pdf": {
+    "/api/v1/scans/{scan_id}/report.pdf": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Executive summary report in PDF [Proposed until backend ships it] */
-        get: operations["getScanReportPdf"];
+        /** Executive PDF report [Proposed full implementation is Phase 9; Phase 0 returns a placeholder PDF] */
+        get: operations["getReportPdf"];
         put?: never;
         post?: never;
         delete?: never;
@@ -158,7 +191,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/findings/{id}/triage": {
+    "/api/v1/findings/{finding_id}/triage": {
         parameters: {
             query?: never;
             header?: never;
@@ -171,8 +204,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Triage a cryptographic finding */
-        patch: operations["triageFinding"];
+        /** Update triage status/note for a finding */
+        patch: operations["patchFindingTriage"];
         trace?: never;
     };
     "/api/v1/policies": {
@@ -182,28 +215,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all assessment policies */
+        /** List policies */
         get: operations["listPolicies"];
-        put?: never;
-        /** Create new assessment policy */
-        post: operations["createPolicy"];
+        /** Create or replace a policy (id taken from the body) */
+        put: operations["upsertPolicy"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/policies/{id}": {
+    "/api/v1/policies/{policy_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get policy by ID */
+        /** Get a policy by id */
         get: operations["getPolicy"];
-        /** Update existing policy */
-        put: operations["updatePolicy"];
+        /** Replace a policy at a specific id */
+        put: operations["putPolicy"];
         post?: never;
         delete?: never;
         options?: never;
@@ -218,7 +251,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** PQC algorithm specification catalog (size and latency) */
+        /** Reference catalog of standardized PQC algorithms (FIPS 203/204/205) */
         get: operations["getPqcCatalog"];
         put?: never;
         post?: never;
@@ -232,16 +265,150 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @enum {string} */
-        RiskBand: "critical" | "high" | "medium" | "low";
-        RiskBands: {
-            critical: number;
-            high: number;
-            medium: number;
-            low: number;
+        ErrorDetail: {
+            error: string;
+            message: string;
         };
         /** @enum {string} */
+        FindingKind: "algorithm" | "certificate" | "key" | "protocol" | "library";
+        /** @enum {string} */
+        Surface: "source" | "binary" | "certificate" | "config" | "image" | "manifest";
+        /** @enum {string} */
+        Family: "RSA" | "DSA" | "DH" | "ECDH" | "ECDSA" | "Ed25519" | "X25519" | "AES" | "ChaCha20" | "3DES" | "DES" | "RC4" | "Blowfish" | "MD5" | "SHA-1" | "SHA-2" | "SHA-3" | "HMAC" | "ML-KEM" | "ML-DSA" | "SLH-DSA";
+        /** @enum {string} */
+        CryptoFunction: "keygen" | "encrypt" | "decrypt" | "sign" | "verify" | "digest" | "tag" | "keyderive" | "unknown";
+        /** @enum {string} */
+        FindingSource: "ast" | "ast-reference" | "ast-protocol-string" | "source-constant" | "binary-symbol" | "binary-constant" | "binary-oid" | "x509-parser" | "pem-parser" | "ssh-key-parser" | "config-parser" | "manifest";
+        /** @enum {string} */
+        TriageStatus: "open" | "accepted-risk" | "false-positive" | "fixed";
+        /** @enum {string} */
         ScanStatus: "queued" | "ingesting" | "scanning" | "scoring" | "done" | "failed";
+        /** @enum {string} */
+        RiskBand: "critical" | "high" | "medium" | "low";
+        /** @enum {string} */
+        Exposure: "external" | "internal" | "isolated" | "test";
+        /** @enum {string} */
+        Criticality: "mission-critical" | "high" | "medium" | "low";
+        /** @enum {string} */
+        GraphNodeType: "system" | "file" | "asset";
+        Location: {
+            path: string;
+            line?: number | null;
+            offset?: number | null;
+            layer?: string | null;
+        };
+        RiskCost: {
+            pkBytesDelta: number;
+            wireBytesDelta: number;
+            opMsDelta: number;
+        };
+        Recommendation: {
+            action: string;
+            target?: string | null;
+            cost: components["schemas"]["RiskCost"];
+        };
+        Risk: {
+            score: number;
+            band: components["schemas"]["RiskBand"];
+            V: number;
+            F: number;
+            U: number;
+            E: number;
+            K: number;
+            X: number;
+            Y: number;
+            Z: number;
+            moscaMargin: number;
+            reason: string;
+            classicallyBroken: boolean;
+            hndl: boolean;
+            needsReview: boolean;
+        };
+        Triage: {
+            status?: components["schemas"]["TriageStatus"];
+            note?: string | null;
+        };
+        TriagePatch: {
+            status: components["schemas"]["TriageStatus"];
+            note?: string | null;
+        };
+        /**
+         * @example {
+         *       "id": "finding_001",
+         *       "kind": "algorithm",
+         *       "surface": "source",
+         *       "family": "RSA",
+         *       "displayName": "RSA-2048 key generation",
+         *       "keySize": 2048,
+         *       "mode": null,
+         *       "curve": null,
+         *       "function": "keygen",
+         *       "location": {
+         *         "path": "src/main/java/com/example/auth/KeyService.java",
+         *         "line": 42,
+         *         "offset": null,
+         *         "layer": null
+         *       },
+         *       "symbol": "KeyPairGenerator.generateKeyPair",
+         *       "snippet": "KeyPairGenerator gen = KeyPairGenerator.getInstance(\"RSA\"); gen.initialize(2048);",
+         *       "source": "ast",
+         *       "confidence": 0.92,
+         *       "risk": {
+         *         "score": 76.95,
+         *         "band": "critical",
+         *         "V": 1,
+         *         "F": 0.9,
+         *         "U": 1,
+         *         "E": 0.95,
+         *         "K": 0.9,
+         *         "X": 12,
+         *         "Y": 8,
+         *         "Z": 10,
+         *         "moscaMargin": 10,
+         *         "reason": "Shor-vulnerable asymmetric keygen on an externally-exposed, mission-critical path; shelf life plus migration time exceeds the analyst's CRQC horizon.",
+         *         "classicallyBroken": false,
+         *         "hndl": true,
+         *         "needsReview": false
+         *       },
+         *       "recommendation": {
+         *         "action": "Migrate to ML-KEM-768 for key establishment (hybrid with X25519 during transition)",
+         *         "target": "ML-KEM-768",
+         *         "cost": {
+         *           "pkBytesDelta": 928,
+         *           "wireBytesDelta": 832,
+         *           "opMsDelta": 0.05
+         *         }
+         *       },
+         *       "triage": {
+         *         "status": "open",
+         *         "note": null
+         *       }
+         *     }
+         */
+        Finding: {
+            id: string;
+            kind: components["schemas"]["FindingKind"];
+            surface: components["schemas"]["Surface"];
+            family: components["schemas"]["Family"] | null;
+            displayName: string;
+            keySize?: number | null;
+            mode?: string | null;
+            curve?: string | null;
+            function: components["schemas"]["CryptoFunction"];
+            location: components["schemas"]["Location"];
+            symbol: string;
+            snippet: string;
+            source: components["schemas"]["FindingSource"];
+            confidence: number;
+            risk?: components["schemas"]["Risk"] | null;
+            recommendation?: components["schemas"]["Recommendation"] | null;
+            triage: components["schemas"]["Triage"];
+        };
+        FindingPage: {
+            items: components["schemas"]["Finding"][];
+            cursor?: string | null;
+            total: number;
+        };
         ScanStats: {
             files: number;
             bytes: number;
@@ -250,157 +417,223 @@ export interface components {
             errors: number;
             skippedPrefilter: number;
         };
+        BandCounts: {
+            /** @default 0 */
+            critical: number;
+            /** @default 0 */
+            high: number;
+            /** @default 0 */
+            medium: number;
+            /** @default 0 */
+            low: number;
+        };
+        /**
+         * @example {
+         *       "id": "scan_stub_001",
+         *       "target": "example-monorepo",
+         *       "status": "done",
+         *       "stats": {
+         *         "files": 482,
+         *         "bytes": 18340221,
+         *         "seconds": 3.9,
+         *         "mbPerSec": 4.48,
+         *         "errors": 0,
+         *         "skippedPrefilter": 311
+         *       },
+         *       "bands": {
+         *         "critical": 2,
+         *         "high": 1,
+         *         "medium": 2,
+         *         "low": 1
+         *       },
+         *       "policyId": "policy_default",
+         *       "crqcYears": 10,
+         *       "startedAt": "2026-09-17T12:00:00Z",
+         *       "finishedAt": "2026-09-17T12:00:04Z"
+         *     }
+         */
         Scan: {
             id: string;
             target: string;
             status: components["schemas"]["ScanStatus"];
-            stats: components["schemas"]["ScanStats"];
-            bands: components["schemas"]["RiskBands"];
-            policyId?: string;
-            /** @default 10 */
+            stats?: components["schemas"]["ScanStats"] | null;
+            bands: components["schemas"]["BandCounts"];
+            policyId: string;
             crqcYears: number;
             /** Format: date-time */
             startedAt: string;
             /** Format: date-time */
             finishedAt?: string | null;
+            bundleHash?: string | null;
         };
-        FindingLocation: {
-            path: string;
-            line: number;
-            offset?: number;
-            layer?: string;
+        ScanCreate: {
+            path?: string | null;
+            policyId?: string | null;
+            crqcYears?: number | null;
         };
-        FindingRisk: {
-            score: number;
-            band: components["schemas"]["RiskBand"];
-            /** @description Vulnerability weight */
-            V: number;
-            /** @description Cryptographic Function weight */
-            F: number;
-            /** @description Mosca Urgency weight */
-            U: number;
-            /** @description System Exposure weight */
-            E: number;
-            /** @description Business Criticality weight */
-            K: number;
-            /** @description Data shelf life in years */
-            X: number;
-            /** @description Migration time in years */
-            Y: number;
-            /** @description Years until Cryptanalytically Relevant Quantum Computer */
-            Z: number;
-            /** @description X + Y - Z */
-            moscaMargin: number;
-            reason: string;
-            classicallyBroken: boolean;
-            /** @description Harvest Now Decrypt Later risk */
-            hndl: boolean;
-            /** @description True when confidence < 0.75 */
-            needsReview: boolean;
+        RescoreRequest: {
+            crqcYears?: number | null;
+            policyId?: string | null;
         };
-        RecommendationCost: {
-            pkBytesDelta: number;
-            wireBytesDelta: number;
-            opMsDelta: number;
+        RescoreResult: {
+            bands: components["schemas"]["BandCounts"];
+            changed: components["schemas"]["Finding"][];
         };
-        Recommendation: {
-            action: string;
-            target: string;
-            cost: components["schemas"]["RecommendationCost"];
+        Context: {
+            exposure: components["schemas"]["Exposure"];
+            criticality: components["schemas"]["Criticality"];
+            shelfLifeYears: number;
+            migrationYears: number;
         };
-        /** @enum {string} */
-        TriageStatus: "open" | "accepted-risk" | "false-positive" | "fixed";
-        Triage: {
-            status: components["schemas"]["TriageStatus"];
-            note?: string;
+        ContextWithGlob: components["schemas"]["Context"] & {
+            glob: string;
         };
-        Finding: {
+        /**
+         * @example {
+         *       "id": "policy_default",
+         *       "name": "Default NTRO baseline",
+         *       "crqcYears": 10,
+         *       "default": {
+         *         "exposure": "internal",
+         *         "criticality": "medium",
+         *         "shelfLifeYears": 5,
+         *         "migrationYears": 3
+         *       },
+         *       "contexts": [
+         *         {
+         *           "glob": "**\/prod/**",
+         *           "exposure": "external",
+         *           "criticality": "mission-critical",
+         *           "shelfLifeYears": 10,
+         *           "migrationYears": 5
+         *         },
+         *         {
+         *           "glob": "**\/test/**",
+         *           "exposure": "test",
+         *           "criticality": "low",
+         *           "shelfLifeYears": 1,
+         *           "migrationYears": 1
+         *         }
+         *       ]
+         *     }
+         */
+        Policy: {
             id: string;
-            kind: string;
-            surface: string;
-            family: string;
-            displayName: string;
-            keySize?: number;
-            mode?: string;
-            curve?: string;
-            function?: string;
-            location: components["schemas"]["FindingLocation"];
-            symbol?: string;
-            snippet?: string;
-            source: string;
-            confidence: number;
-            risk: components["schemas"]["FindingRisk"];
-            recommendation: components["schemas"]["Recommendation"];
-            triage: components["schemas"]["Triage"];
-        };
-        RemediationPlanItem: {
-            location: string;
-            line: number;
-            asset: string;
-            score: number;
-            band: components["schemas"]["RiskBand"];
-            reason: string;
-            mosca_margin: number;
-            confidence: number;
-            action: string;
-            target: string;
+            name: string;
+            crqcYears: number;
+            default: components["schemas"]["Context"];
+            contexts?: components["schemas"]["ContextWithGlob"][];
         };
         GraphNode: {
             id: string;
-            name: string;
-            /** @enum {string} */
-            type: "system" | "file" | "asset";
+            type: components["schemas"]["GraphNodeType"];
+            label: string;
+            band?: components["schemas"]["RiskBand"] | null;
+            score?: number | null;
             occurrences: number;
-            /** @enum {string} */
-            semanticClass: "shor" | "classically-broken" | "grover" | "quantum-safe-classical" | "pqc";
-            riskScore: number;
-            details?: Record<string, never>;
+            parentId?: string | null;
         };
         GraphEdge: {
             source: string;
             target: string;
-            relationship: string;
         };
-        PolicyContext: {
+        Graph: {
+            nodes: components["schemas"]["GraphNode"][];
+            edges: components["schemas"]["GraphEdge"][];
+        };
+        RemediationPlanItem: {
+            findingId: string;
+            band: components["schemas"]["RiskBand"];
+            displayName: string;
+            location: components["schemas"]["Location"];
+            action: string;
+            target?: string | null;
+        };
+        RemediationPlan: {
+            scanId: string;
+            /** Format: date-time */
+            generatedAt: string;
+            items: components["schemas"]["RemediationPlanItem"][];
+        };
+        /**
+         * @example {
+         *       "family": "ML-KEM",
+         *       "displayName": "ML-KEM-768",
+         *       "standard": "FIPS 203",
+         *       "parameterSet": "ML-KEM-768",
+         *       "securityCategory": 3,
+         *       "publicKeyBytes": 1184,
+         *       "ciphertextOrSignatureBytes": 1088,
+         *       "notes": "Recommended default KEM parameter set (roughly AES-192 equivalent)."
+         *     }
+         */
+        PqcCatalogEntry: {
+            family: components["schemas"]["Family"];
+            displayName: string;
+            standard: string;
+            parameterSet: string;
+            securityCategory: number;
+            publicKeyBytes?: number | null;
+            ciphertextOrSignatureBytes?: number | null;
+            notes: string;
+        };
+        HealthStatus: {
             /** @enum {string} */
-            exposure: "external" | "internal" | "isolated" | "test";
+            status: "ok";
+            version: string;
+            /** Format: date-time */
+            time: string;
+        };
+        /** @description WebSocket frame shape for /scans/{scan_id}/events. eventId is the real, stored per-scan sequence number (stringified integer, starting at 1) -- pass the last one seen back as the `after` query param to resume. */
+        ScanEvent: {
             /** @enum {string} */
-            criticality: "mission-critical" | "high" | "medium" | "low";
-            shelfLifeYears: number;
-            migrationYears: number;
-        };
-        PolicyRule: components["schemas"]["PolicyContext"] & {
-            glob: string;
-        };
-        Policy: {
-            id: string;
-            name: string;
-            /** @default 10 */
-            crqcYears: number;
-            default: components["schemas"]["PolicyContext"];
-            contexts: components["schemas"]["PolicyRule"][];
-        };
-        PqcCatalogItem: {
-            alg: string;
-            class: string;
-            pk_bytes: number;
-            ct_or_sig_bytes: number;
-            keygen_ms: number;
-            op1?: string;
-            op1_ms?: number;
-            op2?: string;
-            op2_ms?: number;
+            type: "progress" | "finding" | "stage" | "done" | "error";
+            eventId: string;
+            /** @enum {string} */
+            stage?: "ingesting" | "scanning" | "scoring";
+            filesProcessed?: number;
+            totalFiles?: number;
+            /** @description Real running count of findings by surface, e.g. {source: 3}. */
+            bySurface?: {
+                [key: string]: number;
+            };
+            findingId?: string;
+            family?: string | null;
+            findingCount?: number;
+            scanId?: string;
+            message?: string;
         };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Not found */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorDetail"];
+            };
+        };
+        /** @description Bad request */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorDetail"];
+            };
+        };
+    };
+    parameters: {
+        ScanId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getHealth: {
+    health: {
         parameters: {
             query?: never;
             header?: never;
@@ -409,18 +642,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Service healthy */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** @example ok */
-                        status: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
+                    "application/json": components["schemas"]["HealthStatus"];
                 };
             };
         };
@@ -434,7 +662,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of scans */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -454,25 +682,12 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @description Local filesystem path to scan */
-                    path?: string;
-                    policyId?: string;
-                    /** @default 10 */
-                    crqcYears?: number;
-                };
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file?: string;
-                    policyId?: string;
-                    /** @default 10 */
-                    crqcYears?: number;
-                };
+                "application/json": components["schemas"]["ScanCreate"];
             };
         };
         responses: {
-            /** @description Scan accepted and queued */
-            202: {
+            /** @description Scan created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -480,6 +695,44 @@ export interface operations {
                     "application/json": components["schemas"]["Scan"];
                 };
             };
+        };
+    };
+    uploadScan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description Source bundle archive (.zip, .tar, .tar.gz, .tgz)
+                     */
+                    file: string;
+                    /** @description Optional policy ID to enforce */
+                    policyId?: string;
+                    /**
+                     * @description Cryptographically Relevant Quantum Computer arrival horizon
+                     * @default 10
+                     */
+                    crqcYears?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Scan created from uploaded archive */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
         };
     };
     getScan: {
@@ -487,13 +740,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                scan_id: components["parameters"]["ScanId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Scan details */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -502,48 +755,38 @@ export interface operations {
                     "application/json": components["schemas"]["Scan"];
                 };
             };
-            /** @description Scan not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            404: components["responses"]["NotFound"];
         };
     };
-    getScanFindings: {
+    getFindings: {
         parameters: {
             query?: {
-                band?: "critical" | "high" | "medium" | "low";
-                family?: string;
-                surface?: string;
-                source?: string;
+                band?: components["schemas"]["RiskBand"];
+                family?: components["schemas"]["Family"];
+                surface?: components["schemas"]["Surface"];
+                source?: components["schemas"]["FindingSource"];
                 minConfidence?: number;
                 needsReview?: boolean;
                 q?: string;
                 cursor?: string;
                 limit?: number;
-                sort?: "score_desc" | "score_asc" | "confidence_asc" | "location_asc";
+                sort?: "score" | "path" | "family";
             };
             header?: never;
             path: {
-                id: string;
+                scan_id: components["parameters"]["ScanId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Paginated findings */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        items: components["schemas"]["Finding"][];
-                        total: number;
-                        nextCursor?: string | null;
-                    };
+                    "application/json": components["schemas"]["FindingPage"];
                 };
             };
         };
@@ -553,133 +796,105 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                scan_id: components["parameters"]["ScanId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": {
-                    crqcYears?: number;
-                    policyId?: string;
-                };
+                "application/json": components["schemas"]["RescoreRequest"];
             };
         };
         responses: {
-            /** @description Re-scoring result */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        bands: components["schemas"]["RiskBands"];
-                        changedFindings: {
-                            id: string;
-                            displayName: string;
-                            previousBand: components["schemas"]["RiskBand"];
-                            newBand: components["schemas"]["RiskBand"];
-                            previousScore: number;
-                            newScore: number;
-                        }[];
-                    };
+                    "application/json": components["schemas"]["RescoreResult"];
                 };
             };
         };
     };
-    getScanGraph: {
+    getGraph: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                scan_id: components["parameters"]["ScanId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Graph structure */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        nodes: components["schemas"]["GraphNode"][];
-                        edges: components["schemas"]["GraphEdge"][];
-                    };
+                    "application/json": components["schemas"]["Graph"];
                 };
             };
         };
     };
-    getScanCbom: {
+    getCbom: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                scan_id: components["parameters"]["ScanId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description CycloneDX 1.6 CBOM with signature record */
+            /** @description CycloneDX 1.6 BOM */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** @example CycloneDX */
-                        bomFormat: string;
-                        /** @example 1.6 */
-                        specVersion: string;
-                        serialNumber?: string;
-                        components: Record<string, never>[];
-                        signature: {
-                            algorithm: string;
-                            value: string;
-                            publicKey?: string;
-                        };
-                    };
+                    "application/json": Record<string, never>;
                 };
             };
         };
     };
-    getScanPlan: {
+    getPlan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                scan_id: components["parameters"]["ScanId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Remediation plan */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemediationPlanItem"][];
+                    "application/json": components["schemas"]["RemediationPlan"];
                 };
             };
         };
     };
-    getScanReportPdf: {
+    getReportPdf: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                scan_id: components["parameters"]["ScanId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Binary PDF stream */
+            /** @description PDF report */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -688,34 +903,24 @@ export interface operations {
                     "application/pdf": string;
                 };
             };
-            /** @description Not yet implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
         };
     };
-    triageFinding: {
+    patchFindingTriage: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                finding_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": {
-                    status: components["schemas"]["TriageStatus"];
-                    note?: string;
-                };
+                "application/json": components["schemas"]["TriagePatch"];
             };
         };
         responses: {
-            /** @description Updated finding */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -724,6 +929,7 @@ export interface operations {
                     "application/json": components["schemas"]["Finding"];
                 };
             };
+            404: components["responses"]["NotFound"];
         };
     };
     listPolicies: {
@@ -735,7 +941,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of policies */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -746,7 +952,7 @@ export interface operations {
             };
         };
     };
-    createPolicy: {
+    upsertPolicy: {
         parameters: {
             query?: never;
             header?: never;
@@ -759,8 +965,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Policy created */
-            201: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -775,13 +981,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                policy_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Policy details */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -790,14 +996,15 @@ export interface operations {
                     "application/json": components["schemas"]["Policy"];
                 };
             };
+            404: components["responses"]["NotFound"];
         };
     };
-    updatePolicy: {
+    putPolicy: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                policy_id: string;
             };
             cookie?: never;
         };
@@ -807,7 +1014,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Policy updated */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -827,13 +1034,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Catalog of classical and PQC replacement specifications */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PqcCatalogItem"][];
+                    "application/json": components["schemas"]["PqcCatalogEntry"][];
                 };
             };
         };

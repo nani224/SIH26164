@@ -1,4 +1,4 @@
-import type { Finding, Scan, Policy, RemediationPlanItem, GraphNode, GraphEdge, RiskBands, RiskBand } from '../types/crypto';
+import type { Finding, Scan, Policy, RemediationPlanItem, GraphNode, GraphEdge, RiskBands } from '../types/crypto';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -10,17 +10,14 @@ export interface FindingsFilterParams {
   needsReview?: boolean;
 }
 
+// Matches contracts/openapi.yaml's RescoreResult exactly: {bands, changed}.
+// changed is the list of Findings whose band or score actually moved -- the
+// backend computes this server-side; the frontend must not fabricate a
+// "previous" value from the same post-rescore record (see git history for
+// why -- that used to make every real, non-mocked rescore show zero change).
 export interface RescoreResult {
   bands: RiskBands;
-  changedFindings: Array<{
-    id: string;
-    displayName: string;
-    previousBand: RiskBand;
-    newBand: RiskBand;
-    previousScore: number;
-    newScore: number;
-  }>;
-  changed?: Finding[];
+  changed: Finding[];
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -67,24 +64,7 @@ export async function rescoreScan(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const data = await handleResponse<any>(res);
-  const changedList =
-    data.changedFindings ||
-    (Array.isArray(data.changed)
-      ? data.changed.map((f: any) => ({
-          id: f.id,
-          displayName: f.displayName,
-          previousBand: f.risk?.band || 'low',
-          newBand: f.risk?.band || 'low',
-          previousScore: f.risk?.score || 0,
-          newScore: f.risk?.score || 0,
-        }))
-      : []);
-  return {
-    bands: data.bands,
-    changedFindings: changedList,
-    changed: data.changed || [],
-  };
+  return handleResponse<RescoreResult>(res);
 }
 
 export async function fetchScanGraph(id: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
@@ -99,8 +79,8 @@ export async function fetchScanCbom(id: string): Promise<any> {
 
 export async function fetchScanPlan(id: string): Promise<RemediationPlanItem[]> {
   const res = await fetch(`${API_BASE}/api/v1/scans/${id}/plan`);
-  const data = await handleResponse<any>(res);
-  return Array.isArray(data) ? data : (data.items || []);
+  const data = await handleResponse<{ scanId: string; generatedAt: string; items: RemediationPlanItem[] }>(res);
+  return data.items;
 }
 
 export async function fetchPolicies(): Promise<Policy[]> {

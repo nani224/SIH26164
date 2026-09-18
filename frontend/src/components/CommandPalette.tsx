@@ -70,7 +70,7 @@ export function CommandPalette() {
 
   const matchedFindings = findings.filter((f) =>
     f.displayName.toLowerCase().includes(query.toLowerCase()) ||
-    f.family.toLowerCase().includes(query.toLowerCase()) ||
+    (f.family ?? '').toLowerCase().includes(query.toLowerCase()) ||
     f.location.path.toLowerCase().includes(query.toLowerCase())
   );
 
@@ -152,7 +152,7 @@ export function CommandPalette() {
                       <span className="text-[var(--text-muted)] ml-2">in {f.location.path}:{f.location.line}</span>
                     </div>
                     <span className="text-[10px] uppercase font-bold text-[var(--band-critical)]">
-                      Score {f.risk.score.toFixed(1)}
+                      Score {f.risk ? f.risk.score.toFixed(1) : '—'}
                     </span>
                   </button>
                 ))}

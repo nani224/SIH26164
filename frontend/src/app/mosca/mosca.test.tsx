@@ -50,16 +50,17 @@ describe('Screen 3: Mosca Quantum Risk Matrix (Loop F2 Full States & Unit Pass)'
   });
 
   it('proves the domain invariant: moving Z re-ranks quantum assets while classically broken stay fixed', async () => {
+    // Response shape matches the real contract's RescoreResult (bands +
+    // changed: Finding[] -- new state only). MoscaMatrixView derives
+    // "previous" itself by diffing against the `findings` prop (mockFindings
+    // below, which already has f-005 at band=medium/score=32.0).
+    const f005 = mockFindings.find((f) => f.id === 'f-005')!;
     const mockRescore = vi.fn().mockResolvedValue({
-      bands: { critical: 2, high: 1, medium: 1, low: 0 },
-      changedFindings: [
+      bands: { critical: 2, high: 1, medium: 0, low: 1 },
+      changed: [
         {
-          id: 'f-001',
-          displayName: 'RSA-2048',
-          previousBand: 'high',
-          newBand: 'critical',
-          previousScore: 68.0,
-          newScore: 88.0,
+          ...f005,
+          risk: { ...f005.risk!, band: 'high', score: 55.0 },
         },
       ],
     });

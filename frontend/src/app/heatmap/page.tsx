@@ -17,16 +17,10 @@ export default function HeatmapPage() {
 
   const findings = findingsData?.items ?? [];
 
-  const surfaces = [
-    'network-protocol',
-    'certificate',
-    'api-layer',
-    'data-at-rest',
-    'legacy-service',
-    'binary-embedded',
-  ];
+  // Matches contracts/openapi.yaml's Surface enum exactly.
+  const surfaces = ['source', 'binary', 'certificate', 'config', 'image', 'manifest'];
 
-  const families = ['RSA', 'ECDH', 'DH', 'AES', 'SHA1', 'DES', 'RC4', 'ML-KEM'];
+  const families = ['RSA', 'ECDH', 'DH', 'AES', 'SHA-1', 'DES', 'RC4', 'ML-KEM'];
 
   // Compute cell data
   const matrixData = surfaces.map((surface) => {
@@ -34,8 +28,8 @@ export default function HeatmapPage() {
       surface,
       cells: families.map((family) => {
         const matches = findings.filter(
-          (f) => f.surface === surface && f.family.toUpperCase().includes(family)
-        );
+          (f) => f.surface === surface && f.risk !== null && f.risk !== undefined && (f.family ?? '').toUpperCase().includes(family)
+        ) as Array<(typeof findings)[number] & { risk: NonNullable<(typeof findings)[number]['risk']> }>;
         if (matches.length === 0) return null;
 
         const worstScore = Math.max(...matches.map((m) => m.risk.score));

@@ -218,6 +218,17 @@ export default function ScanLauncherPage() {
                   </>
                 )}
               </button>
+              {createScanMutation.isError && (
+                <div
+                  role="alert"
+                  className="mt-3 p-3 rounded border border-[var(--band-critical)] bg-[var(--crypto-shor-bg)] text-[var(--band-critical)] text-[11px] flex items-start gap-2"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <span>
+                    SCAN REJECTED: {createScanMutation.error instanceof Error ? createScanMutation.error.message : 'Unknown error'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

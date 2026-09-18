@@ -40,10 +40,13 @@ export default function CryptoEstateGraphPage() {
     queryFn: () => fetchScanFindings(activeScanId),
   });
 
+  // Keyed by finding id (matches an asset GraphNode's id 1:1 -- see
+  // api/graph.py::build_graph) rather than displayName, which can collide
+  // across multiple findings of the same algorithm.
   const findingsMap = useRef(new Map<string, Finding>());
   useEffect(() => {
     if (findingsData?.items) {
-      findingsData.items.forEach((f) => findingsMap.current.set(f.displayName, f));
+      findingsData.items.forEach((f) => findingsMap.current.set(f.id, f));
     }
   }, [findingsData]);
 
@@ -113,17 +116,17 @@ export default function CryptoEstateGraphPage() {
       const y = Math.sin(angle) * radius;
       const z = ((idx % 7) - 3) * 2;
 
-      // Color mapping: Functional risk instrumentation
-      const raw = node as any;
-      const cls = raw.semanticClass || (raw.band === 'critical' ? 'shor' : raw.band === 'high' ? 'classically-broken' : raw.band === 'medium' ? 'grover' : 'quantum-safe-classical');
-      let colorHex = 0xf43f5e; // Shor red
-      if (cls === 'classically-broken') colorHex = 0xd946ef; // magenta
-      else if (cls === 'pqc') colorHex = 0x2dd4bf; // lattice teal
-      else if (cls === 'grover') colorHex = 0xf59e0b; // amber
-      else if (cls === 'quantum-safe-classical') colorHex = 0x38bdf8; // steel blue
+      // Color mapping: node.band is computed server-side (api/graph.py) from
+      // the same Mosca thresholds as everywhere else -- never recompute them
+      // here. GraphNode carries no algorithm family, so band is the only
+      // real signal available for this color mapping.
+      let colorHex = 0xf43f5e; // critical: Shor red
+      if (node.band === 'high') colorHex = 0xf59e0b; // amber
+      else if (node.band === 'medium') colorHex = 0x38bdf8; // steel blue
+      else if (node.band === 'low') colorHex = 0x2dd4bf; // lattice teal
 
-      const score = raw.score ?? raw.riskScore ?? 50;
-      const scale = score >= 60 ? 1.3 : 0.9;
+      const score = node.score ?? 0;
+      const scale = node.band === 'critical' ? 1.3 : 0.9;
       matrix.makeScale(scale, scale, scale);
       matrix.setPosition(x, y, z);
       instancedMesh.setMatrixAt(idx, matrix);
@@ -179,7 +182,7 @@ export default function CryptoEstateGraphPage() {
     const handleClick = () => {
       if (hoveredNode) {
         // Look up corresponding finding if available to open drawer
-        const f = findingsMap.current.get(hoveredNode.node.name);
+        const f = findingsMap.current.get(hoveredNode.node.id);
         if (f) {
           openDrawer(f);
         }
@@ -269,10 +272,9 @@ export default function CryptoEstateGraphPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-auto">
               {graphData?.nodes.slice(0, 9).map((node) => {
-                const raw = node as any;
-                const nodeScore = raw.score ?? raw.riskScore ?? 0;
-                const band: RiskBand = (raw.band as RiskBand) || (nodeScore >= 60 ? 'critical' : nodeScore >= 35 ? 'high' : nodeScore >= 15 ? 'medium' : 'low');
-                const nodeLabel = raw.label || raw.name || 'Crypto Component';
+                const nodeScore = node.score ?? 0;
+                const band: RiskBand = node.band ?? 'low';
+                const nodeLabel = node.label || 'Crypto Component';
                 return (
                   <div
                     key={node.id}
@@ -301,10 +303,9 @@ export default function CryptoEstateGraphPage() {
 
         {/* Hover Tooltip Overlay */}
         {hoveredNode && (() => {
-          const raw = hoveredNode.node as any;
-          const nodeScore = raw.score ?? raw.riskScore ?? 0;
-          const band: RiskBand = (raw.band as RiskBand) || (nodeScore >= 60 ? 'critical' : nodeScore >= 35 ? 'high' : nodeScore >= 15 ? 'medium' : 'low');
-          const nodeLabel = raw.label || raw.name || 'Crypto Component';
+          const nodeScore = hoveredNode.node.score ?? 0;
+          const band: RiskBand = hoveredNode.node.band ?? 'low';
+          const nodeLabel = hoveredNode.node.label || 'Crypto Component';
           return (
             <div
               style={{ left: hoveredNode.x + 16, top: hoveredNode.y + 16 }}

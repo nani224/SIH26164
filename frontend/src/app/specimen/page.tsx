@@ -41,8 +41,10 @@ export default function SpecimenPage() {
     mutationFn: (z: number) => rescoreScan(activeScanId, { crqcYears: z }),
     onSuccess: (data) => {
       const map = new Map<string, { newScore: number; newBand: RiskBand }>();
-      data.changedFindings.forEach((c) => {
-        map.set(c.id, { newScore: c.newScore, newBand: c.newBand });
+      data.changed.forEach((f) => {
+        if (f.risk) {
+          map.set(f.id, { newScore: f.risk.score, newBand: f.risk.band });
+        }
       });
       setChangedMap(map);
     },
@@ -56,23 +58,30 @@ export default function SpecimenPage() {
     }
   }, [crqcZ, rescoreMutation]);
 
-  // Read-through from server findings and server rescore results (Zero client-side math re-implementation)
+  // Read-through from server findings and server rescore results (Zero client-side math re-implementation).
+  // risk is nullable per contract (a finding may not be scored yet); this
+  // view is risk-focused, so unscored findings are excluded rather than
+  // rendered with fabricated numbers.
   const calculatedFindings = useMemo(() => {
-    return findings.map((f) => {
-      const change = changedMap.get(f.id);
-      const score = change ? change.newScore : f.risk.score;
-      const band = change ? change.newBand : f.risk.band;
-      const margin = f.risk.X + f.risk.Y - crqcZ;
-      const u = f.risk.classicallyBroken ? 1.0 : f.risk.U;
+    return findings
+      .filter((f) => f.risk !== null && f.risk !== undefined)
+      .map((f) => {
+        const risk = f.risk!;
+        const change = changedMap.get(f.id);
+        const score = change ? change.newScore : risk.score;
+        const band = change ? change.newBand : risk.band;
+        const margin = risk.X + risk.Y - crqcZ;
+        const u = risk.classicallyBroken ? 1.0 : risk.U;
 
-      return {
-        ...f,
-        calculatedU: u,
-        calculatedScore: score,
-        calculatedBand: band,
-        calculatedMargin: margin,
-      };
-    });
+        return {
+          ...f,
+          risk,
+          calculatedU: u,
+          calculatedScore: score,
+          calculatedBand: band,
+          calculatedMargin: margin,
+        };
+      });
   }, [findings, changedMap, crqcZ]);
 
   const filteredFindings = useMemo(() => {
@@ -429,7 +438,7 @@ export default function SpecimenPage() {
                       <RiskBandBadge band={f.calculatedBand} score={f.calculatedScore} showScore={false} />
                     </td>
                     <td className="py-2.5 px-3 text-[var(--text-muted)] text-[11px] max-w-xs truncate">
-                      {f.recommendation.action}
+                      {f.recommendation?.action ?? '—'}
                     </td>
                   </tr>
                 );

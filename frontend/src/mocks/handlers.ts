@@ -106,25 +106,25 @@ export const handlers = [
 
     let filtered = [...findingsStore];
     if (band && band !== 'all') {
-      filtered = filtered.filter((f) => f.risk.band === band);
+      filtered = filtered.filter((f) => f.risk?.band === band);
     }
     if (surface && surface !== 'all') {
       filtered = filtered.filter((f) => f.surface === surface);
     }
     if (family && family !== 'all') {
-      filtered = filtered.filter((f) => f.family.toLowerCase().includes(family.toLowerCase()));
+      filtered = filtered.filter((f) => (f.family ?? '').toLowerCase().includes(family.toLowerCase()));
     }
     if (q) {
       filtered = filtered.filter(
         (f) =>
           f.displayName.toLowerCase().includes(q) ||
-          f.family.toLowerCase().includes(q) ||
+          (f.family ?? '').toLowerCase().includes(q) ||
           f.location.path.toLowerCase().includes(q) ||
           f.surface.toLowerCase().includes(q)
       );
     }
     if (needsReview === 'true') {
-      filtered = filtered.filter((f) => f.risk.needsReview);
+      filtered = filtered.filter((f) => f.risk?.needsReview);
     }
 
     return HttpResponse.json({
@@ -134,23 +134,23 @@ export const handlers = [
     });
   }),
 
-  // Rescore endpoint: applies Mosca X + Y - Z formula
+  // Rescore endpoint: applies Mosca X + Y - Z formula.
+  // Response shape matches contracts/openapi.yaml's RescoreResult exactly:
+  // {bands, changed}. changed carries the NEW Finding state only -- same
+  // as the real backend (api/store.py::rescore_scan_findings) -- so the
+  // frontend must diff against its own pre-rescore snapshot for "previous"
+  // values, never trust a fabricated previousBand/previousScore from here.
   http.post('/api/v1/scans/:id/rescore', async ({ request }) => {
     const body = (await request.json()) as { crqcYears?: number; policyId?: string };
     const z = body.crqcYears ?? 10;
 
-    const changedFindings: Array<{
-      id: string;
-      displayName: string;
-      previousBand: RiskBand;
-      newBand: RiskBand;
-      previousScore: number;
-      newScore: number;
-    }> = [];
-
+    const changed: Finding[] = [];
     const bands = { critical: 0, high: 0, medium: 0, low: 0 };
 
     findingsStore = findingsStore.map((f) => {
+      if (!f.risk) {
+        return f;
+      }
       const prevScore = f.risk.score;
       const prevBand = f.risk.band;
 
@@ -172,18 +172,7 @@ export const handlers = [
 
       bands[newBand]++;
 
-      if (newBand !== prevBand || Math.abs(newScore - prevScore) > 0.1) {
-        changedFindings.push({
-          id: f.id,
-          displayName: f.displayName,
-          previousBand: prevBand,
-          newBand: newBand,
-          previousScore: prevScore,
-          newScore: newScore,
-        });
-      }
-
-      return {
+      const updated: Finding = {
         ...f,
         risk: {
           ...f.risk,
@@ -194,12 +183,15 @@ export const handlers = [
           band: newBand,
         },
       };
+
+      if (newBand !== prevBand || Math.abs(newScore - prevScore) > 0.1) {
+        changed.push(updated);
+      }
+
+      return updated;
     });
 
-    return HttpResponse.json({
-      bands,
-      changedFindings,
-    });
+    return HttpResponse.json({ bands, changed });
   }),
 
   // Get crypto estate hierarchy graph
@@ -212,9 +204,14 @@ export const handlers = [
     return HttpResponse.json(mockCbom);
   }),
 
-  // Get remediation plan
-  http.get('/api/v1/scans/:id/plan', () => {
-    return HttpResponse.json(mockPlan);
+  // Get remediation plan. Matches contracts/openapi.yaml's RemediationPlan
+  // exactly: {scanId, generatedAt, items} -- not a bare array.
+  http.get('/api/v1/scans/:id/plan', ({ params }) => {
+    return HttpResponse.json({
+      scanId: params.id,
+      generatedAt: new Date().toISOString(),
+      items: mockPlan,
+    });
   }),
 
   // Policies CRUD
