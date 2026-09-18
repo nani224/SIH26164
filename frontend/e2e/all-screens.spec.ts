@@ -113,6 +113,7 @@ test.describe('ECDAT 10-Screen E2E Verification Matrix', () => {
   test('Core Web Vitals CLS Budget (< 0.1) across key views', async ({ page }) => {
     await page.goto('/overview');
     await page.waitForLoadState('networkidle');
+    await expect(page.locator('text=SCREEN 2 · CRYPTOGRAPHIC OVERVIEW CONSOLE')).toBeVisible();
 
     const cls = await page.evaluate(async () => {
       return new Promise<number>((resolve) => {
