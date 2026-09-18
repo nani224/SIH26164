@@ -83,10 +83,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Only rate limit mutating methods on API paths
         if request.method in ("POST", "PATCH", "PUT", "DELETE") and request.url.path.startswith("/api/v1/"):
-            client_ip = (
+            # X-Test-Client-Id lets the test suite isolate rate-limit buckets
+            # per test (TestClient requests all share one fixed host/IP).
+            # Trusting it from any caller by default let an external client
+            # bypass rate limiting just by varying a header, so it's honored
+            # only when explicitly enabled -- never in a real deployment.
+            test_client_id = (
                 request.headers.get("X-Test-Client-Id")
-                or (request.client.host if request.client else "unknown_client")
+                if os.environ.get("ECDAT_RATE_LIMIT_TRUST_TEST_HEADER") == "1"
+                else None
             )
+            client_ip = test_client_id or (request.client.host if request.client else "unknown_client")
             key = f"{client_ip}:{request.method}:{request.url.path}"
 
             allowed, remaining, retry_after = self.limiter.is_allowed(key)

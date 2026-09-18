@@ -61,5 +61,9 @@ test, air-gap run, CBOM strict validation, security scanners.
 
 Add ML to detection or scoring; silently change risk weights; tune on
 HOLD; copy code or rules whose licence forbids it; report unmeasured
-numbers; call external services at runtime; edit `frontend/` or repo-root
-files; weaken a gate to exit a loop.
+numbers; call external services at runtime; weaken a gate to exit a loop.
+
+(The original "don't edit frontend/ or repo-root files" restriction only
+applied while two separate agent tracks were building backend/frontend in
+parallel. Once both are merged, see the root `CLAUDE.md` instead -- it's
+the shared reference for whoever owns the whole repo at that point.)

@@ -1,5 +1,75 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Whole-repo cross-track audit + fix pass
+
+Backend and frontend were built by two separate agent tracks and merged
+onto `main`; this pass re-verified every claim in this file against real
+command output (not commit messages), found and fixed real defects, and
+ran the first genuine backend+frontend end-to-end integration test this
+project has had. See root `CLAUDE.md`, `.claude/agents/*.md` for the audit
+methodology.
+
+Real defects found and fixed:
+- `GET /scans/{id}/graph` always returned the same Phase 0 canned stub
+  regardless of scan id. Added `api/graph.py::build_graph()` -- a real
+  system->file->asset graph derived from `store.list_findings(scan_id)`,
+  with real band/score/occurrences. `tests/test_graph_real.py` (new)
+  proves two different scans now produce different graphs.
+- The "unencrypted private key -> score >= 90" domain rule
+  (`engine/factors.py`) was unreachable from any real scan: it guarded on
+  `kind=FindingKind.KEY`, which no real detector ever emits (only
+  `api/stub_data.py`'s example data uses it). Retargeted to
+  `function=KEYGEN` + a Shor-broken family (the real, reachable signal) --
+  see `docs/decisions/backend/012-private-key-floor-reachability.md`. New
+  end-to-end test `test_real_rsa_keygen_scan_triggers_private_key_floor`
+  proves it now fires from an actual `POST /scans` + real detector run,
+  not a hand-built `Detection`.
+- `api/rate_limiter.py` trusted a client-supplied `X-Test-Client-Id` header
+  unconditionally, letting any external caller bypass rate limiting by
+  varying it. Gated behind `ECDAT_RATE_LIMIT_TRUST_TEST_HEADER=1`
+  (test-only, set in `tests/conftest.py`), never trusted by default.
+- `engine/ingest.py`: `MAX_COMPRESSION_RATIO` was declared but never
+  enforced (per-entry for zip via `compress_size`, aggregate archive-size
+  vs. total-uncompressed for tar, since tar's gzip wraps the whole stream
+  not each member). Tar extraction now passes `filter="data"` (adopts
+  Python 3.12's safer default early, silences the 3.14 deprecation
+  warning).
+- `engine/scanner.py` had no per-file size cap -- one pathological huge
+  file could still be read whole into memory even though the aggregate
+  archive quota was enforced. Added a 100 MB per-file cap, counted in
+  `ScanStats.skippedPrefilter` (not `errors`, since it's a policy skip,
+  not an I/O failure).
+
+Real end-to-end integration (real `uvicorn` backend + real `next build &&
+next start` frontend, MSW structurally cannot run in a production build):
+verified via `frontend/e2e/finale-integration.spec.ts` (real upload -> WS
+stage events -> Overview band counts matched against the API directly ->
+real `POST /rescore` -> real finding drawer + triage PATCH persisted ->
+real CBOM fetched and shape-checked -> real graph with 2D fallback), both
+themes, run against the live backend, not mocks. Also manually verified a
+hostile path-traversal tar.gz is rejected by the real running
+`POST /scans/upload` (400, traversal target never created, backend stays
+healthy afterward) -- see the matching frontend note for the UI-side gap
+this surfaced (launcher never showed upload errors) and fix.
+
+Security scanners run for real this session (previously blocked on no
+network access): `bandit` (3 findings, all reviewed as false positives --
+see below), `pip-audit` (clean), `gitleaks` (clean, 26 commits scanned).
+Bandit's 2 SQL-injection warnings in `api/store.py` are on
+`f"...{ph}..."` strings where `{ph}` is only the dialect placeholder
+character (`?`/`%s`); the actual values are always passed as parameterized
+query args, never interpolated -- bandit's static check can't distinguish
+that pattern. Its `tarfile_unsafe_members` warning on `zf.extractall()` in
+`engine/ingest.py` (zip path) is pre-mitigated by this file's own manual
+zip-slip/symlink validation of every entry before extraction (zipfile has
+no `filter=` parameter the way tarfile does in 3.12+); the tar path was
+given `filter="data"` as belt-and-suspenders on top of the same manual
+checks.
+
+Gates: `ruff`, `mypy --strict`, `pytest` (117 passed, up from 112),
+`contract_diff.py`, `verify_airgap.py`, `bandit`, `pip-audit`, `gitleaks`
+all clean/reviewed.
+
 ## 2026-09-18 — Phase 10: Security Hardening, Audit Log Hash-Chaining & Air-Gap Verification
 
 Completed enterprise security hardening, tamper-evident audit logging, and automated air-gap verification:

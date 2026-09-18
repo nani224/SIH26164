@@ -23,9 +23,6 @@ from api.models import (
     Finding,
     FindingKind,
     FindingSource,
-    GraphEdge,
-    GraphNode,
-    GraphNodeType,
     Location,
     Policy,
     PqcCatalogEntry,
@@ -257,41 +254,6 @@ _SCAN = Scan(
     finishedAt=datetime(2026, 9, 17, 12, 0, 4, tzinfo=UTC),
 )
 
-def _node(
-    node_id: str, node_type: str, label: str, band: str, score: float,
-    occurrences: int, parent_id: str | None,
-) -> GraphNode:
-    return GraphNode(
-        id=node_id,
-        type=GraphNodeType(node_type),
-        label=label,
-        band=RiskBand(band),
-        score=score,
-        occurrences=occurrences,
-        parentId=parent_id,
-    )
-
-
-_GRAPH_NODES = [
-    _node("sys_root", "system", "example-monorepo", "critical", 92.0, 6, None),
-    _node("file_keyservice", "file", "KeyService.java", "critical", 76.95, 1, "sys_root"),
-    _node("file_serverkey", "file", "server.key", "critical", 92.0, 1, "sys_root"),
-    _node("file_nginxconf", "file", "nginx.conf", "high", 35.84, 1, "sys_root"),
-    _node("file_verifycpp", "file", "verify.cpp", "medium", 21.0, 1, "sys_root"),
-    _node("file_tokengo", "file", "token.go", "medium", 15.12, 1, "sys_root"),
-    _node("file_vaultpy", "file", "vault.py", "low", 0.63, 1, "sys_root"),
-    _node("asset_rsa2048", "asset", "RSA-2048 keygen", "critical", 76.95, 1, "file_keyservice"),
-]
-_GRAPH_EDGES = [
-    GraphEdge(source="sys_root", target="file_keyservice"),
-    GraphEdge(source="sys_root", target="file_serverkey"),
-    GraphEdge(source="sys_root", target="file_nginxconf"),
-    GraphEdge(source="sys_root", target="file_verifycpp"),
-    GraphEdge(source="sys_root", target="file_tokengo"),
-    GraphEdge(source="sys_root", target="file_vaultpy"),
-    GraphEdge(source="file_keyservice", target="asset_rsa2048"),
-]
-
 PQC_CATALOG: list[PqcCatalogEntry] = [spec.to_catalog_entry() for spec in NIST_PQC_CATALOG]
 
 
@@ -304,11 +266,3 @@ def list_findings() -> list[Finding]:
 
 def default_scan() -> Scan:
     return _SCAN.model_copy(deep=True)
-
-
-def default_graph_nodes() -> list[GraphNode]:
-    return list(_GRAPH_NODES)
-
-
-def default_graph_edges() -> list[GraphEdge]:
-    return list(_GRAPH_EDGES)

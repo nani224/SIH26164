@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from api.models import Context, Criticality, Exposure, Policy
 from engine.scanner import scan
 
@@ -84,3 +86,21 @@ def test_scan_go_files(tmp_path: Path) -> None:
     assert len(result.findings) == 1
     assert result.findings[0].family == "SHA-2"
     assert result.findings[0].location.path == "main.go"
+
+
+def test_scan_skips_oversized_file_without_reading_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A pathological single huge file must be skipped (counted in
+    skippedPrefilter), not read whole into memory -- see engine.scanner's
+    _MAX_FILE_BYTES. Uses a tiny cap via monkeypatch instead of writing a
+    real 100 MB fixture file.
+    """
+    import engine.scanner as scanner_module
+
+    monkeypatch.setattr(scanner_module, "_MAX_FILE_BYTES", 10)
+    (tmp_path / "huge.py").write_text('import hashlib\nhashlib.md5(b"x")\n')  # well over 10 bytes
+    (tmp_path / "small.py").write_text("x=1")  # under 10 bytes, still scanned
+
+    result = scan(tmp_path, _POLICY)
+    assert result.stats.skippedPrefilter == 1
+    assert result.stats.errors == 0
+    assert len(result.findings) == 0  # the only finding-bearing file was skipped

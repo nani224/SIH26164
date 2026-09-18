@@ -25,16 +25,21 @@ def _policy(**overrides: object) -> Policy:
 
 
 def _detection(**overrides: object) -> Detection:
+    # function=SIGN, not KEYGEN: KEYGEN + a Shor-broken family (RSA's V=1.0)
+    # trips the private-key >=90 floor (see engine/factors.py) outside a
+    # test-exposure path, which would swamp every other factor these
+    # generic tests are isolating. The two dedicated private-key-floor
+    # tests below override function=KEYGEN explicitly.
     defaults: dict[str, object] = dict(
         kind=FindingKind.ALGORITHM,
         surface=Surface.SOURCE,
         family=Family.RSA,
-        display_name="RSA keygen",
-        function=CryptoFunction.KEYGEN,
+        display_name="RSA signature",
+        function=CryptoFunction.SIGN,
         path="app.py",
         line=1,
-        symbol="rsa.generate_private_key",
-        snippet="rsa.generate_private_key(...)",
+        symbol="private_key.sign",
+        snippet="private_key.sign(...)",
         source=FindingSource.AST,
         confidence=0.9,
     )
@@ -104,9 +109,14 @@ def test_confident_finding_does_not_need_review() -> None:
 
 
 def test_unencrypted_private_key_outside_test_path_is_forced_to_at_least_90() -> None:
+    # function=KEYGEN + a Shor-broken family (V=1.0) is the real signal a
+    # scan can actually produce today (see engine/factors.py's
+    # forced_private_key comment) -- kind=KEY + function=SIGN/DECRYPT is
+    # never emitted by any real detector, so this must exercise the
+    # reachable path, not a hand-built one that can't occur in practice.
     d = _detection(
-        kind=FindingKind.KEY, family=Family.RSA, function=CryptoFunction.SIGN, confidence=0.95,
-        display_name="Unencrypted RSA private key", symbol="PRIVATE KEY", path="secrets/server.key",
+        kind=FindingKind.ALGORITHM, family=Family.RSA, function=CryptoFunction.KEYGEN, confidence=0.95,
+        display_name="RSA key generation", symbol="rsa.generate_private_key", path="secrets/server_keygen.py",
     )
     policy = _policy(exposure=Exposure.INTERNAL, criticality=Criticality.LOW)
     risk = derive_risk(d, policy)
@@ -116,8 +126,8 @@ def test_unencrypted_private_key_outside_test_path_is_forced_to_at_least_90() ->
 
 def test_private_key_override_does_not_apply_in_test_paths() -> None:
     d = _detection(
-        kind=FindingKind.KEY, family=Family.RSA, function=CryptoFunction.SIGN, confidence=0.95,
-        display_name="Unencrypted RSA private key", symbol="PRIVATE KEY", path="tests/fixtures/server.key",
+        kind=FindingKind.ALGORITHM, family=Family.RSA, function=CryptoFunction.KEYGEN, confidence=0.95,
+        display_name="RSA key generation", symbol="rsa.generate_private_key", path="tests/fixtures/server_keygen.py",
     )
     policy = _policy(exposure=Exposure.TEST, criticality=Criticality.LOW)
     risk = derive_risk(d, policy)
