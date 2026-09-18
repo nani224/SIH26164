@@ -1,0 +1,215 @@
+@import "tailwindcss";
+
+@theme {
+  --color-crypto-shor: var(--crypto-shor);
+  --color-crypto-shor-bg: var(--crypto-shor-bg);
+  --color-crypto-shor-border: var(--crypto-shor-border);
+
+  --color-crypto-broken: var(--crypto-broken);
+  --color-crypto-broken-bg: var(--crypto-broken-bg);
+  --color-crypto-broken-border: var(--crypto-broken-border);
+
+  --color-crypto-grover: var(--crypto-grover);
+  --color-crypto-grover-bg: var(--crypto-grover-bg);
+  --color-crypto-grover-border: var(--crypto-grover-border);
+
+  --color-crypto-safe-classical: var(--crypto-safe-classical);
+  --color-crypto-safe-classical-bg: var(--crypto-safe-classical-bg);
+  --color-crypto-safe-classical-border: var(--crypto-safe-classical-border);
+
+  --color-crypto-pqc: var(--crypto-pqc);
+  --color-crypto-pqc-bg: var(--crypto-pqc-bg);
+  --color-crypto-pqc-border: var(--crypto-pqc-border);
+
+  --color-band-critical: var(--band-critical);
+  --color-band-critical-bg: var(--band-critical-bg);
+  --color-band-high: var(--band-high);
+  --color-band-high-bg: var(--band-high-bg);
+  --color-band-medium: var(--band-medium);
+  --color-band-medium-bg: var(--band-medium-bg);
+  --color-band-low: var(--band-low);
+  --color-band-low-bg: var(--band-low-bg);
+
+  --font-sans: var(--font-sans), "IBM Plex Sans Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  :root {
+    /* Theme: Light "Cipher Clean Room" */
+    --color-scheme: light;
+    --surface-base: oklch(0.97 0.008 245);
+    --surface-raised: oklch(0.93 0.012 245);
+    --surface-card: oklch(0.99 0.004 245);
+    --surface-card-hover: oklch(0.95 0.01 245);
+    --surface-overlay: oklch(0.98 0.006 245 / 0.88);
+
+    --border-subtle: oklch(0.86 0.012 245);
+    --border-prominent: oklch(0.68 0.025 245);
+    --border-focus: oklch(0.45 0.12 245);
+
+    --text-primary: oklch(0.15 0.02 250);
+    --text-secondary: oklch(0.28 0.02 250);
+    --text-muted: oklch(0.38 0.025 250);
+
+    /* Cryptographic Semantic Tokens (Tuned for light field WCAG AA >= 4.5:1) */
+    --crypto-shor: oklch(0.38 0.22 25);
+    --crypto-shor-bg: oklch(0.38 0.22 25 / 0.08);
+    --crypto-shor-border: oklch(0.38 0.22 25 / 0.35);
+
+    --crypto-broken: oklch(0.36 0.22 320);
+    --crypto-broken-bg: oklch(0.36 0.22 320 / 0.08);
+    --crypto-broken-border: oklch(0.36 0.22 320 / 0.35);
+
+    --crypto-grover: oklch(0.38 0.15 75);
+    --crypto-grover-bg: oklch(0.38 0.15 75 / 0.08);
+    --crypto-grover-border: oklch(0.38 0.15 75 / 0.35);
+
+    --crypto-safe-classical: oklch(0.35 0.14 230);
+    --crypto-safe-classical-bg: oklch(0.35 0.14 230 / 0.08);
+    --crypto-safe-classical-border: oklch(0.35 0.14 230 / 0.35);
+
+    --crypto-pqc: oklch(0.32 0.14 185);
+    --crypto-pqc-bg: oklch(0.32 0.14 185 / 0.08);
+    --crypto-pqc-border: oklch(0.32 0.14 185 / 0.35);
+
+    /* Perceptual Risk Band Ramp (Light Theme) */
+    --band-critical: oklch(0.38 0.22 25);
+    --band-critical-bg: oklch(0.38 0.22 25 / 0.08);
+    --band-high: oklch(0.40 0.18 45);
+    --band-high-bg: oklch(0.40 0.18 45 / 0.08);
+    --band-medium: oklch(0.38 0.15 75);
+    --band-medium-bg: oklch(0.38 0.15 75 / 0.08);
+    --band-low: oklch(0.32 0.14 150);
+    --band-low-bg: oklch(0.32 0.14 150 / 0.08);
+
+    /* Lattice Motif */
+    --lattice-line: oklch(0.85 0.01 245 / 0.45);
+  }
+
+  .dark {
+    /* Theme: Dark "Observatory Deep Void" */
+    --color-scheme: dark;
+    --surface-base: oklch(0.12 0.015 250);
+    --surface-raised: oklch(0.15 0.018 250);
+    --surface-card: oklch(0.18 0.022 250);
+    --surface-card-hover: oklch(0.22 0.025 250);
+    --surface-overlay: oklch(0.16 0.02 250 / 0.88);
+
+    --border-subtle: oklch(0.26 0.02 250);
+    --border-prominent: oklch(0.38 0.03 250);
+    --border-focus: oklch(0.78 0.15 185);
+
+    --text-primary: oklch(0.98 0.005 245);
+    --text-secondary: oklch(0.90 0.015 245);
+    --text-muted: oklch(0.82 0.015 245);
+
+    /* Cryptographic Semantic Tokens (Glow-tuned for dark field WCAG AA >= 4.5:1) */
+    --crypto-shor: oklch(0.74 0.22 25);
+    --crypto-shor-bg: oklch(0.74 0.22 25 / 0.14);
+    --crypto-shor-border: oklch(0.74 0.22 25 / 0.45);
+
+    --crypto-broken: oklch(0.76 0.20 320);
+    --crypto-broken-bg: oklch(0.76 0.20 320 / 0.14);
+    --crypto-broken-border: oklch(0.76 0.20 320 / 0.45);
+
+    --crypto-grover: oklch(0.82 0.16 75);
+    --crypto-grover-bg: oklch(0.82 0.16 75 / 0.14);
+    --crypto-grover-border: oklch(0.82 0.16 75 / 0.45);
+
+    --crypto-safe-classical: oklch(0.78 0.13 230);
+    --crypto-safe-classical-bg: oklch(0.78 0.13 230 / 0.14);
+    --crypto-safe-classical-border: oklch(0.78 0.13 230 / 0.45);
+
+    --crypto-pqc: oklch(0.78 0.15 185);
+    --crypto-pqc-bg: oklch(0.78 0.15 185 / 0.14);
+    --crypto-pqc-border: oklch(0.78 0.15 185 / 0.45);
+
+    /* Perceptual Risk Band Ramp (Dark Theme) */
+    --band-critical: oklch(0.74 0.22 25);
+    --band-critical-bg: oklch(0.74 0.22 25 / 0.14);
+    --band-high: oklch(0.78 0.18 45);
+    --band-high-bg: oklch(0.78 0.18 45 / 0.14);
+    --band-medium: oklch(0.82 0.16 75);
+    --band-medium-bg: oklch(0.82 0.16 75 / 0.14);
+    --band-low: oklch(0.78 0.14 150);
+    --band-low-bg: oklch(0.78 0.14 150 / 0.14);
+
+    /* Lattice Motif */
+    --lattice-line: oklch(0.24 0.015 250 / 0.45);
+  }
+
+  body {
+    background-color: var(--surface-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.01em;
+    min-height: 100vh;
+  }
+}
+
+/* 45-degree diagonal cross-hatch pattern for Classically Broken Cryptography */
+.hatch-broken {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    var(--crypto-broken-border) 4px,
+    var(--crypto-broken-border) 6px
+  );
+}
+
+.hatch-broken-dense {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    var(--crypto-broken-border) 2px,
+    var(--crypto-broken-border) 3px
+  );
+}
+
+/* Faint ML-KEM lattice grid background motif */
+.lattice-bg {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, var(--lattice-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--lattice-line) 1px, transparent 1px);
+}
+
+/* Technical tabular numbers */
+.num-tabular {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Monospace font for hex, addresses, and code snippets */
+.font-mono-code {
+  font-family: var(--font-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Hairline borders */
+.border-hairline {
+  border-width: 1px;
+  border-color: var(--border-subtle);
+}
+
+.border-hairline-prominent {
+  border-width: 1px;
+  border-color: var(--border-prominent);
+}
+
+/* Danger glow based on risk score */
+.glow-critical {
+  box-shadow: 0 0 16px -2px oklch(0.62 0.23 25 / 0.35);
+}
+
+.glow-high {
+  box-shadow: 0 0 12px -2px oklch(0.68 0.21 45 / 0.3);
+}
+
+/* Needs review dashed border indicator */
+.needs-review-dashed {
+  border-style: dashed;
+  border-width: 1.5px;
+  border-color: var(--band-medium);
+}

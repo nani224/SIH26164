@@ -1,0 +1,33 @@
+{
+  "$schema": "https://unpkg.com/knip@5/overview/schema.json",
+  "entry": [
+    "src/app/**/page.tsx",
+    "src/app/**/layout.tsx",
+    "src/lib/api.ts",
+    "src/types/crypto.ts",
+    "src/**/*.test.{ts,tsx}",
+    "src/**/*.stories.{ts,tsx}",
+    "e2e/**/*.spec.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "e2e/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "src/types/api.generated.ts"
+  ],
+  "ignoreDependencies": [
+    "@types/d3",
+    "d3",
+    "framer-motion",
+    "tailwind-merge",
+    "@storybook/addon-a11y",
+    "eslint-config-next",
+    "@eslint/eslintrc",
+    "@typescript-eslint/eslint-plugin",
+    "tailwindcss",
+    "@fontsource/ibm-plex-sans-condensed",
+    "@fontsource/jetbrains-mono"
+  ],
+  "ignoreExportsUsedInFile": true
+}
