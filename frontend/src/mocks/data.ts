@@ -1,4 +1,4 @@
-import type { Finding, Scan, Policy, PqcCatalogItem } from '../types/crypto';
+import type { Finding, Scan, Policy, PqcCatalogItem, RemediationPlanItem, GraphNode, GraphEdge } from '../types/crypto';
 
 export const mockScans: Scan[] = [
   {
@@ -429,6 +429,100 @@ export const mockFindings: Finding[] = [
       status: 'open',
     },
   },
+  {
+    id: 'f-hsm-001',
+    kind: 'hardware-module',
+    surface: 'hardware-module',
+    family: 'PKCS#11 / HSM',
+    displayName: 'Thales Luna PCIe HSM [Proposed]',
+    keySize: 4096,
+    function: 'hardware-root-of-trust',
+    location: {
+      path: 'hw/slot-0/pci-0000:03:00.0',
+      line: 1,
+      offset: 0,
+    },
+    symbol: 'C_SignInit',
+    snippet: 'PKCS#11 C_Initialize(NULL); C_OpenSession(slot_id=0, flags=CKF_SERIAL_SESSION); [Proposed]',
+    source: 'hardware-probe',
+    confidence: 0.85,
+    risk: {
+      score: 72.0,
+      band: 'critical',
+      V: 1.0,
+      F: 0.9,
+      U: 0.8,
+      E: 1.0,
+      K: 1.0,
+      X: 12,
+      Y: 6,
+      Z: 10,
+      moscaMargin: 8,
+      reason: 'Hardware security module firmware running legacy RSA-4096 / P-384 root keys [Proposed]',
+      classicallyBroken: false,
+      hndl: true,
+      needsReview: false,
+    },
+    recommendation: {
+      action: 'Upgrade HSM firmware to support CNSA 2.0 / ML-DSA stateful firmware signing',
+      target: 'ML-DSA-87 / Hybrid PKCS#11 v3.2',
+      cost: {
+        pkBytesDelta: 2592,
+        wireBytesDelta: 4627,
+        opMsDelta: 1.4,
+      },
+    },
+    triage: {
+      status: 'open',
+    },
+  },
+  {
+    id: 'f-cloud-001',
+    kind: 'cloud-service',
+    surface: 'cloud-service',
+    family: 'Cloud KMS',
+    displayName: 'AWS KMS / Azure Key Vault Managed Key [Proposed]',
+    keySize: 2048,
+    function: 'cloud-envelope-encryption',
+    location: {
+      path: 'terraform/kms-enclave.tf',
+      line: 18,
+      offset: 240,
+    },
+    symbol: 'aws_kms_key.app_vault',
+    snippet: 'customer_master_key_spec = "RSA_2048", key_usage = "ENCRYPT_DECRYPT" [Proposed]',
+    source: 'cloud-api',
+    confidence: 0.95,
+    risk: {
+      score: 84.0,
+      band: 'critical',
+      V: 1.0,
+      F: 1.0,
+      U: 0.84,
+      E: 1.0,
+      K: 1.0,
+      X: 15,
+      Y: 8,
+      Z: 10,
+      moscaMargin: 13,
+      reason: 'Cloud KMS CMK uses Shor-vulnerable RSA-2048 for database envelope key encryption [Proposed]',
+      classicallyBroken: false,
+      hndl: true,
+      needsReview: false,
+    },
+    recommendation: {
+      action: 'Migrate Cloud KMS Key Ring to Kyber / ML-KEM post-quantum hybrid KEM',
+      target: 'AWS KMS Post-Quantum Hybrid / ML-KEM-768',
+      cost: {
+        pkBytesDelta: 1184,
+        wireBytesDelta: 1088,
+        opMsDelta: 0.08,
+      },
+    },
+    triage: {
+      status: 'open',
+    },
+  },
 ];
 
 export const mockPqcCatalog: PqcCatalogItem[] = [
@@ -508,5 +602,224 @@ export const mockPqcCatalog: PqcCatalogItem[] = [
     op1_ms: 45.2,
     op2: 'verify',
     op2_ms: 0.85,
+  },
+];
+
+export const mockPolicies: Policy[] = [
+  {
+    id: 'policy-default-defense',
+    name: 'National Defense Core (CNSA 2.0)',
+    crqcYears: 10,
+    default: {
+      exposure: 'internal',
+      criticality: 'high',
+      shelfLifeYears: 10,
+      migrationYears: 5,
+    },
+    contexts: [
+      {
+        glob: 'configs/**',
+        exposure: 'external',
+        criticality: 'mission-critical',
+        shelfLifeYears: 15,
+        migrationYears: 5,
+      },
+      {
+        glob: 'certs/**',
+        exposure: 'external',
+        criticality: 'mission-critical',
+        shelfLifeYears: 12,
+        migrationYears: 6,
+      },
+      {
+        glob: 'storage/**',
+        exposure: 'isolated',
+        criticality: 'high',
+        shelfLifeYears: 20,
+        migrationYears: 3,
+      },
+      {
+        glob: 'legacy/**',
+        exposure: 'internal',
+        criticality: 'medium',
+        shelfLifeYears: 5,
+        migrationYears: 2,
+      },
+    ],
+  },
+  {
+    id: 'policy-commercial-banking',
+    name: 'Financial Mesh & Sovereign Banking',
+    crqcYears: 8,
+    default: {
+      exposure: 'internal',
+      criticality: 'medium',
+      shelfLifeYears: 7,
+      migrationYears: 4,
+    },
+    contexts: [
+      {
+        glob: 'payments/**',
+        exposure: 'external',
+        criticality: 'mission-critical',
+        shelfLifeYears: 10,
+        migrationYears: 4,
+      },
+    ],
+  },
+];
+
+export const mockGraph: { nodes: GraphNode[]; edges: GraphEdge[] } = {
+  nodes: [
+    { id: 'sys-root', name: 'NTRO Core Infrastructure', type: 'system', occurrences: 1420, riskScore: 98.0, semanticClass: 'shor' },
+    { id: 'file-ssh', name: 'configs/sshd_config', type: 'file', occurrences: 2, riskScore: 100.0, semanticClass: 'shor' },
+    { id: 'file-cert', name: 'certs/ca-root.crt', type: 'file', occurrences: 1, riskScore: 95.0, semanticClass: 'classically-broken' },
+    { id: 'file-vault', name: 'storage/vault.db', type: 'file', occurrences: 1, riskScore: 12.0, semanticClass: 'quantum-safe-classical' },
+    { id: 'file-auth', name: 'legacy/auth.py', type: 'file', occurrences: 1, riskScore: 78.0, semanticClass: 'shor' },
+    { id: 'file-mesh', name: 'mesh/envoy.yaml', type: 'file', occurrences: 1, riskScore: 8.0, semanticClass: 'pqc' },
+    { id: 'file-telemetry', name: 'firmware/libtelemetry.so', type: 'file', occurrences: 1, riskScore: 98.0, semanticClass: 'classically-broken' },
+    { id: 'asset-x25519', name: 'X25519 (ECDH)', type: 'asset', occurrences: 1, riskScore: 100.0, semanticClass: 'shor' },
+    { id: 'asset-sha1', name: 'SHA-1 Fingerprint', type: 'asset', occurrences: 1, riskScore: 95.0, semanticClass: 'classically-broken' },
+    { id: 'asset-aes256', name: 'AES-256-GCM', type: 'asset', occurrences: 1, riskScore: 12.0, semanticClass: 'quantum-safe-classical' },
+    { id: 'asset-mlkem', name: 'ML-KEM-768', type: 'asset', occurrences: 1, riskScore: 8.0, semanticClass: 'pqc' },
+  ],
+  edges: [
+    { source: 'sys-root', target: 'file-ssh', relationship: 'contains' },
+    { source: 'sys-root', target: 'file-cert', relationship: 'contains' },
+    { source: 'sys-root', target: 'file-vault', relationship: 'contains' },
+    { source: 'sys-root', target: 'file-auth', relationship: 'contains' },
+    { source: 'sys-root', target: 'file-mesh', relationship: 'contains' },
+    { source: 'sys-root', target: 'file-telemetry', relationship: 'contains' },
+    { source: 'file-ssh', target: 'asset-x25519', relationship: 'uses' },
+    { source: 'file-cert', target: 'asset-sha1', relationship: 'uses' },
+    { source: 'file-vault', target: 'asset-aes256', relationship: 'uses' },
+    { source: 'file-mesh', target: 'asset-mlkem', relationship: 'uses' },
+  ],
+};
+
+export const mockCbom = {
+  bomFormat: 'CycloneDX',
+  specVersion: '1.6',
+  serialNumber: 'urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79',
+  version: 1,
+  metadata: {
+    timestamp: '2026-09-18T00:00:00Z',
+    tools: {
+      components: [
+        {
+          name: 'ECDAT Scanner',
+          version: '1.0.0',
+          vendor: 'NTRO SIH26164',
+        },
+      ],
+    },
+  },
+  components: [
+    {
+      type: 'cryptographic-asset',
+      name: 'X25519',
+      version: 'curve25519',
+      cryptoProperties: {
+        assetType: 'algorithm',
+        algorithmProperties: {
+          family: 'ECDH',
+          primitive: 'key-exchange',
+          parameterSetIdentifier: '256',
+          quantumSecurityLevel: 0,
+        },
+      },
+    },
+    {
+      type: 'cryptographic-asset',
+      name: 'SHA-1',
+      cryptoProperties: {
+        assetType: 'algorithm',
+        algorithmProperties: {
+          family: 'SHA1',
+          primitive: 'hash',
+          classicalSecurityLevel: 0,
+        },
+      },
+    },
+    {
+      type: 'cryptographic-asset',
+      name: 'ML-KEM-768',
+      cryptoProperties: {
+        assetType: 'algorithm',
+        algorithmProperties: {
+          family: 'ML-KEM',
+          primitive: 'kem',
+          quantumSecurityLevel: 3,
+        },
+      },
+    },
+  ],
+  signature: {
+    algorithm: 'ML-DSA-65',
+    value: '30450221008d1f2a3c4b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f',
+    publicKey: '04a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f',
+  },
+};
+
+export const mockPlan: RemediationPlanItem[] = [
+  {
+    location: 'configs/sshd_config',
+    line: 2,
+    asset: 'X25519',
+    score: 100.0,
+    band: 'critical',
+    reason: 'Shor-vulnerable key exchange on external perimeter',
+    mosca_margin: 15,
+    confidence: 1.0,
+    action: 'Upgrade SSH kex algorithms to ML-KEM hybrid',
+    target: 'ML-KEM-768 / X25519-ML-KEM Hybrid',
+  },
+  {
+    location: 'certs/ca-root.crt',
+    line: 14,
+    asset: 'SHA-1 Fingerprint',
+    score: 95.0,
+    band: 'critical',
+    reason: 'Classically broken signature algorithm',
+    mosca_margin: 6,
+    confidence: 1.0,
+    action: 'Re-issue certificate with stateful hash signature',
+    target: 'SLH-DSA-128s / ML-DSA-65',
+  },
+  {
+    location: 'legacy/auth.py',
+    line: 42,
+    asset: 'RSA-2048',
+    score: 78.0,
+    band: 'critical',
+    reason: 'Public key vulnerable to Shor algorithm',
+    mosca_margin: 4,
+    confidence: 0.95,
+    action: 'Replace RSA authentication token signer',
+    target: 'ML-DSA-65',
+  },
+  {
+    location: 'firmware/libtelemetry.so',
+    line: 1,
+    asset: 'RC4 (ARC4)',
+    score: 98.0,
+    band: 'critical',
+    reason: 'Classically broken stream cipher with catastrophic keystream bias',
+    mosca_margin: 3,
+    confidence: 0.71,
+    action: 'Excise legacy stream cipher and purge symbol references',
+    target: 'ChaCha20-Poly1305 / AES-256',
+  },
+  {
+    location: 'storage/vault.db',
+    line: 88,
+    asset: 'AES-256-GCM',
+    score: 12.0,
+    band: 'low',
+    reason: 'Quantum-safe symmetric primitive; meets CNSA 2.0 requirements',
+    mosca_margin: -2,
+    confidence: 1.0,
+    action: 'Retain key size and rotate key derivation material',
+    target: 'AES-256-GCM',
   },
 ];

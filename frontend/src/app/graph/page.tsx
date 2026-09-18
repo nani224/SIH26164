@@ -1,22 +1,40 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
-import { mockFindings } from '../../mocks/data';
-import { classifyAlgorithm, type Finding } from '../../types/crypto';
+import { fetchScanGraph, fetchScanFindings } from '../../lib/api';
+import { classifyAlgorithm, type Finding, type GraphNode, type RiskBand } from '../../types/crypto';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { Network, Sparkles, Layers, RefreshCw, Eye, Info, ZoomIn } from 'lucide-react';
 import * as THREE from 'three';
 
 export default function CryptoEstateGraphPage() {
-  const { openDrawer } = useAppStore();
+  const { activeScanId, openDrawer } = useAppStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [use3D, setUse3D] = useState(true);
-  const [hoveredNode, setHoveredNode] = useState<{ finding: Finding; x: number; y: number } | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<{ node: GraphNode; x: number; y: number } | null>(null);
+
+  const { data: graphData, isLoading: isGraphLoading } = useQuery({
+    queryKey: ['graph', activeScanId],
+    queryFn: () => fetchScanGraph(activeScanId),
+  });
+
+  const { data: findingsData } = useQuery({
+    queryKey: ['findings', activeScanId],
+    queryFn: () => fetchScanFindings(activeScanId),
+  });
+
+  const findingsMap = useRef(new Map<string, Finding>());
+  useEffect(() => {
+    if (findingsData?.items) {
+      findingsData.items.forEach((f) => findingsMap.current.set(f.displayName, f));
+    }
+  }, [findingsData]);
 
   useEffect(() => {
-    if (!use3D || !canvasRef.current) return;
+    if (!use3D || !canvasRef.current || !graphData?.nodes) return;
 
     const canvas = canvasRef.current;
     const width = canvas.parentElement?.clientWidth || 900;
@@ -41,6 +59,13 @@ export default function CryptoEstateGraphPage() {
     pointLight.position.set(0, 5, 10);
     scene.add(pointLight);
 
+    // Create System, File, and Asset Nodes from API Graph
+    const nodeMeshes: Array<{ mesh: THREE.Mesh; node: GraphNode }> = [];
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.6 });
+
+    const nodes = graphData.nodes;
+    const rootNode = nodes.find((n) => n.type === 'system') || nodes[0];
+
     // Central Root System Node
     const rootGeo = new THREE.SphereGeometry(1.6, 32, 32);
     const rootMat = new THREE.MeshStandardMaterial({
@@ -51,36 +76,34 @@ export default function CryptoEstateGraphPage() {
     });
     const rootMesh = new THREE.Mesh(rootGeo, rootMat);
     scene.add(rootMesh);
+    if (rootNode) nodeMeshes.push({ mesh: rootMesh, node: rootNode });
 
-    // Create File and Finding Nodes
-    const nodeMeshes: Array<{ mesh: THREE.Mesh; finding: Finding }> = [];
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.6 });
+    const childNodes = nodes.filter((n) => n.id !== rootNode?.id);
 
-    mockFindings.forEach((finding, idx) => {
-      const angle = (idx / mockFindings.length) * Math.PI * 2;
-      const radius = 8 + (idx % 3) * 3;
+    childNodes.forEach((node, idx) => {
+      const angle = (idx / childNodes.length) * Math.PI * 2;
+      const radius = node.type === 'file' ? 6 + (idx % 2) * 2 : 10 + (idx % 3) * 2;
       const x = Math.cos(angle) * radius;
       const y = Math.sin(angle) * radius;
       const z = ((idx % 5) - 2) * 2;
 
       // Color mapping
-      const cls = classifyAlgorithm(finding.family, finding.displayName, finding.risk.classicallyBroken);
       let colorHex = 0xf43f5e; // Shor red
-      if (cls === 'classically-broken') colorHex = 0xd946ef; // magenta
-      else if (cls === 'pqc') colorHex = 0x2dd4bf; // lattice teal
-      else if (cls === 'grover') colorHex = 0xf59e0b; // amber
-      else if (cls === 'quantum-safe-classical') colorHex = 0x38bdf8; // steel blue
+      if (node.semanticClass === 'classically-broken') colorHex = 0xd946ef; // magenta
+      else if (node.semanticClass === 'pqc') colorHex = 0x2dd4bf; // lattice teal
+      else if (node.semanticClass === 'grover') colorHex = 0xf59e0b; // amber
+      else if (node.semanticClass === 'quantum-safe-classical') colorHex = 0x38bdf8; // steel blue
 
-      const nodeGeo = new THREE.SphereGeometry(finding.risk.score >= 60 ? 0.9 : 0.6, 16, 16);
+      const nodeGeo = new THREE.SphereGeometry(node.riskScore >= 60 ? 0.9 : 0.6, 16, 16);
       const nodeMat = new THREE.MeshStandardMaterial({
         color: colorHex,
         emissive: colorHex,
-        emissiveIntensity: finding.risk.score >= 60 ? 0.6 : 0.2,
+        emissiveIntensity: node.riskScore >= 60 ? 0.6 : 0.2,
       });
       const mesh = new THREE.Mesh(nodeGeo, nodeMat);
       mesh.position.set(x, y, z);
       scene.add(mesh);
-      nodeMeshes.push({ mesh, finding });
+      nodeMeshes.push({ mesh, node });
 
       // Connecting line to root
       const lineGeo = new THREE.BufferGeometry().setFromPoints([
@@ -107,7 +130,7 @@ export default function CryptoEstateGraphPage() {
         const target = nodeMeshes.find((n) => n.mesh === intersects[0].object);
         if (target) {
           setHoveredNode({
-            finding: target.finding,
+            node: target.node,
             x: event.clientX - rect.left,
             y: event.clientY - rect.top,
           });
@@ -118,12 +141,11 @@ export default function CryptoEstateGraphPage() {
     };
 
     const handleClick = () => {
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(nodeMeshes.map((n) => n.mesh));
-      if (intersects.length > 0) {
-        const target = nodeMeshes.find((n) => n.mesh === intersects[0].object);
-        if (target) {
-          openDrawer(target.finding);
+      if (hoveredNode) {
+        // Look up corresponding finding if available to open drawer
+        const f = findingsMap.current.get(hoveredNode.node.name);
+        if (f) {
+          openDrawer(f);
         }
       }
     };
@@ -132,123 +154,121 @@ export default function CryptoEstateGraphPage() {
     canvas.addEventListener('click', handleClick);
 
     // Animation Loop
-    let animationId: number;
+    let animationFrameId: number;
     const animate = () => {
-      animationId = requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
 
-      // Subtle slow rotation of entire graph cluster
-      scene.rotation.y += 0.003;
-      scene.rotation.x = Math.sin(scene.rotation.y * 0.5) * 0.1;
+      // Subtle scene rotation
+      scene.rotation.y += 0.0015;
+      scene.rotation.x = Math.sin(Date.now() * 0.0005) * 0.05;
 
       renderer.render(scene, camera);
     };
     animate();
 
     return () => {
-      cancelAnimationFrame(animationId);
+      cancelAnimationFrame(animationFrameId);
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('click', handleClick);
       renderer.dispose();
     };
-  }, [use3D, openDrawer]);
+  }, [use3D, graphData, openDrawer]);
 
   return (
-    <div className="space-y-4 font-mono text-xs">
+    <div className="space-y-4 font-mono">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
         <div>
           <div className="text-xs text-[var(--crypto-pqc)] font-bold flex items-center gap-1.5 mb-1">
             <Network className="w-3.5 h-3.5" />
-            <span>SCREEN 6 · CRYPTO ESTATE HIERARCHY GRAPH</span>
+            <span>SCREEN 6 · CRYPTO ESTATE GRAPH (3D / 2D)</span>
           </div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">
             System → File → Cryptographic Asset Topology
           </h1>
           <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-            Node radius = Occurrences · Color = Semantic Class · Glow = Risk Score. Click any node to focus camera and open finding drawer.
+            Spatial estate visualization. Powered by live graph API endpoint. Node size = severity, bloom = Mosca risk score.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 text-xs">
           <button
             onClick={() => setUse3D(!use3D)}
-            className="px-3 py-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border-prominent)] hover:border-[var(--crypto-pqc)] transition-colors text-xs flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:border-[var(--border-prominent)] text-[var(--text-primary)] transition-colors flex items-center gap-1.5"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
-            <span>{use3D ? 'SWITCH TO 2D CANVAS' : 'SWITCH TO 3D WEBGL'}</span>
+            <Layers className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+            <span>{use3D ? 'SWITCH TO 2D CANVAS FALLBACK' : 'SWITCH TO 3D WEBGL ENGINE'}</span>
           </button>
         </div>
       </div>
 
-      {/* Graph Visualizer Container */}
-      <div className="relative border border-[var(--border-subtle)] rounded-xl overflow-hidden bg-[var(--surface-base)] shadow-2xl">
-        {/* Canvas */}
-        <canvas ref={canvasRef} className="w-full h-[550px] cursor-grab active:cursor-grabbing block" />
-
-        {/* 2D Fallback Render if 3D is toggled off */}
-        {!use3D && (
-          <div className="absolute inset-0 p-8 flex flex-col justify-between bg-[var(--surface-base)]">
-            <div className="text-center space-y-1">
-              <span className="text-xs font-bold text-[var(--crypto-pqc)]">HIGH-DENSITY 2D CANVASS CLUSTER</span>
-              <p className="text-[11px] text-[var(--text-muted)]">
-                Optimized 2D fallback for low-power GPUs and prefers-reduced-motion mode.
-              </p>
+      {/* Main Canvas Card */}
+      <div className="relative border border-[var(--border-subtle)] rounded-lg overflow-hidden bg-[#0a0c10] h-[550px]">
+        {isGraphLoading ? (
+          <div className="flex h-full items-center justify-center text-xs text-[var(--text-muted)] gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
+            <span>INITIALIZING WEBGL SPATIAL MESH FROM API...</span>
+          </div>
+        ) : use3D ? (
+          <canvas ref={canvasRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+        ) : (
+          /* 2D Canvas Fallback for low-end / reduced-motion environments */
+          <div className="p-8 h-full flex flex-col justify-between">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 text-xs text-[var(--text-secondary)]">
+              <span>2D Hierarchical Projection Mode</span>
+              <span>Root: NTRO Core</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {mockFindings.map((f) => {
-                const cls = classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken);
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-auto">
+              {graphData?.nodes.slice(0, 9).map((node) => {
+                const band: RiskBand = node.riskScore >= 60 ? 'critical' : node.riskScore >= 35 ? 'high' : node.riskScore >= 15 ? 'medium' : 'low';
                 return (
                   <div
-                    key={f.id}
-                    onClick={() => openDrawer(f)}
-                    className="p-3 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded cursor-pointer hover:border-[var(--crypto-pqc)] transition-colors"
+                    key={node.id}
+                    className="p-3 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] flex items-center justify-between"
                   >
-                    <CryptoBadge semanticClass={cls} displayName={f.displayName} size="sm" />
-                    <div className="mt-2 text-[10px] text-[var(--text-muted)] truncate">{f.location.path}</div>
-                    <div className="mt-1 flex justify-between items-center text-[10px]">
-                      <span>Score:</span>
-                      <RiskBandBadge band={f.risk.band} score={f.risk.score} />
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs font-bold text-[var(--text-primary)] truncate block">
+                        {node.name}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)] truncate block uppercase">
+                        Type: {node.type} · {node.occurrences} instances
+                      </span>
                     </div>
+                    <RiskBandBadge band={band} score={node.riskScore} />
                   </div>
                 );
               })}
             </div>
-          </div>
-        )}
 
-        {/* Interactive Hover Tooltip */}
-        {hoveredNode && (
-          <div
-            style={{ left: `${hoveredNode.x + 15}px`, top: `${hoveredNode.y + 15}px` }}
-            className="pointer-events-none absolute z-20 rounded-lg border border-[var(--border-prominent)] bg-[var(--surface-overlay)] p-3 shadow-xl backdrop-blur-md max-w-xs space-y-1"
-          >
-            <div className="font-bold text-[var(--text-primary)]">{hoveredNode.finding.displayName}</div>
-            <div className="text-[10px] text-[var(--text-muted)]">{hoveredNode.finding.location.path}</div>
-            <div className="flex items-center gap-2 pt-1">
-              <RiskBandBadge band={hoveredNode.finding.risk.band} score={hoveredNode.finding.risk.score} />
-              <span className="text-[10px] text-[var(--text-secondary)]">Click to open drawer</span>
+            <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-2">
+              <Info className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+              <span>Accessible 2D fallback mode enabled for screen readers and prefers-reduced-motion.</span>
             </div>
           </div>
         )}
 
-        {/* Legend Overlay */}
-        <div className="absolute bottom-4 left-4 z-10 bg-[var(--surface-overlay)] border border-[var(--border-subtle)] p-2.5 rounded-lg backdrop-blur-md flex flex-wrap items-center gap-3 text-[10px] text-[var(--text-secondary)]">
-          <span className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--crypto-shor)] inline-block" /> Shor
-          </span>
-          <span className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--crypto-broken)] inline-block hatch-broken" /> Broken
-          </span>
-          <span className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--crypto-grover)] inline-block" /> Grover
-          </span>
-          <span className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--crypto-safe-classical)] inline-block" /> Classical Safe
-          </span>
-          <span className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--crypto-pqc)] inline-block" /> PQC
-          </span>
-        </div>
+        {/* Hover Tooltip Overlay */}
+        {hoveredNode && (() => {
+          const band: RiskBand = hoveredNode.node.riskScore >= 60 ? 'critical' : hoveredNode.node.riskScore >= 35 ? 'high' : hoveredNode.node.riskScore >= 15 ? 'medium' : 'low';
+          return (
+            <div
+              style={{ left: hoveredNode.x + 16, top: hoveredNode.y + 16 }}
+              className="absolute z-30 pointer-events-none p-3 rounded-lg border border-[var(--border-prominent)] bg-[var(--surface-overlay)] backdrop-blur-md shadow-lg text-xs max-w-xs space-y-1.5 font-mono"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-[var(--text-primary)] truncate">{hoveredNode.node.name}</span>
+                <RiskBandBadge band={band} score={hoveredNode.node.riskScore} />
+              </div>
+              <div className="text-[10px] text-[var(--text-muted)] truncate">
+                Type: {hoveredNode.node.type}
+              </div>
+              <div className="text-[10px] text-[var(--text-muted)]">
+                Occurrences: {hoveredNode.node.occurrences} · Class: {hoveredNode.node.semanticClass}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

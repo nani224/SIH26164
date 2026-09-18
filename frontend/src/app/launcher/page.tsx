@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
+import { createScan } from '../../lib/api';
 import {
   Upload,
   FileArchive,
@@ -34,29 +36,34 @@ export default function ScanLauncherPage() {
   const [scanStage, setScanStage] = useState<'idle' | 'ingesting' | 'scanning' | 'scoring' | 'done'>('idle');
   const [counters, setCounters] = useState({ files: 0, bytes: 0, findings: 0 });
 
+  const createScanMutation = useMutation({
+    mutationFn: (data: { path: string; policyId: string; crqcYears: number }) => createScan(data),
+    onSuccess: (newScan) => {
+      setActiveScanId(newScan.id);
+      setCounters({
+        files: newScan.stats.files,
+        bytes: newScan.stats.bytes,
+        findings: newScan.bands.critical + newScan.bands.high + newScan.bands.medium + newScan.bands.low,
+      });
+      setScanStage('done');
+      setIsScanning(false);
+    },
+    onError: () => {
+      setIsScanning(false);
+      setScanStage('idle');
+    },
+  });
+
   const startScan = () => {
     setIsScanning(true);
     setScanStage('ingesting');
     setCounters({ files: 0, bytes: 0, findings: 0 });
 
-    // Stage 1: Ingesting
-    setTimeout(() => {
-      setCounters({ files: 450, bytes: 9200000, findings: 2 });
-      setScanStage('scanning');
-
-      // Stage 2: Scanning (AST + Binary)
-      setTimeout(() => {
-        setCounters({ files: 1420, bytes: 28450190, findings: 8 });
-        setScanStage('scoring');
-
-        // Stage 3: Scoring (Mosca Quantum Framework)
-        setTimeout(() => {
-          setScanStage('done');
-          setIsScanning(false);
-          setActiveScanId('scan-7f8e1a');
-        }, 1200);
-      }, 1500);
-    }, 1200);
+    createScanMutation.mutate({
+      path: targetPath,
+      policyId: selectedPolicy,
+      crqcYears: crqcZ,
+    });
   };
 
   return (

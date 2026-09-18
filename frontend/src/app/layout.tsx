@@ -1,11 +1,56 @@
 import type { Metadata } from 'next';
+import localFont from 'next/font/local';
 import './globals.css';
-import { MswProvider } from '../components/MswProvider';
+import { Providers } from '../components/Providers';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { FindingDrawer } from '../components/FindingDrawer';
 import { CommandPalette } from '../components/CommandPalette';
 import { CommandPaletteButton } from '../components/CommandPaletteButton';
 import Link from 'next/link';
+
+const ibmPlexSansCondensed = localFont({
+  src: [
+    {
+      path: '../../public/fonts/ibm-plex-sans-condensed-latin-400-normal.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/ibm-plex-sans-condensed-latin-600-normal.woff2',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/ibm-plex-sans-condensed-latin-700-normal.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const jetbrainsMono = localFont({
+  src: [
+    {
+      path: '../../public/fonts/jetbrains-mono-latin-400-normal.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/jetbrains-mono-latin-600-normal.woff2',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/jetbrains-mono-latin-700-normal.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-mono',
+  display: 'swap',
+});
 import {
   Shield,
   Eye,
@@ -33,8 +78,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="lattice-bg min-h-screen antialiased selection:bg-[var(--crypto-pqc-bg)] selection:text-[var(--crypto-pqc)] text-[var(--text-primary)] bg-[var(--surface-base)]">
-        <MswProvider>
+      <body className={`${ibmPlexSansCondensed.variable} ${jetbrainsMono.variable} lattice-bg min-h-screen antialiased selection:bg-[var(--crypto-pqc-bg)] selection:text-[var(--crypto-pqc)] text-[var(--text-primary)] bg-[var(--surface-base)] font-sans`}>
+        <Providers>
           {/* Top Console Navigation Bar */}
           <header className="sticky top-0 z-40 backdrop-blur-md bg-[var(--surface-overlay)] border-b border-[var(--border-subtle)] px-4 py-2">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -140,7 +185,7 @@ export default function RootLayout({
           {/* Global Drawers & Palettes */}
           <FindingDrawer />
           <CommandPalette />
-        </MswProvider>
+        </Providers>
       </body>
     </html>
   );

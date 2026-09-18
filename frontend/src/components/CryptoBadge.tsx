@@ -3,18 +3,24 @@ import { AlertTriangle, ShieldCheck, ShieldAlert, Cpu, Lock } from 'lucide-react
 import clsx from 'clsx';
 
 interface CryptoBadgeProps {
-  semanticClass: CryptoSemanticClass;
-  displayName: string;
+  semanticClass?: CryptoSemanticClass;
+  cryptoClass?: CryptoSemanticClass;
+  displayName?: string;
+  label?: string;
   needsReview?: boolean;
   size?: 'sm' | 'md';
 }
 
 export function CryptoBadge({
   semanticClass,
+  cryptoClass,
   displayName,
+  label,
   needsReview = false,
   size = 'md',
 }: CryptoBadgeProps) {
+  const finalClass = semanticClass || cryptoClass || 'shor';
+  const finalLabel = displayName || label || 'UNKNOWN';
   const isSm = size === 'sm';
 
   const badgeStyles: Record<CryptoSemanticClass, { container: string; text: string; icon: typeof Lock; label: string }> = {
@@ -50,7 +56,7 @@ export function CryptoBadge({
     },
   };
 
-  const current = badgeStyles[semanticClass];
+  const current = badgeStyles[finalClass];
   const Icon = current.icon;
 
   return (
@@ -61,10 +67,10 @@ export function CryptoBadge({
         current.container,
         needsReview && 'needs-review-dashed ring-1 ring-[var(--band-medium)] ring-offset-1 ring-offset-[var(--surface-base)]'
       )}
-      title={`${displayName} — Semantic category: ${current.label}${needsReview ? ' (Low confidence: Needs analyst review)' : ''}`}
+      title={`${finalLabel} — Semantic category: ${current.label}${needsReview ? ' (Low confidence: Needs analyst review)' : ''}`}
     >
       <Icon className={clsx('flex-shrink-0', isSm ? 'w-3 h-3' : 'w-3.5 h-3.5')} />
-      <span className={clsx('tracking-wide', current.text)}>{displayName}</span>
+      <span className={clsx('tracking-wide', current.text)}>{finalLabel}</span>
       <span className="opacity-60 text-[10px] uppercase font-semibold">[{current.label}]</span>
       {needsReview && (
         <span

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { rescoreScan, type RescoreResult } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
-import { classifyAlgorithm, type Finding, type RiskBand } from '../../types/crypto';
+import { classifyAlgorithm, type Finding, type RiskBand, type RiskBands } from '../../types/crypto';
 import {
   Calculator,
   Sliders,
@@ -17,79 +19,82 @@ import {
 export interface MoscaMatrixViewProps {
   findings: Finding[];
   initialZ?: number;
+  scanId?: string;
   error?: string | null;
   onFindingSelect?: (finding: Finding) => void;
+  onZRescore?: (z: number) => Promise<RescoreResult>;
 }
 
 export function MoscaMatrixView({
   findings,
   initialZ = 10,
+  scanId = 'scan-7f8e1a',
   error = null,
   onFindingSelect,
+  onZRescore,
 }: MoscaMatrixViewProps) {
   const [crqcZ, setCrqcZ] = useState<number>(initialZ);
   const [hoveredFinding, setHoveredFinding] = useState<Finding | null>(null);
 
-  // Re-scoring computation across findings
-  const { currentFindings, changedFindings, bands } = useMemo(() => {
-    const changed: Array<{
-      finding: Finding;
-      oldBand: RiskBand;
+  // Server-driven re-scoring state (ZERO local formula calculation)
+  const [serverBands, setServerBands] = useState<RiskBands | null>(null);
+  const [changedFindingsList, setChangedFindingsList] = useState<
+    Array<{
+      id: string;
+      displayName: string;
+      previousBand: RiskBand;
       newBand: RiskBand;
-      oldScore: number;
+      previousScore: number;
       newScore: number;
-    }> = [];
+    }>
+  >([]);
 
-    const bandCounts = { critical: 0, high: 0, medium: 0, low: 0 };
-
-    const computed = findings.map((f) => {
-      const oldScore = f.risk.score;
-      const oldBand = f.risk.band;
-
-      let u = f.risk.U;
-      let score = oldScore;
-      let band: RiskBand = oldBand;
-      const margin = f.risk.X + f.risk.Y - crqcZ;
-
-      if (!f.risk.classicallyBroken) {
-        // Quantum-sensitive: recalculate U
-        const rawU = 0.5 + margin / (2 * crqcZ);
-        u = Math.max(0.05, Math.min(1.0, rawU));
-        score = Math.round(100 * f.risk.V * f.risk.F * u * f.risk.E * f.risk.K * 10) / 10;
-        if (score >= 60) band = 'critical';
-        else if (score >= 35) band = 'high';
-        else if (score >= 15) band = 'medium';
-        else band = 'low';
-      } else {
-        // Classically broken invariant: U = 1.0!
-        u = 1.0;
-        score = oldScore;
-        band = oldBand;
+  // Mutation to call real POST /api/v1/scans/{id}/rescore endpoint
+  const rescoreMutation = useMutation({
+    mutationFn: async (z: number) => {
+      if (onZRescore) {
+        return onZRescore(z);
       }
+      return rescoreScan(scanId, { crqcYears: z });
+    },
+    onSuccess: (data) => {
+      setServerBands(data.bands);
+      setChangedFindingsList(data.changedFindings);
+    },
+  });
 
-      bandCounts[band]++;
+  const lastTriggeredZ = useRef<number>(initialZ);
+  useEffect(() => {
+    if (crqcZ !== lastTriggeredZ.current) {
+      lastTriggeredZ.current = crqcZ;
+      rescoreMutation.mutate(crqcZ);
+    }
+  }, [crqcZ, rescoreMutation]);
 
-      if (band !== oldBand || Math.abs(score - oldScore) > 0.5) {
-        changed.push({
-          finding: f,
-          oldBand,
-          newBand: band,
-          oldScore,
-          newScore: score,
-        });
-      }
+  // Map server-returned changed scores onto current findings for plotting
+  const currentFindings = useMemo(() => {
+    const changeMap = new Map(changedFindingsList.map((c) => [c.id, c]));
+
+    return findings.map((f) => {
+      const change = changeMap.get(f.id);
+      const score = change ? change.newScore : f.risk.score;
+      const band = change ? change.newBand : f.risk.band;
 
       return {
         ...f,
-        calculatedU: u,
         calculatedScore: score,
         calculatedBand: band,
-        calculatedMargin: margin,
       };
     });
+  }, [findings, changedFindingsList]);
 
-    return { currentFindings: computed, changedFindings: changed, bands: bandCounts };
-  }, [findings, crqcZ]);
+  // Derive band counts from server response or fallback to findings
+  const bands = useMemo(() => {
+    if (serverBands) return serverBands;
+    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+    findings.forEach((f) => counts[f.risk.band]++);
+    return counts;
+  }, [findings, serverBands]);
 
   // Matrix dimensions for SVG scatter plot
   const width = 800;
@@ -140,6 +145,11 @@ export function MoscaMatrixView({
 
   return (
     <div className="space-y-6 font-mono text-xs">
+      {/* Screen reader live region for scenario horizon announcements */}
+      <div className="sr-only" aria-live="polite">
+        CRQC horizon updated to {crqcZ} years. {changedFindingsList.length} cryptographic assets shifted risk bands based on live server re-score.
+      </div>
+
       {/* Header briefing */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
         <div>
@@ -153,6 +163,7 @@ export function MoscaMatrixView({
           <p className="text-xs text-[var(--text-secondary)] mt-0.5 max-w-3xl">
             Where $X$ = Data Shelf Life, $Y$ = Migration Time, $Z$ = Years to CRQC.
             Points to the right of the vertical $Z$ line represent cryptographic assets that will be compromised by quantum adversaries before migration completes.
+            Classically-broken assets remain fixed at U = 1.
           </p>
         </div>
 
@@ -225,19 +236,19 @@ export function MoscaMatrixView({
                     strokeDasharray="2,4"
                   />
                   <text
-                    x={padding.left - 8}
+                    x={padding.left - 10}
                     y={yScale(score) + 4}
-                    fill="var(--text-muted)"
-                    fontSize="10"
                     textAnchor="end"
-                    fontFamily="monospace"
+                    fontSize="10"
+                    fill="var(--text-muted)"
+                    className="font-mono"
                   >
                     {score}
                   </text>
                 </g>
               ))}
 
-              {[5, 10, 15, 20, 25, 30].map((years) => (
+              {[0, 5, 10, 15, 20, 25, 30].map((years) => (
                 <g key={`x-grid-${years}`}>
                   <line
                     x1={xScale(years)}
@@ -249,106 +260,86 @@ export function MoscaMatrixView({
                   />
                   <text
                     x={xScale(years)}
-                    y={height - padding.bottom + 16}
-                    fill="var(--text-muted)"
-                    fontSize="10"
+                    y={height - padding.bottom + 18}
                     textAnchor="middle"
-                    fontFamily="monospace"
+                    fontSize="10"
+                    fill="var(--text-muted)"
+                    className="font-mono"
                   >
                     {years}y
                   </text>
                 </g>
               ))}
 
-              {/* Threat Threshold Backgrounds */}
+              {/* Critical Risk Zone Shading (Y >= 60) */}
               <rect
                 x={padding.left}
-                y={yScale(100)}
+                y={padding.top}
                 width={chartWidth}
-                height={yScale(60) - yScale(100)}
-                fill="oklch(0.64 0.23 25 / 0.05)"
+                height={yScale(60) - padding.top}
+                fill="var(--band-critical-bg)"
+                opacity="0.3"
               />
-              <line
-                x1={padding.left}
-                y1={yScale(60)}
-                x2={width - padding.right}
-                y2={yScale(60)}
-                stroke="var(--band-critical)"
-                strokeWidth="1"
-                strokeDasharray="4,4"
-              />
-              <text
-                x={width - padding.right - 6}
-                y={yScale(60) - 6}
-                fill="var(--band-critical)"
-                fontSize="9"
-                textAnchor="end"
-                fontFamily="monospace"
-              >
-                CRITICAL THRESHOLD (Score ≥ 60)
-              </text>
 
-              {/* Vertical Draggable CRQC Horizon Line (Z) */}
-              <line
-                x1={xScale(crqcZ)}
-                y1={padding.top}
-                x2={xScale(crqcZ)}
-                y2={height - padding.bottom}
-                stroke="var(--crypto-pqc)"
-                strokeWidth="2.5"
-                strokeDasharray="6,3"
-              />
-              <polygon
-                points={`${xScale(crqcZ) - 5},${padding.top} ${xScale(crqcZ) + 5},${padding.top} ${xScale(crqcZ)},${padding.top + 8}`}
-                fill="var(--crypto-pqc)"
-              />
-              <text
-                x={xScale(crqcZ)}
-                y={padding.top - 8}
-                fill="var(--crypto-pqc)"
-                fontSize="11"
-                fontWeight="bold"
-                textAnchor="middle"
-                fontFamily="monospace"
-              >
-                CRQC HORIZON: Z = {crqcZ}y
-              </text>
-
-              {/* Threat Zone Shading (X + Y > Z) */}
+              {/* Quantum Jeopardy Zone Shading (X+Y > Z) */}
               <rect
                 x={xScale(crqcZ)}
                 y={padding.top}
-                width={width - padding.right - xScale(crqcZ)}
+                width={chartWidth - (xScale(crqcZ) - padding.left)}
                 height={chartHeight}
-                fill="oklch(0.64 0.23 25 / 0.07)"
+                fill="var(--crypto-shor-bg)"
+                opacity="0.15"
               />
+
+              {/* Vertical Draggable CRQC Horizon Line (Z) */}
+              <g className="cursor-ew-resize">
+                <line
+                  x1={xScale(crqcZ)}
+                  y1={padding.top}
+                  x2={xScale(crqcZ)}
+                  y2={height - padding.bottom}
+                  stroke="var(--crypto-pqc)"
+                  strokeWidth="2.5"
+                  strokeDasharray="4,4"
+                />
+                <text
+                  x={xScale(crqcZ)}
+                  y={padding.top - 10}
+                  textAnchor="middle"
+                  fill="var(--crypto-pqc)"
+                  fontSize="11"
+                  fontWeight="bold"
+                  className="font-mono"
+                >
+                  CRQC HORIZON: Z = {crqcZ}y
+                </text>
+              </g>
 
               {/* Scatter Points */}
               {currentFindings.map((f) => {
-                const totalYears = f.risk.X + f.risk.Y;
-                const cx = xScale(Math.min(maxXandY, totalYears));
+                const totalExposure = f.risk.X + f.risk.Y;
+                const cx = xScale(totalExposure);
                 const cy = yScale(f.calculatedScore);
-                const cls = classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken);
-
-                let fillColor = 'var(--crypto-shor)';
-                if (cls === 'classically-broken') fillColor = 'var(--crypto-broken)';
-                else if (cls === 'pqc') fillColor = 'var(--crypto-pqc)';
-                else if (cls === 'grover') fillColor = 'var(--crypto-grover)';
-                else if (cls === 'quantum-safe-classical') fillColor = 'var(--crypto-safe-classical)';
-
+                const cryptoClass = classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken);
                 const isHovered = hoveredFinding?.id === f.id;
+
+                let fill = 'var(--crypto-shor)';
+                if (cryptoClass === 'classically-broken') fill = 'var(--crypto-broken)';
+                else if (cryptoClass === 'pqc') fill = 'var(--crypto-pqc)';
+                else if (cryptoClass === 'grover') fill = 'var(--crypto-grover)';
+                else if (cryptoClass === 'quantum-safe-classical') fill = 'var(--crypto-safe-classical)';
 
                 return (
                   <g
                     key={f.id}
                     data-testid={`scatter-node-${f.id}`}
-                    data-alg={f.displayName}
                     tabIndex={0}
                     role="button"
-                    aria-label={`${f.displayName} in ${f.location.path}: Threat score ${f.calculatedScore.toFixed(1)}, Risk band ${f.calculatedBand}`}
-                    className="cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--crypto-pqc)]"
+                    aria-label={`${f.displayName} at ${f.location.path}, score ${f.calculatedScore}, band ${f.calculatedBand}`}
                     onMouseEnter={() => setHoveredFinding(f)}
                     onMouseLeave={() => setHoveredFinding(null)}
+                    onFocus={() => setHoveredFinding(f)}
+                    onBlur={() => setHoveredFinding(null)}
                     onClick={() => onFindingSelect?.(f)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -356,39 +347,52 @@ export function MoscaMatrixView({
                         onFindingSelect?.(f);
                       }
                     }}
+                    className="cursor-pointer transition-all duration-300 focus:outline-none"
                   >
                     <circle
                       cx={cx}
                       cy={cy}
-                      r={isHovered ? 8 : 6}
-                      fill={fillColor}
-                      stroke="var(--surface-base)"
-                      strokeWidth="2"
-                      className={cls === 'classically-broken' ? 'hatch-broken' : ''}
+                      r={isHovered ? 8 : f.calculatedScore >= 60 ? 6 : 4.5}
+                      fill={fill}
+                      stroke={
+                        isHovered
+                          ? 'var(--text-primary)'
+                          : f.risk.needsReview
+                          ? 'var(--band-medium)'
+                          : 'var(--surface-base)'
+                      }
+                      strokeWidth={isHovered ? 2.5 : f.risk.needsReview ? 1.5 : 1}
+                      strokeDasharray={f.risk.needsReview ? '2,2' : undefined}
+                      className={
+                        f.calculatedScore >= 60
+                          ? 'filter drop-shadow-[0_0_6px_var(--band-critical)]'
+                          : ''
+                      }
                     />
-                    {isHovered && (
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={12}
-                        fill="none"
-                        stroke={fillColor}
-                        strokeWidth="1.5"
-                        strokeDasharray="2,2"
-                        className="animate-spin"
-                      />
+                    {findings.length <= 50 && (
+                      <text
+                        x={cx + 8}
+                        y={cy + 3}
+                        fontSize="9"
+                        fill="var(--text-muted)"
+                        className="pointer-events-none font-mono select-none"
+                      >
+                        {f.displayName}
+                      </text>
                     )}
-                    <text
-                      x={cx}
-                      y={cy - 9}
-                      fill="var(--text-primary)"
-                      fontSize="9"
-                      fontWeight="bold"
-                      textAnchor="middle"
-                      fontFamily="monospace"
-                    >
-                      {f.displayName}
-                    </text>
+                    {isHovered && (
+                      <text
+                        x={cx}
+                        y={cy - 12}
+                        textAnchor="middle"
+                        fontSize="10"
+                        fill="var(--text-primary)"
+                        fontWeight="bold"
+                        className="pointer-events-none font-mono"
+                      >
+                        {f.displayName} ({f.calculatedScore})
+                      </text>
+                    )}
                   </g>
                 );
               })}
@@ -396,81 +400,85 @@ export function MoscaMatrixView({
               {/* Axis Titles */}
               <text
                 x={width / 2}
-                y={height - 10}
-                fill="var(--text-secondary)"
-                fontSize="11"
+                y={height - 12}
                 textAnchor="middle"
-                fontFamily="monospace"
+                fontSize="11"
+                fill="var(--text-secondary)"
+                className="font-mono font-bold"
               >
-                Data Lifetime + Migration Time (X + Y in Years) →
+                Mosca Exposure: X + Y (Years: Shelf Life + Migration Time)
               </text>
               <text
                 x={-height / 2}
                 y={18}
                 transform="rotate(-90)"
-                fill="var(--text-secondary)"
-                fontSize="11"
                 textAnchor="middle"
-                fontFamily="monospace"
+                fontSize="11"
+                fill="var(--text-secondary)"
+                className="font-mono font-bold"
               >
-                ← Quantum Threat Score (0 - 100)
+                Computed Risk Score (0–100)
               </text>
             </svg>
           </div>
 
-          <div className="text-[11px] text-[var(--text-muted)] mt-2 flex items-center justify-between">
-            <span>Click any node to open finding drawer and review full cryptographic parameters.</span>
-            <span>Right of Z line = Critical quantum exposure ($X + Y &gt; Z$).</span>
+          {/* Bottom Invariant Rule Reminder */}
+          <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)] border border-[var(--border-subtle)] p-2.5 rounded-lg">
+            <span>
+              <strong>Domain Invariant:</strong> Classically broken assets (MD5, SHA-1, DES, RC4) remain fixed at $U = 1.0$ and never change score when $Z$ is moved.
+            </span>
+            <span className="text-[var(--crypto-pqc)] font-bold">
+              {rescoreMutation.isPending ? 'RE-SCORING VIA API...' : 'SERVER SYNCHRONIZED'}
+            </span>
           </div>
         </div>
 
-        {/* Right Col: Side List of Findings That Changed Band */}
-        <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl p-5 space-y-4 flex flex-col justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
-              <span className="font-bold text-xs text-[var(--text-primary)] uppercase flex items-center gap-1.5">
-                <RefreshCw className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+        {/* Right 1 Col: Dynamic Findings Affected by Z-Movement */}
+        <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl p-4 sm:p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-3">
+              <span className="font-bold text-[var(--text-primary)] uppercase flex items-center gap-1.5">
+                <RefreshCw
+                  className={`w-3.5 h-3.5 text-[var(--crypto-pqc)] ${
+                    rescoreMutation.isPending ? 'animate-spin' : ''
+                  }`}
+                />
                 <span>Scenario Horizon Shifts</span>
               </span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)] text-[var(--crypto-grover)] font-bold">
-                Z = {crqcZ} yrs
+              <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] text-[var(--text-secondary)] num-tabular">
+                {changedFindingsList.length} Affected
               </span>
             </div>
 
-            <p className="text-[11px] text-[var(--text-secondary)]">
-              When Z shifts, Mosca Urgency U = clamp(0.5 + M/(2Z), 0.05, 1) re-calculates for public key algorithms (RSA, ECC, DH).
-              Classically broken algorithms visibly <strong className="text-[var(--crypto-broken)]">remain fixed at U = 1</strong>.
+            <p className="text-[11px] text-[var(--text-muted)] mb-3">
+              Findings where Mosca urgency ($U$) recalculation altered risk scores under $Z = {crqcZ}$y scenario horizon (via live POST /rescore).
             </p>
 
-            <div aria-live="polite" aria-atomic="true" className="sr-only">
-              CRQC horizon updated to {crqcZ} years. {changedFindings.length} findings changed risk band.
-            </div>
-
-            <div className="space-y-2 pt-1 max-h-72 overflow-y-auto" aria-live="polite">
-              {changedFindings.length === 0 ? (
-                <div className="p-4 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)] rounded">
-                  No band transitions at current horizon ($Z = {crqcZ}$). Drag slider to observe sensitivity shifts.
+            {/* List of Affected Assets */}
+            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+              {changedFindingsList.length === 0 ? (
+                <div className="p-6 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)] rounded-lg">
+                  No findings changed risk bands at baseline horizon $Z = {crqcZ}$y.
                 </div>
               ) : (
-                changedFindings.map(({ finding, oldBand, newBand, oldScore, newScore }) => (
+                changedFindingsList.map((item) => (
                   <div
-                    key={finding.id}
-                    onClick={() => onFindingSelect?.(finding)}
-                    className="p-2.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] cursor-pointer text-xs space-y-1.5 transition-colors"
+                    key={item.id}
+                    className="p-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] hover:border-[var(--border-prominent)] transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-[var(--text-primary)]">{finding.displayName}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">{finding.location.path}</span>
+                      <span className="font-bold text-[var(--text-primary)]">{item.displayName}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">ID: {item.id}</span>
                     </div>
-                    <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center justify-between mt-2 pt-1 border-t border-[var(--border-subtle)] text-[10px]">
                       <div className="flex items-center gap-1.5">
-                        <RiskBandBadge band={oldBand} score={oldScore} showScore={false} />
+                        <RiskBandBadge band={item.previousBand} size="sm" />
                         <ArrowRight className="w-3 h-3 text-[var(--text-muted)]" />
-                        <RiskBandBadge band={newBand} score={newScore} showScore={false} />
+                        <RiskBandBadge band={item.newBand} size="sm" />
                       </div>
-                      <span className="font-bold num-tabular text-[var(--text-primary)]">
-                        {oldScore.toFixed(0)} → {newScore.toFixed(0)}
-                      </span>
+                      <div className="num-tabular font-bold text-[var(--text-primary)]">
+                        {item.previousScore.toFixed(1)} → {item.newScore.toFixed(1)}
+                      </div>
                     </div>
                   </div>
                 ))
@@ -478,27 +486,35 @@ export function MoscaMatrixView({
             </div>
           </div>
 
-          {/* Active Band Distribution */}
-          <div className="bg-[var(--surface-raised)] border border-[var(--border-subtle)] p-3 rounded-lg space-y-1.5 text-xs pt-3">
-            <div className="text-[10px] uppercase font-bold text-[var(--text-muted)]">
-              Current Band Counts at Z={crqcZ}y
-            </div>
-            <div className="grid grid-cols-4 gap-1 text-center font-bold">
-              <div className="bg-[var(--surface-card)] p-1.5 rounded border border-[var(--border-subtle)] text-[var(--band-critical)]">
-                <div className="text-[9px] text-[var(--text-muted)]">CRIT</div>
-                <div>{bands.critical}</div>
+          {/* Band Distribution Metric Counter */}
+          <div className="border-t border-[var(--border-subtle)] pt-3 mt-4">
+            <span className="text-[10px] uppercase text-[var(--text-muted)] font-bold block mb-2">
+              Current Posture Distribution (Z = {crqcZ}y)
+            </span>
+            <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+              <div className="p-1.5 rounded bg-[var(--surface-raised)] border border-[var(--band-critical)]/30">
+                <span className="text-[var(--band-critical)] font-bold num-tabular text-xs">
+                  {bands.critical}
+                </span>
+                <span className="block text-[var(--text-muted)] mt-0.5">Critical</span>
               </div>
-              <div className="bg-[var(--surface-card)] p-1.5 rounded border border-[var(--border-subtle)] text-[var(--band-high)]">
-                <div className="text-[9px] text-[var(--text-muted)]">HIGH</div>
-                <div>{bands.high}</div>
+              <div className="p-1.5 rounded bg-[var(--surface-raised)] border border-[var(--band-high)]/30">
+                <span className="text-[var(--band-high)] font-bold num-tabular text-xs">
+                  {bands.high}
+                </span>
+                <span className="block text-[var(--text-muted)] mt-0.5">High</span>
               </div>
-              <div className="bg-[var(--surface-card)] p-1.5 rounded border border-[var(--border-subtle)] text-[var(--band-medium)]">
-                <div className="text-[9px] text-[var(--text-muted)]">MED</div>
-                <div>{bands.medium}</div>
+              <div className="p-1.5 rounded bg-[var(--surface-raised)] border border-[var(--band-medium)]/30">
+                <span className="text-[var(--band-medium)] font-bold num-tabular text-xs">
+                  {bands.medium}
+                </span>
+                <span className="block text-[var(--text-muted)] mt-0.5">Med</span>
               </div>
-              <div className="bg-[var(--surface-card)] p-1.5 rounded border border-[var(--border-subtle)] text-[var(--band-low)]">
-                <div className="text-[9px] text-[var(--text-muted)]">LOW</div>
-                <div>{bands.low}</div>
+              <div className="p-1.5 rounded bg-[var(--surface-raised)] border border-[var(--band-low)]/30">
+                <span className="text-[var(--band-low)] font-bold num-tabular text-xs">
+                  {bands.low}
+                </span>
+                <span className="block text-[var(--text-muted)] mt-0.5">Low</span>
               </div>
             </div>
           </div>
