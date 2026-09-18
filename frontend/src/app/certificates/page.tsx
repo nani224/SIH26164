@@ -27,7 +27,7 @@ export default function CertificatesPage() {
   const currentYear = 2026;
   const crqcYear = currentYear + crqcZ;
 
-  const { data: findingsData, isLoading } = useQuery({
+  const { data: findingsData, isLoading, error } = useQuery({
     queryKey: ['findings', activeScanId],
     queryFn: () => fetchScanFindings(activeScanId),
   });
@@ -145,6 +145,10 @@ export default function CertificatesPage() {
         <div className="p-12 text-center text-xs text-[var(--text-muted)] flex items-center justify-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
           <span>QUERYING CERTIFICATE FINDINGS FROM DISCOVERY DAEMON...</span>
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center text-xs border border-[var(--band-critical)] rounded-lg bg-[var(--surface-card)]">
+          <p className="text-[var(--band-critical)]">Failed to query certificate telemetry from API endpoint.</p>
         </div>
       ) : (
         <>

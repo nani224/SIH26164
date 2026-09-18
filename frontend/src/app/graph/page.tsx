@@ -16,7 +16,7 @@ export default function CryptoEstateGraphPage() {
   const [use3D, setUse3D] = useState(true);
   const [hoveredNode, setHoveredNode] = useState<{ node: GraphNode; x: number; y: number } | null>(null);
 
-  const { data: graphData, isLoading: isGraphLoading } = useQuery({
+  const { data: graphData, isLoading: isGraphLoading, error: graphError } = useQuery({
     queryKey: ['graph', activeScanId],
     queryFn: () => fetchScanGraph(activeScanId),
   });
@@ -67,6 +67,7 @@ export default function CryptoEstateGraphPage() {
     const rootNode = nodes.find((n) => n.type === 'system') || nodes[0];
 
     // Central Root System Node
+    // Central Root System Node
     const rootGeo = new THREE.SphereGeometry(1.6, 32, 32);
     const rootMat = new THREE.MeshStandardMaterial({
       color: 0x2dd4bf,
@@ -76,43 +77,52 @@ export default function CryptoEstateGraphPage() {
     });
     const rootMesh = new THREE.Mesh(rootGeo, rootMat);
     scene.add(rootMesh);
-    if (rootNode) nodeMeshes.push({ mesh: rootMesh, node: rootNode });
 
     const childNodes = nodes.filter((n) => n.id !== rootNode?.id);
+    const count = childNodes.length;
+
+    // High-performance instanced rendering: 5,000+ nodes rendered in 1 single draw call
+    const instanceGeo = new THREE.SphereGeometry(0.7, 12, 12);
+    const instanceMat = new THREE.MeshStandardMaterial({
+      roughness: 0.4,
+      metalness: 0.5,
+    });
+    const instancedMesh = new THREE.InstancedMesh(instanceGeo, instanceMat, Math.max(count, 1));
+    const matrix = new THREE.Matrix4();
+    const color = new THREE.Color();
+    const linePoints: THREE.Vector3[] = [];
 
     childNodes.forEach((node, idx) => {
-      const angle = (idx / childNodes.length) * Math.PI * 2;
-      const radius = node.type === 'file' ? 6 + (idx % 2) * 2 : 10 + (idx % 3) * 2;
+      const angle = (idx / count) * Math.PI * 2;
+      const radius = node.type === 'file' ? 6 + (idx % 3) * 2 : 11 + (idx % 5) * 2;
       const x = Math.cos(angle) * radius;
       const y = Math.sin(angle) * radius;
-      const z = ((idx % 5) - 2) * 2;
+      const z = ((idx % 7) - 3) * 2;
 
-      // Color mapping
+      // Color mapping: Functional risk instrumentation
       let colorHex = 0xf43f5e; // Shor red
       if (node.semanticClass === 'classically-broken') colorHex = 0xd946ef; // magenta
       else if (node.semanticClass === 'pqc') colorHex = 0x2dd4bf; // lattice teal
       else if (node.semanticClass === 'grover') colorHex = 0xf59e0b; // amber
       else if (node.semanticClass === 'quantum-safe-classical') colorHex = 0x38bdf8; // steel blue
 
-      const nodeGeo = new THREE.SphereGeometry(node.riskScore >= 60 ? 0.9 : 0.6, 16, 16);
-      const nodeMat = new THREE.MeshStandardMaterial({
-        color: colorHex,
-        emissive: colorHex,
-        emissiveIntensity: node.riskScore >= 60 ? 0.6 : 0.2,
-      });
-      const mesh = new THREE.Mesh(nodeGeo, nodeMat);
-      mesh.position.set(x, y, z);
-      scene.add(mesh);
-      nodeMeshes.push({ mesh, node });
+      const scale = node.riskScore >= 60 ? 1.3 : 0.9;
+      matrix.makeScale(scale, scale, scale);
+      matrix.setPosition(x, y, z);
+      instancedMesh.setMatrixAt(idx, matrix);
+      instancedMesh.setColorAt(idx, color.setHex(colorHex));
 
-      // Connecting line to root
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(x, y, z),
-      ]);
-      const line = new THREE.Line(lineGeo, lineMaterial);
-      scene.add(line);
+      linePoints.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(x, y, z));
     });
+
+    instancedMesh.instanceMatrix.needsUpdate = true;
+    if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+    scene.add(instancedMesh);
+
+    // Single draw call for all connecting lines
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
+    const lineSegments = new THREE.LineSegments(lineGeo, lineMaterial);
+    scene.add(lineSegments);
 
     // Raycaster for interactions
     const raycaster = new THREE.Raycaster();
@@ -124,16 +134,25 @@ export default function CryptoEstateGraphPage() {
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(nodeMeshes.map((n) => n.mesh));
+      const intersects = raycaster.intersectObjects([rootMesh, instancedMesh]);
 
       if (intersects.length > 0) {
-        const target = nodeMeshes.find((n) => n.mesh === intersects[0].object);
-        if (target) {
+        const hit = intersects[0];
+        if (hit.object === rootMesh && rootNode) {
           setHoveredNode({
-            node: target.node,
+            node: rootNode,
             x: event.clientX - rect.left,
             y: event.clientY - rect.top,
           });
+        } else if (hit.object === instancedMesh && hit.instanceId !== undefined) {
+          const target = childNodes[hit.instanceId];
+          if (target) {
+            setHoveredNode({
+              node: target,
+              x: event.clientX - rect.left,
+              y: event.clientY - rect.top,
+            });
+          }
         }
       } else {
         setHoveredNode(null);
@@ -170,6 +189,12 @@ export default function CryptoEstateGraphPage() {
       cancelAnimationFrame(animationFrameId);
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('click', handleClick);
+      instanceGeo.dispose();
+      instanceMat.dispose();
+      lineGeo.dispose();
+      lineMaterial.dispose();
+      rootGeo.dispose();
+      rootMat.dispose();
       renderer.dispose();
     };
   }, [use3D, graphData, openDrawer]);
@@ -208,6 +233,12 @@ export default function CryptoEstateGraphPage() {
           <div className="flex h-full items-center justify-center text-xs text-[var(--text-muted)] gap-2">
             <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
             <span>INITIALIZING WEBGL SPATIAL MESH FROM API...</span>
+          </div>
+        ) : graphError ? (
+          <div className="flex h-full items-center justify-center p-8 text-center text-xs text-[var(--band-critical)]">
+            <div className="border border-[var(--band-critical)] rounded-lg p-6 bg-[var(--surface-card)]">
+              <p>Failed to query crypto estate topology from API endpoint.</p>
+            </div>
           </div>
         ) : use3D ? (
           <canvas ref={canvasRef} className="w-full h-full cursor-grab active:cursor-grabbing" />

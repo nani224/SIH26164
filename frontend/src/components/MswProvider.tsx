@@ -8,7 +8,10 @@ export function MswProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function initMsw() {
       // In air-gapped / standalone frontend development, enable MSW unless explicitly disabled
-      if (process.env.NEXT_PUBLIC_ENABLE_MSW === 'false') {
+      if (
+        process.env.NEXT_PUBLIC_ENABLE_MSW === 'false' ||
+        (typeof window !== 'undefined' && (window as any).__DISABLE_MSW__)
+      ) {
         setReady(true);
         return;
       }

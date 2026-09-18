@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
-import { fetchScanFindings, fetchScans } from '../../lib/api';
+import { fetchScanFindings, fetchScans, rescoreScan } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { classifyAlgorithm, type CryptoSemanticClass, type RiskBand } from '../../types/crypto';
@@ -33,31 +33,37 @@ export default function SpecimenPage() {
   });
   const findings = findingsData?.items ?? [];
 
-  // Scenario state: Z horizon slider (5 to 15 years, default 10)
   const [crqcZ, setCrqcZ] = useState<number>(10);
   const [selectedFamily, setSelectedFamily] = useState<string>('all');
+  const [changedMap, setChangedMap] = useState<Map<string, { newScore: number; newBand: RiskBand }>>(new Map());
 
-  // Interactive Mosca recalculation demonstrating domain invariants
+  const rescoreMutation = useMutation({
+    mutationFn: (z: number) => rescoreScan(activeScanId, { crqcYears: z }),
+    onSuccess: (data) => {
+      const map = new Map<string, { newScore: number; newBand: RiskBand }>();
+      data.changedFindings.forEach((c) => {
+        map.set(c.id, { newScore: c.newScore, newBand: c.newBand });
+      });
+      setChangedMap(map);
+    },
+  });
+
+  const lastTriggeredZ = useRef<number>(10);
+  useEffect(() => {
+    if (crqcZ !== lastTriggeredZ.current) {
+      lastTriggeredZ.current = crqcZ;
+      rescoreMutation.mutate(crqcZ);
+    }
+  }, [crqcZ, rescoreMutation]);
+
+  // Read-through from server findings and server rescore results (Zero client-side math re-implementation)
   const calculatedFindings = useMemo(() => {
     return findings.map((f) => {
-      let u = f.risk.U;
-      let score = f.risk.score;
-      let band: RiskBand = f.risk.band;
+      const change = changedMap.get(f.id);
+      const score = change ? change.newScore : f.risk.score;
+      const band = change ? change.newBand : f.risk.band;
       const margin = f.risk.X + f.risk.Y - crqcZ;
-
-      if (!f.risk.classicallyBroken) {
-        // Quantum sensitive: U adjusts with Mosca margin
-        const rawU = 0.5 + margin / (2 * crqcZ);
-        u = Math.max(0.05, Math.min(1.0, rawU));
-        score = Math.round(100 * f.risk.V * f.risk.F * u * f.risk.E * f.risk.K * 10) / 10;
-        if (score >= 60) band = 'critical';
-        else if (score >= 35) band = 'high';
-        else if (score >= 15) band = 'medium';
-        else band = 'low';
-      } else {
-        // Classically broken: U = 1 invariant regardless of Z!
-        u = 1.0;
-      }
+      const u = f.risk.classicallyBroken ? 1.0 : f.risk.U;
 
       return {
         ...f,
@@ -67,7 +73,7 @@ export default function SpecimenPage() {
         calculatedMargin: margin,
       };
     });
-  }, [crqcZ]);
+  }, [findings, changedMap, crqcZ]);
 
   const filteredFindings = useMemo(() => {
     if (selectedFamily === 'all') return calculatedFindings;

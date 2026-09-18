@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+@theme {
+  --color-crypto-shor: var(--crypto-shor);
+  --color-crypto-shor-bg: var(--crypto-shor-bg);
+  --color-crypto-shor-border: var(--crypto-shor-border);
+
+  --color-crypto-broken: var(--crypto-broken);
+  --color-crypto-broken-bg: var(--crypto-broken-bg);
+  --color-crypto-broken-border: var(--crypto-broken-border);
+
+  --color-crypto-grover: var(--crypto-grover);
+  --color-crypto-grover-bg: var(--crypto-grover-bg);
+  --color-crypto-grover-border: var(--crypto-grover-border);
+
+  --color-crypto-safe-classical: var(--crypto-safe-classical);
+  --color-crypto-safe-classical-bg: var(--crypto-safe-classical-bg);
+  --color-crypto-safe-classical-border: var(--crypto-safe-classical-border);
+
+  --color-crypto-pqc: var(--crypto-pqc);
+  --color-crypto-pqc-bg: var(--crypto-pqc-bg);
+  --color-crypto-pqc-border: var(--crypto-pqc-border);
+
+  --color-band-critical: var(--band-critical);
+  --color-band-critical-bg: var(--band-critical-bg);
+  --color-band-high: var(--band-high);
+  --color-band-high-bg: var(--band-high-bg);
+  --color-band-medium: var(--band-medium);
+  --color-band-medium-bg: var(--band-medium-bg);
+  --color-band-low: var(--band-low);
+  --color-band-low-bg: var(--band-low-bg);
+
+  --font-sans: var(--font-sans), "IBM Plex Sans Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
 @layer base {
   :root {
     /* Theme: Light "Cipher Clean Room" */
