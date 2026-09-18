@@ -58,6 +58,42 @@ paths:
                 items:
                   $ref: "#/components/schemas/Scan"
 
+  /api/v1/scans/upload:
+    post:
+      operationId: uploadScan
+      summary: Upload an archive (.zip, .tar, .tar.gz, .tgz) for sandboxed extraction and scanning
+      tags: [scans]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Source bundle archive (.zip, .tar, .tar.gz, .tgz)
+                policyId:
+                  type: string
+                  description: Optional policy ID to enforce
+                crqcYears:
+                  type: integer
+                  minimum: 5
+                  maximum: 15
+                  default: 10
+                  description: Cryptographically Relevant Quantum Computer arrival horizon
+      responses:
+        "201":
+          description: Scan created from uploaded archive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scan"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
   /api/v1/scans/{scan_id}:
     get:
       operationId: getScan
@@ -346,6 +382,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorDetail"
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorDetail"
 
   schemas:
     ErrorDetail:
@@ -569,6 +611,7 @@ components:
         crqcYears: { type: integer }
         startedAt: { type: string, format: date-time }
         finishedAt: { type: [string, "null"], format: date-time }
+        bundleHash: { type: [string, "null"] }
       example:
         id: scan_stub_001
         target: example-monorepo

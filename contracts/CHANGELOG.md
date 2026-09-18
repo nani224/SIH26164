@@ -1,5 +1,9 @@
 # Contract Changelog
 
+## 0.3.0-phase6-ingest — 2026-09-18
+
+Additive update: added `POST /api/v1/scans/upload` endpoint for sandboxed streaming multipart upload of archive bundles (.zip, .tar, .tar.gz, .tgz) with bundleHash computation, zip-slip/symlink defense, and 2GB ceiling. Added optional `bundleHash` property to `Scan` schema.
+
 ## 0.2.0-phase4-events — 2026-09-18
 
 Additive, documentation-only update to `ScanEvent` (the WS frame shape for
