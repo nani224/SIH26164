@@ -1,9 +1,9 @@
-"""ECDAT backend — Phase 0 FastAPI skeleton.
+"""ECDAT backend — FastAPI app.
 
-Every route here returns in-memory stub data (see api/stub_data.py). There
-is no real detection engine, persistence, auth, or CORS hardening yet --
-those are later phases (see backend/PLAN.md). This app exists so the
-frontend has a real, contract-shaped API to integrate against from day 1.
+Scans/findings/policies are persisted (SQLModel + SQLite, api/db.py) as of
+Phase 2. There is still no real detection engine wired in (POST /scans
+still returns stub-shaped data -- that's Phase 3), no auth, no CORS
+hardening (Phase 10). See backend/PLAN.md.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from api import db
 from api.routes import catalog, findings, health, policies, scans
 
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
@@ -23,14 +24,15 @@ log = structlog.get_logger("ecdat.api")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    log.info("ecdat_api_startup", phase="0")
+    db.init_db()
+    log.info("ecdat_api_startup", phase="2")
     yield
 
 
 app = FastAPI(
     title="ECDAT API",
-    version="0.1.0-phase0",
-    description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — Phase 0 contract skeleton.",
+    version="0.2.0-phase2",
+    description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — Phase 2 persistence.",
     lifespan=lifespan,
 )
 

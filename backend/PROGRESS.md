@@ -1,5 +1,77 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 2: Persistence
+
+Replaced `api/store.py`'s in-memory dicts with SQLModel + SQLite
+(`api/db.py`, `api/db_models.py`) per `PLAN.md`'s Phase 2 scope — see ADR
+004. Every raw risk factor is stored as its own column (per the brief),
+`Recommendation`/`Policy` nested data as JSON columns. Every mutating
+store call now writes an `AuditLogRecord`. Routes switched from
+`stub_data.*` to `store.*` for findings; `api/store.py`'s public function
+signatures are unchanged from Phase 0/1, so the API contract is untouched
+— `contract_diff.py` still reports zero drift.
+
+Manual end-to-end verification (not just the test suite): booted a real
+`uvicorn` server against a file-based SQLite DB, `POST /scans`, killed the
+process, restarted it, re-fetched the scan — it was still there. This
+caught a real bug: SQLite silently strips `tzinfo` from stored
+`datetime`s, so `startedAt`/`finishedAt` lost their `Z` suffix after a
+restart. Fixed in `api/db._as_utc()` (reattaches UTC on read) with a
+regression test. See `docs/decisions/backend/004-phase2-persistence.md`
+for the write-up — this is exactly the kind of bug an in-memory-only test
+suite doesn't catch, which is why the manual restart check was worth doing.
+
+### Gate output (real, run from `backend/`)
+
+```
+$ uv run ruff check .
+All checks passed!
+
+$ uv run mypy --strict .
+Success: no issues found in 41 source files
+
+$ uv run pytest --cov=api --cov=engine --cov=scripts --cov=bench --cov-report=term-missing --cov-fail-under=85
+...
+TOTAL                       1116     61    95%
+Required test coverage of 85% reached. Total coverage: 94.53%
+65 passed, 3 warnings in 3.23s
+
+$ uv run python scripts/contract_diff.py
+No contract drift.
+```
+
+### Manual verification
+
+```
+$ DATABASE_URL="sqlite:////tmp/phase2_test.db" uv run uvicorn api.main:app ...
+$ curl -X POST .../api/v1/scans -d '{"path": "/tmp/persist-me"}'
+  -> {"id": "scan_7c6b1e016d82", ..., "startedAt": "2026-09-18T00:23:52.606973Z"}
+# killed the process, restarted uvicorn against the same DB file
+$ curl .../api/v1/scans/scan_7c6b1e016d82
+  -> {"startedAt": "2026-09-18T00:23:52.606973Z", ...}   # survived, Z intact after the fix
+```
+
+### Loops run
+
+None of B1/B3-B6 apply. No Loop-B2-relevant formula change this phase
+(only how factors reach storage, not the formula itself) — Phase 0's
+`tests/test_risk_formula.py` still passes unchanged.
+
+### BLOCKED items
+
+None.
+
+### Contract changes / PROPOSALS decisions
+
+None — verified via `contract_diff.py`.
+
+### Next 3 tasks
+
+See `PLAN.md`: (1) Phase 3 — wire `engine.scanner.scan()` into
+`POST /scans` so real findings actually get persisted, (2) a real
+hand-labelled DEV/HOLD corpus (Loop B1), (3) Phase 4/5 real-time WS +
+rescore performance budget now that findings live in an indexed DB.
+
 ## 2026-09-17 — Phase 1: Engine Packaging
 
 Built a real Python detection engine per `PLAN.md`'s Phase 1 scope:

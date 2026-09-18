@@ -43,3 +43,23 @@
   encoding per-pattern logic into tree-sitter query predicates, kept the
   detector both easier to test and easier to extend — recommend the same
   approach for the next language.
+
+## 2026-09-18 — Phase 2
+
+- SQLite + SQLAlchemy/SQLModel silently strips `tzinfo` from stored
+  `datetime` values, even with `Column(DateTime(timezone=True))` — that
+  flag mostly matters for backends with a real `TIMESTAMPTZ` type
+  (Postgres); SQLite has no native timezone-aware datetime storage.
+  Verified empirically with a throwaway script before trusting it. Fix:
+  reattach `tzinfo=UTC` on read (`api/db._as_utc()`), since every
+  timestamp this app writes is already UTC by convention. Found this via
+  the "boot a real server, restart it, check the data" manual
+  verification step -- the automated test suite alone (in-memory SQLite,
+  one shared connection for the whole session) didn't surface it until a
+  regression test was added afterward targeting it directly. Lesson: for
+  persistence work, a real restart-the-process check catches things an
+  in-memory test DB can paper over.
+- `create_engine("sqlite://", ...)` gives every new connection its own
+  separate empty in-memory database unless you force a single shared
+  connection via `poolclass=StaticPool` -- confirmed empirically before
+  relying on it for the test suite's shared seeded database.

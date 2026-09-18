@@ -26,6 +26,7 @@ Versions below are what `uv sync` resolved into `uv.lock` on 2026-09-17
 | openapi-spec-validator | 0.9.0 | pypi | Apache-2.0 | Validate contracts/openapi.yaml is real OpenAPI 3.1 |
 | tree-sitter | 0.26.0 | pypi | MIT | AST parsing core, per brief |
 | tree-sitter-python | 0.25.0 | pypi | MIT | Python grammar (compiled into wheel — see ADR 003, no separate vendoring needed) |
+| sqlmodel | 0.0.42 | pypi | MIT | Persistence (scans/findings/policies/audit_log), per brief's stack |
 
 ## Vendored spec files (build-time download, pinned by hash)
 
@@ -49,9 +50,9 @@ per-language `tree-sitter-<lang>` PyPI packages instead (see ADR 003);
 each ships its grammar compiled into the wheel, pinned via `uv.lock`, no
 runtime fetch.
 
-## Not yet adopted (Phase 2+ toolbelt, per the brief)
+## Not yet adopted (Phase 3+ toolbelt, per the brief)
 
 pyelftools, LIEF, pefile, liboqs/liboqs-python, cyclonedx-python-lib,
-SQLModel, arq/Redis, bandit, semgrep, pip-audit, gitleaks, grype/trivy,
+arq/Redis, bandit, semgrep, pip-audit, gitleaks, grype/trivy,
 schemathesis, locust/k6, py-spy, bubblewrap/nsjail. None of these are used
 yet; listed here so the next session doesn't have to re-derive the plan.

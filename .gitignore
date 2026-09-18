@@ -12,3 +12,5 @@ build/
 .env
 .DS_Store
 uv.lock.bak
+*.db
+*.db-journal

@@ -1,11 +1,12 @@
 # ECDAT Backend
 
 Backend for the Enterprise Cryptographic Discovery & Analysis Tool
-(SIH26164). **Phases 0-1 done**: a contract-exact FastAPI stub (still
-returning stub data — the engine isn't wired into the API yet, that's
-Phase 3) plus a real, working Python detection engine with a small starter
-bench harness. No persistence, no auth. See `PLAN.md` for what's next and
-`docs/decisions/backend/` for why things are built the way they are.
+(SIH26164). **Phases 0-2 done**: a contract-exact FastAPI app backed by
+real SQLite persistence, plus a real, working Python detection engine with
+a small starter bench harness — not yet wired together (`POST /scans`
+still creates an empty scan; that's Phase 3). No auth. See `PLAN.md` for
+what's next and `docs/decisions/backend/` for why things are built the
+way they are.
 
 ## Requirements
 
@@ -23,8 +24,9 @@ uv run uvicorn api.main:app --reload
 The API is served under `/api/v1` (e.g. `http://127.0.0.1:8000/api/v1/health`).
 Interactive docs at `http://127.0.0.1:8000/docs`.
 
-All data is in-memory (`api/store.py`, `api/stub_data.py`) and resets on
-restart — there is no database yet (Phase 2).
+Scans/findings/policies persist in SQLite (`api/db.py`, `api/store.py`) —
+survives restarts. `api/stub_data.py` is now only the one-time seed data
+loaded into an empty database.
 
 ## Test / gates
 
@@ -39,8 +41,11 @@ uv run python bench/evaluate.py   # real precision/recall on the starter fixture
 
 ## Env vars
 
-None yet. Phase 2+ will add `DATABASE_URL` (SQLite default, Postgres via
-config) and Phase 10 will add JWT/CORS-related settings.
+- `DATABASE_URL` — default `sqlite:///./ecdat.db`. SQLModel/SQLAlchemy
+  URL, so a Postgres URL should work in principle (untested against a
+  real Postgres instance so far).
+
+Phase 10 will add JWT/CORS-related settings.
 
 ## Offline / air-gap
 
@@ -55,7 +60,7 @@ no network access.
 ```
 backend/
   engine/        # detection/risk/recommendation engine (Python detector so far)
-  api/           # FastAPI app, Pydantic models, in-memory stub data/store
+  api/           # FastAPI app, Pydantic models, SQLModel persistence (db.py, db_models.py, store.py)
   bench/         # evaluate.py + starter fixtures (see bench/README.md)
   scripts/       # contract_diff.py (contract-keeper check)
   tests/
