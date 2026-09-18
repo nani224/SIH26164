@@ -80,7 +80,13 @@ paths:
     description: >
       WebSocket endpoint (not representable as a standard OpenAPI 3.1
       operation). Emits ScanEvent JSON frames: {type: progress|finding|stage|done|error, eventId, ...}.
-      See components.schemas.ScanEvent.
+      See components.schemas.ScanEvent. Events are the real, stored record
+      of what the scan did (not simulated) and are replayed after
+      POST /scans returns -- scanning is currently synchronous, so there
+      is nothing to stream live yet. Accepts an optional `after` query
+      param (the last eventId already seen by the client, as an integer;
+      omit or 0 for "from the start") to resume without re-sending events
+      already delivered. Delivery is rate-limited to <=10 messages/sec.
 
   /api/v1/scans/{scan_id}/findings:
     get:
@@ -727,13 +733,24 @@ components:
 
     ScanEvent:
       type: object
-      description: WebSocket frame shape for /scans/{scan_id}/events
+      description: >
+        WebSocket frame shape for /scans/{scan_id}/events. eventId is the
+        real, stored per-scan sequence number (stringified integer,
+        starting at 1) -- pass the last one seen back as the `after`
+        query param to resume.
       required: [type, eventId]
       properties:
         type: { type: string, enum: [progress, finding, stage, done, error] }
         eventId: { type: string }
-        stage: { type: string }
-        percent: { type: number }
+        stage: { type: string, enum: [ingesting, scanning, scoring] }
+        filesProcessed: { type: integer }
+        totalFiles: { type: integer }
+        bySurface:
+          type: object
+          description: "Real running count of findings by surface, e.g. {source: 3}."
+          additionalProperties: { type: integer }
         findingId: { type: string }
+        family: { type: [string, "null"] }
+        findingCount: { type: integer }
         scanId: { type: string }
         message: { type: string }
