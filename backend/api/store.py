@@ -15,34 +15,54 @@ from sqlmodel import select
 
 from api import db, stub_data
 from api.db_models import FindingRecord, PolicyRecord, ScanRecord
-from api.models import BandCounts, Finding, Policy, Scan, ScanCreate, ScanStats, ScanStatus
+from api.filtering import band_counts
+from api.models import Finding, Policy, Scan, ScanCreate, ScanStatus
+from engine.models import ScanResult
 
 
-def create_scan(payload: ScanCreate) -> Scan:
-    scan_id = f"scan_{uuid.uuid4().hex[:12]}"
-    now = datetime.now(UTC)
+def resolve_policy(payload: ScanCreate) -> Policy:
+    """The policy a scan should score against: payload.policyId (falling
+    back to the default policy) with payload.crqcYears applied as a
+    per-scan override of the horizon (Z), if given.
+    """
     with db.session_scope() as session:
         policy_id = payload.policyId or stub_data.DEFAULT_POLICY.id
-        policy_rec = session.get(PolicyRecord, policy_id)
-        policy = db.record_to_policy(policy_rec) if policy_rec is not None else stub_data.DEFAULT_POLICY
+        rec = session.get(PolicyRecord, policy_id)
+        policy = db.record_to_policy(rec) if rec is not None else stub_data.DEFAULT_POLICY
+    if payload.crqcYears is not None:
+        policy = policy.model_copy(update={"crqcYears": payload.crqcYears})
+    return policy
 
-        scan = Scan(
-            id=scan_id,
-            target=payload.path or "uploaded-artifact",
-            status=ScanStatus.DONE,
-            stats=ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0),
-            bands=BandCounts(),
-            policyId=policy.id,
-            crqcYears=payload.crqcYears or policy.crqcYears,
-            startedAt=now,
-            finishedAt=now,
-        )
+
+def create_scan_from_result(
+    payload: ScanCreate, result: ScanResult, policy: Policy, *, scan_status: ScanStatus = ScanStatus.DONE
+) -> Scan:
+    scan_id = f"scan_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    scan = Scan(
+        id=scan_id,
+        target=payload.path or "uploaded-artifact",
+        status=scan_status,
+        stats=result.stats,
+        bands=band_counts(result.findings),
+        policyId=policy.id,
+        crqcYears=policy.crqcYears,
+        startedAt=now,
+        finishedAt=now,
+    )
+    with db.session_scope() as session:
         session.add(db.scan_to_record(scan))
+        for finding in result.findings:
+            session.add(db.finding_to_record(finding, scan_id=scan_id))
         db.log_audit(
-            session, action="scan.create", entity_type="scan", entity_id=scan_id, detail={"target": scan.target}
+            session,
+            action="scan.create",
+            entity_type="scan",
+            entity_id=scan_id,
+            detail={"target": scan.target, "findingCount": len(result.findings)},
         )
         session.commit()
-        return scan
+    return scan
 
 
 def list_scans() -> list[Scan]:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -29,9 +30,12 @@ from api.models import (
     RiskBand,
     Scan,
     ScanCreate,
+    ScanStatus,
 )
 from api.pdf_stub import build_stub_report_pdf
+from engine.models import ScanResult
 from engine.risk import rescore as rescore_formula
+from engine.scanner import scan as run_scan
 
 router = APIRouter()
 
@@ -45,7 +49,20 @@ def _get_scan_or_404(scan_id: str) -> Scan:
 
 @router.post("/scans", response_model=Scan, status_code=201)
 async def create_scan(payload: ScanCreate) -> Scan:
-    return store.create_scan(payload)
+    if not payload.path:
+        raise HTTPException(status_code=400, detail="path is required (upload support is not implemented yet)")
+    target = Path(payload.path)
+    if not target.exists():
+        raise HTTPException(status_code=400, detail=f"path does not exist: {payload.path}")
+
+    policy = store.resolve_policy(payload)
+    try:
+        result = run_scan(target, policy)
+        scan_status = ScanStatus.DONE
+    except OSError:
+        result = ScanResult()
+        scan_status = ScanStatus.FAILED
+    return store.create_scan_from_result(payload, result, policy, scan_status=scan_status)
 
 
 @router.get("/scans", response_model=list[Scan])

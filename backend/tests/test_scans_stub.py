@@ -1,21 +1,41 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 STUB_SCAN_ID = "scan_stub_001"
 
 
-def test_create_and_list_scan(client: TestClient) -> None:
-    resp = client.post("/api/v1/scans", json={"path": "/tmp/example"})
+def test_create_and_list_scan(client: TestClient, tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text('import hashlib\nhashlib.md5(b"x")\n')
+
+    resp = client.post("/api/v1/scans", json={"path": str(tmp_path)})
     assert resp.status_code == 201
     created = resp.json()
-    assert created["target"] == "/tmp/example"
+    assert created["target"] == str(tmp_path)
     assert created["status"] == "done"
+    assert created["stats"]["files"] == 1
+    assert created["bands"]["low"] + created["bands"]["medium"] >= 1
 
     listed = client.get("/api/v1/scans").json()
     ids = {s["id"] for s in listed}
     assert created["id"] in ids
     assert STUB_SCAN_ID in ids
+
+    findings = client.get(f"/api/v1/scans/{created['id']}/findings").json()
+    assert findings["total"] == 1
+    assert findings["items"][0]["family"] == "MD5"
+
+
+def test_create_scan_missing_path_400(client: TestClient) -> None:
+    resp = client.post("/api/v1/scans", json={})
+    assert resp.status_code == 400
+
+
+def test_create_scan_nonexistent_path_400(client: TestClient) -> None:
+    resp = client.post("/api/v1/scans", json={"path": "/does/not/exist/anywhere"})
+    assert resp.status_code == 400
 
 
 def test_get_scan_404(client: TestClient) -> None:

@@ -1,12 +1,12 @@
 # ECDAT Backend
 
 Backend for the Enterprise Cryptographic Discovery & Analysis Tool
-(SIH26164). **Phases 0-2 done**: a contract-exact FastAPI app backed by
-real SQLite persistence, plus a real, working Python detection engine with
-a small starter bench harness — not yet wired together (`POST /scans`
-still creates an empty scan; that's Phase 3). No auth. See `PLAN.md` for
-what's next and `docs/decisions/backend/` for why things are built the
-way they are.
+(SIH26164). **Phases 0-3 done**: `POST /scans` actually scans a real
+server-side Python path with a real tree-sitter detector and persists
+real, risk-scored findings to SQLite. No auth, no upload/sandboxing yet
+(Phase 6), no async progress yet (Phase 4 — scanning is synchronous). See
+`PLAN.md` for what's next and `docs/decisions/backend/` for why things
+are built the way they are.
 
 ## Requirements
 
@@ -27,6 +27,14 @@ Interactive docs at `http://127.0.0.1:8000/docs`.
 Scans/findings/policies persist in SQLite (`api/db.py`, `api/store.py`) —
 survives restarts. `api/stub_data.py` is now only the one-time seed data
 loaded into an empty database.
+
+Try a real scan (Python only so far):
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/scans \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/absolute/path/to/some/python/project"}'
+```
 
 ## Test / gates
 
