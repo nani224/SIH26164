@@ -1,6 +1,6 @@
 # ECDAT Backend — Plan
 
-## Status: Phases 0-1 complete, Phases 2-10 not started
+## Status: Phases 0-2 complete, Phases 3-10 not started
 
 ## Phase 0 — Contract & Skeleton (this session)
 - [x] Repo layout (backend/{engine,api,scripts,tests}, contracts/, docs/decisions/{backend,frontend}/, frontend/.gitkeep)
@@ -29,10 +29,19 @@
 - [ ] Engine not wired into the API yet — `POST /scans` still returns
       Phase 0 stub data; that's Phase 3.
 
-## Phase 2 — Persistence
-- [ ] SQLModel models: scans, findings (all raw risk factors stored),
-      policies, triage, audit_log
-- [ ] Wire `api/store.py` to the database instead of in-memory dicts
+## Phase 2 — Persistence (done, this session)
+- [x] SQLModel models: scans, findings (all raw risk factors stored),
+      policies, audit_log (`api/db_models.py`) — see ADR 004
+- [x] `api/store.py` rewired to SQLite via `api/db.py`; same public
+      function signatures, zero contract drift
+- [x] Every mutating store call writes an `AuditLogRecord`
+- [x] Manual restart test: `POST /scans`, kill the process, restart against
+      the same DB file, confirm the scan is still there
+- [x] Found + fixed a real bug via that manual test: SQLite strips tzinfo
+      from stored datetimes; `api/db._as_utc()` reattaches UTC on read
+- [ ] Postgres — not exercised (URL-compatible in principle, untested)
+- [ ] Engine still not wired to persist findings — `POST /scans` creates
+      an empty scan (0 findings); that's Phase 3
 
 ## Phase 3 — Real API
 - [ ] Replace stub responses with real engine/persistence calls
@@ -44,13 +53,13 @@ performance budget, sandboxed ingest, engine improvements via Loop B1,
 PQC catalog re-measurement, exports, security hardening). Not started.
 
 ## Next 3 tasks
-1. Source and hand-label a real DEV/HOLD corpus (Loop B1) from 3+ unseen
+1. Phase 3: wire `engine.scanner.scan()` into `POST /scans` (persisting
+   real findings via `api/store.py` instead of an empty scan), and extend
+   the Python detector's coverage (ec.ECDH, hmac.HMAC object-oriented
+   form, PEM/X.509 parsing) before adding a second language.
+2. Source and hand-label a real DEV/HOLD corpus (Loop B1) from 3+ unseen
    real projects to replace the synthetic starter fixtures with a
    meaningful measured floor.
-2. Phase 2: replace `backend/api/store.py`'s in-memory dicts with SQLModel
-   + SQLite, storing all raw risk factors, keeping the API contract
-   unchanged (contract-diff must still pass).
-3. Phase 3: wire `engine.scanner.scan()` into `POST /scans` (replacing the
-   stub), and extend the Python detector to more of the brief's
-   family/library list (ec.ECDH, hmac.HMAC object-oriented form, PEM/X.509
-   parsing) before adding a second language.
+3. Phase 4/5: real-time WS scan progress backed by the real engine run,
+   and a `< 200ms for 10,000 findings` rescore budget test now that
+   findings are in a real (indexed) database.

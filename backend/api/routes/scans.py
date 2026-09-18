@@ -74,7 +74,7 @@ async def get_findings(
 ) -> FindingPage:
     _get_scan_or_404(scan_id)
     filtered = filter_findings(
-        stub_data.list_findings(),
+        store.list_findings(scan_id),
         band=band,
         family=family,
         surface=surface,
@@ -91,7 +91,7 @@ async def get_findings(
 async def rescore_scan(scan_id: str, payload: RescoreRequest) -> RescoreResult:
     _get_scan_or_404(scan_id)
     changed: list[Finding] = []
-    for finding in stub_data.list_findings():
+    for finding in store.list_findings(scan_id):
         if finding.risk is None:
             continue
         new_z = payload.crqcYears if payload.crqcYears is not None else finding.risk.Z
@@ -116,9 +116,9 @@ async def rescore_scan(scan_id: str, payload: RescoreRequest) -> RescoreResult:
                 }
             )
             updated = finding.model_copy(update={"risk": updated_risk})
-            stub_data.replace_finding(finding.id, updated)
+            store.replace_finding(finding.id, updated, action="finding.rescore")
             changed.append(updated)
-    return RescoreResult(bands=band_counts(stub_data.list_findings()), changed=changed)
+    return RescoreResult(bands=band_counts(store.list_findings(scan_id)), changed=changed)
 
 
 @router.get("/scans/{scan_id}/graph", response_model=Graph)
@@ -130,14 +130,14 @@ async def get_graph(scan_id: str) -> Graph:
 @router.get("/scans/{scan_id}/cbom")
 async def get_cbom(scan_id: str) -> dict[str, Any]:
     scan = _get_scan_or_404(scan_id)
-    return build_cbom(scan, stub_data.list_findings())
+    return build_cbom(scan, store.list_findings(scan_id))
 
 
 @router.get("/scans/{scan_id}/plan", response_model=RemediationPlan)
 async def get_plan(scan_id: str) -> RemediationPlan:
     _get_scan_or_404(scan_id)
     band_priority = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    findings = [f for f in stub_data.list_findings() if f.recommendation is not None and f.risk is not None]
+    findings = [f for f in store.list_findings(scan_id) if f.recommendation is not None and f.risk is not None]
     findings.sort(key=lambda f: band_priority.get(f.risk.band, 99) if f.risk else 99)
     items = [
         RemediationPlanItem(

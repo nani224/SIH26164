@@ -328,19 +328,10 @@ PQC_CATALOG: list[PqcCatalogEntry] = [
 
 
 def list_findings() -> list[Finding]:
+    """Seed data only as of Phase 2 -- api/db.py's init_db() loads this once
+    into the database; runtime reads/writes go through api/store.py instead.
+    """
     return list(_FINDINGS)
-
-
-def get_finding(finding_id: str) -> Finding | None:
-    return next((f for f in _FINDINGS if f.id == finding_id), None)
-
-
-def replace_finding(finding_id: str, updated: Finding) -> None:
-    for i, f in enumerate(_FINDINGS):
-        if f.id == finding_id:
-            _FINDINGS[i] = updated
-            return
-    raise KeyError(finding_id)
 
 
 def default_scan() -> Scan:
