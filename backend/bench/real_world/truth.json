@@ -1,0 +1,10 @@
+{
+  "itsdangerous_signer.py": [
+    {"family": "SHA-1", "function": "digest", "line": 45},
+    {"family": "HMAC", "function": "tag", "line": 63},
+    {"family": "HMAC", "function": "tag", "line": 207}
+  ],
+  "cryptography_rsa_recipe.py": [
+    {"family": "RSA", "function": "keygen", "line": 3}
+  ]
+}

@@ -1,5 +1,32 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Loop B1 starter step: real, unseen, hand-labelled Python code
+
+Small, fast pass (explicitly not the brief's full DEV/HOLD scale — see
+`bench/real_world/README.md`): fetched 2 small real files never used to
+build or tune the detector (`itsdangerous`'s signer, BSD-3-Clause, and
+`cryptography`'s own official RSA keygen doctest recipe, Apache-2.0/BSD
+-- both on the licence gate's "OK" list), hand-labelled their crypto
+usage by reading the source first, then ran the detector.
+
+```
+$ uv run python bench/real_world/evaluate.py
+precision=1.0 recall=1.0 f1=1.0
+truth=4 detected=4 tp=4
+```
+
+4/4, no false positives/negatives -- on real, unseen code, not just the
+synthetic starter set. Reading a broader real file (PyJWT's
+`algorithms.py`, not vendored) surfaced two real, honestly-documented
+detector gaps (bare `hashlib.X` attribute references without a call; no
+type inference for `key.sign()`-style OO calls -- the latter already
+listed in the brief's own Phase 7) rather than silently ignoring them --
+see `bench/real_world/README.md` and `PLAN.md`.
+
+Gates: `uv run ruff check . && uv run mypy --strict .` clean (46 files),
+`uv run pytest` 78/78 passed at 94% coverage, `contract_diff.py` clean
+(no API changes this pass).
+
 ## 2026-09-18 — Phase 4: Real-Time Events (scoped: real event log, sync scanning)
 
 User was asked to choose between (a) a real, stored per-scan event log
