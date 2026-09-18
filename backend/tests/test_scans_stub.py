@@ -190,15 +190,14 @@ def test_pqc_catalog(client: TestClient) -> None:
     assert families == {"ML-KEM", "ML-DSA", "SLH-DSA"}
 
 
-def test_scan_events_websocket(client: TestClient) -> None:
-    with client.websocket_connect(f"/api/v1/scans/{STUB_SCAN_ID}/events") as ws:
-        events = []
-        for _ in range(7):
-            events.append(ws.receive_json())
-    types = [e["type"] for e in events]
-    assert types[0] == "stage"
-    assert types[-1] == "done"
-    assert all("eventId" in e for e in events)
+def test_scan_events_websocket_empty_for_seeded_scan(client: TestClient) -> None:
+    """scan_stub_001 is Phase 0/1 seed data, not the output of a real scan
+    run -- it has no event history (see api/db.py's seeding, and
+    tests/test_scan_events_real.py for the real-event-log tests against
+    an actually-POSTed scan). Connecting should just get a clean close.
+    """
+    with client.websocket_connect(f"/api/v1/scans/{STUB_SCAN_ID}/events"):
+        pass
 
 
 def test_scan_events_websocket_404(client: TestClient) -> None:

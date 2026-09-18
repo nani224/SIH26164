@@ -1,5 +1,81 @@
 # ECDAT Backend — Progress
 
+## 2026-09-18 — Phase 4: Real-Time Events (scoped: real event log, sync scanning)
+
+User was asked to choose between (a) a real, stored per-scan event log
+replayed after a still-synchronous `POST /scans` returns, with genuine
+resume-by-eventId, or (b) making scanning fully asynchronous so a WS
+client can watch it live. Chose (a) -- smaller, deterministic, no
+async-timing test flakiness; full async scanning stays a documented gap
+for later, not silently faked.
+
+Preceded by a separate `contract: update ScanEvent schema...` PR (#5,
+merged) per this repo's git rules (contract changes never land inside a
+feature commit) -- replaced the placeholder `percent` field with the real
+fields this phase's event log actually produces.
+
+Built: `engine.scanner.scan()` takes an optional `on_event` callback and
+emits real `stage`/`progress`/`finding` events as it runs (real stage
+transitions, a real running per-surface finding counter, real finding
+ids). `ScanEventRecord` + `store.list_events()` persist and replay that
+log. `WS /scans/{id}/events` now sends the *actual* recorded events for
+that scan (previously: a hardcoded canned sequence referencing fake
+finding ids, regardless of what was scanned) -- rate-limited to <=10
+msg/sec, with `?after=<eventId>` resume.
+
+### Gate output (real, run from `backend/`)
+
+```
+$ uv run ruff check .
+All checks passed!
+
+$ uv run mypy --strict .
+Success: no issues found in 43 source files
+
+$ uv run pytest --cov=api --cov=engine --cov=scripts --cov=bench --cov-report=term-missing --cov-fail-under=85
+...
+TOTAL                       1183     64    95%
+Required test coverage of 85% reached. Total coverage: 94.59%
+77 passed, 3 warnings in 4.85s
+
+$ uv run python scripts/contract_diff.py
+No contract drift.
+```
+
+### Manual verification
+
+Booted a real `uvicorn` server, wrote a file with `hashlib.md5(...)` +
+`hmac.new(..., hashlib.sha1)`, `POST /scans`, then used a real Python
+`websockets` client:
+- Full replay: 7 real events in order (`stage:ingesting`,
+  `stage:scanning`, 2x real `finding` events with real ids/families,
+  `progress` with `bySurface: {"source": 2}`, `stage:scoring`, `done`
+  with the right `findingCount`).
+- Resume: reconnecting with `?after=4` returned only events 5-7 (the
+  genuine tail) -- confirms resume is real, not decorative.
+
+### Loops run
+
+None of B1/B3-B6 apply. No risk-formula/factor change this phase.
+
+### BLOCKED items
+
+None. The one deliberate gap (live streaming during an in-flight scan)
+is a scoped-out design decision, not a blocker -- see `PLAN.md`.
+
+### Contract changes / PROPOSALS decisions
+
+`contract: update ScanEvent schema for real Phase 4 event log` (PR #5,
+merged before this feature PR) -- see `contracts/CHANGELOG.md`. No
+PROPOSALS from the frontend agent yet.
+
+### Next 3 tasks
+
+See `PLAN.md`: (1) a real hand-labelled DEV/HOLD corpus (Loop B1) plus
+broader Python detection coverage, (2) Phase 5 rescore performance
+budget, (3) revisit async scanning if live-during-scan progress becomes
+important before Phase 6.
+
 ## 2026-09-18 — Phase 3: Real API
 
 Wired `engine.scanner.scan()` into `POST /scans`: it now scans the given

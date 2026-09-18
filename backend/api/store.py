@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from sqlmodel import select
 
 from api import db, stub_data
-from api.db_models import FindingRecord, PolicyRecord, ScanRecord
+from api.db_models import FindingRecord, PolicyRecord, ScanEventRecord, ScanRecord
 from api.filtering import band_counts
 from api.models import Finding, Policy, Scan, ScanCreate, ScanStatus
 from engine.models import ScanResult
@@ -35,7 +35,12 @@ def resolve_policy(payload: ScanCreate) -> Policy:
 
 
 def create_scan_from_result(
-    payload: ScanCreate, result: ScanResult, policy: Policy, *, scan_status: ScanStatus = ScanStatus.DONE
+    payload: ScanCreate,
+    result: ScanResult,
+    policy: Policy,
+    *,
+    scan_status: ScanStatus = ScanStatus.DONE,
+    events: list[tuple[str, dict[str, object]]] | None = None,
 ) -> Scan:
     scan_id = f"scan_{uuid.uuid4().hex[:12]}"
     now = datetime.now(UTC)
@@ -50,10 +55,18 @@ def create_scan_from_result(
         startedAt=now,
         finishedAt=now,
     )
+    all_events = list(events or [])
+    final_type = "error" if scan_status == ScanStatus.FAILED else "done"
+    all_events.append((final_type, {"scanId": scan_id, "findingCount": len(result.findings)}))
+
     with db.session_scope() as session:
         session.add(db.scan_to_record(scan))
         for finding in result.findings:
             session.add(db.finding_to_record(finding, scan_id=scan_id))
+        for event_id, (event_type, event_payload) in enumerate(all_events, start=1):
+            session.add(
+                ScanEventRecord(scan_id=scan_id, event_id=event_id, type=event_type, payload=event_payload)
+            )
         db.log_audit(
             session,
             action="scan.create",
@@ -63,6 +76,15 @@ def create_scan_from_result(
         )
         session.commit()
     return scan
+
+
+def list_events(scan_id: str, after: int | None = None) -> list[ScanEventRecord]:
+    with db.session_scope() as session:
+        query = select(ScanEventRecord).where(ScanEventRecord.scan_id == scan_id)
+        if after:
+            query = query.where(ScanEventRecord.event_id > after)
+        query = query.order_by(ScanEventRecord.event_id)  # type: ignore[arg-type]
+        return list(session.exec(query).all())
 
 
 def list_scans() -> list[Scan]:

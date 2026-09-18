@@ -56,13 +56,20 @@ async def create_scan(payload: ScanCreate) -> Scan:
         raise HTTPException(status_code=400, detail=f"path does not exist: {payload.path}")
 
     policy = store.resolve_policy(payload)
+    collected_events: list[tuple[str, dict[str, Any]]] = []
+
+    def on_event(event_type: str, event_payload: dict[str, Any]) -> None:
+        collected_events.append((event_type, event_payload))
+
     try:
-        result = run_scan(target, policy)
+        result = run_scan(target, policy, on_event=on_event)
         scan_status = ScanStatus.DONE
     except OSError:
         result = ScanResult()
         scan_status = ScanStatus.FAILED
-    return store.create_scan_from_result(payload, result, policy, scan_status=scan_status)
+    return store.create_scan_from_result(
+        payload, result, policy, scan_status=scan_status, events=collected_events
+    )
 
 
 @router.get("/scans", response_model=list[Scan])
@@ -178,8 +185,17 @@ async def get_report_pdf(scan_id: str) -> Response:
     return Response(content=pdf_bytes, media_type="application/pdf")
 
 
+_MAX_EVENTS_PER_SEC = 10
+
+
 @router.websocket("/scans/{scan_id}/events")
-async def scan_events(websocket: WebSocket, scan_id: str) -> None:
+async def scan_events(websocket: WebSocket, scan_id: str, after: int = 0) -> None:
+    """Replays the real, stored event log for a scan (see engine.scanner's
+    on_event callback + store.create_scan_from_result). Scanning is
+    synchronous, so this always replays a completed scan's history rather
+    than streaming one live -- pass `after=<last eventId you saw>` to
+    resume without re-receiving events already delivered.
+    """
     await websocket.accept()
     scan = store.get_scan(scan_id)
     if scan is None:
@@ -187,19 +203,13 @@ async def scan_events(websocket: WebSocket, scan_id: str) -> None:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    events: list[dict[str, Any]] = [
-        {"type": "stage", "stage": "ingesting"},
-        {"type": "progress", "percent": 40},
-        {"type": "stage", "stage": "scanning"},
-        {"type": "finding", "findingId": "finding_001"},
-        {"type": "finding", "findingId": "finding_003"},
-        {"type": "stage", "stage": "scoring"},
-        {"type": "done", "scanId": scan_id},
-    ]
+    events = store.list_events(scan_id, after=after or None)
     try:
-        for i, event in enumerate(events, start=1):
-            await websocket.send_json({**event, "eventId": str(i)})
-            await asyncio.sleep(0.02)
+        for i, event in enumerate(events):
+            frame: dict[str, Any] = {"type": event.type, "eventId": str(event.event_id), **event.payload}
+            await websocket.send_json(frame)
+            if i < len(events) - 1:
+                await asyncio.sleep(1 / _MAX_EVENTS_PER_SEC)
         await websocket.close()
     except WebSocketDisconnect:
         return
