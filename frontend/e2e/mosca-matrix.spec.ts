@@ -29,7 +29,10 @@ test.describe('Screen 3: Mosca Quantum Risk Matrix E2E & Real Browser Accessibil
 
     // 3. Adjust Z slider from 10y to 5y
     const slider = page.getByLabel('CRQC Horizon in years');
-    await slider.fill('5');
+    await slider.focus();
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press('ArrowLeft');
+    }
 
     // 4. Verify Z line text updates in DOM
     await expect(page.locator('text=CRQC HORIZON: Z = 5y')).toBeVisible();

@@ -34,3 +34,22 @@ This file tracks RFCs and change proposals from the frontend (`Antigravity`) to 
 - **Requested By**: Screen 4 (Inventory)
 - **Justification**: Visibility into sovereign cloud cryptographic assets (AWS KMS, Azure Key Vault, Google Cloud HSM enclaves).
 - **Proposed Schema**: Extend `surface` enum in `components['schemas']['Finding']` with `"cloud-kms"`.
+
+---
+
+### [PROPOSED] RFC-004: Native WebSocket Progress Event Stream
+- **Endpoint**: `ws://<host>/api/v1/scans/{id}/events`
+- **Status**: Proposed / Implemented in Frontend WebSocket Client
+- **Requested By**: Screen 1 (Scan Launcher)
+- **Justification**: Real-time progress streaming for large repositories without polling `GET /scans/{id}`.
+- **Proposed Message Payload**:
+  ```json
+  {
+    "scanId": "string",
+    "stage": "ingesting" | "scanning" | "scoring" | "done" | "failed",
+    "files": 1420,
+    "bytes": 28450190,
+    "findings": 50,
+    "progressPercent": 100
+  }
+  ```

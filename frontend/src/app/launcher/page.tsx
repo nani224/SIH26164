@@ -90,6 +90,7 @@ export default function ScanLauncherPage() {
           <div className="bg-[var(--surface-card)] border border-[var(--border-prominent)] rounded-xl p-6 text-center relative hover:border-[var(--border-focus)] transition-colors">
             <input
               type="file"
+              aria-label="Upload bundle archive or binary target"
               className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -150,6 +151,7 @@ export default function ScanLauncherPage() {
                 </label>
                 <select
                   value={selectedPolicy}
+                  aria-label="Evaluation Policy"
                   onChange={(e) => setSelectedPolicy(e.target.value)}
                   className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded p-2 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]"
                 >
@@ -172,6 +174,7 @@ export default function ScanLauncherPage() {
                   max="15"
                   step="1"
                   value={crqcZ}
+                  aria-label="CRQC Horizon in years"
                   onChange={(e) => setCrqcZ(Number(e.target.value))}
                   className="w-full accent-[var(--crypto-pqc)] cursor-pointer mt-1"
                 />

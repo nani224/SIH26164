@@ -71,7 +71,7 @@ export function CryptoBadge({
     >
       <Icon className={clsx('flex-shrink-0', isSm ? 'w-3 h-3' : 'w-3.5 h-3.5')} />
       <span className={clsx('tracking-wide', current.text)}>{finalLabel}</span>
-      <span className="opacity-60 text-[10px] uppercase font-semibold">[{current.label}]</span>
+      <span className="text-[10px] uppercase font-semibold">[{current.label}]</span>
       {needsReview && (
         <span
           className="ml-1 px-1 py-0.2 bg-[var(--band-medium)] text-[var(--surface-base)] rounded text-[9px] font-bold"

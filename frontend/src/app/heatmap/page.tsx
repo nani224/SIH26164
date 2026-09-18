@@ -1,12 +1,21 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { mockFindings } from '../../mocks/data';
-import { Grid, Sparkles, ArrowRight, ShieldAlert } from 'lucide-react';
-import { classifyAlgorithm } from '../../types/crypto';
+import { useQuery } from '@tanstack/react-query';
+import { useAppStore } from '../../lib/store';
+import { fetchScanFindings } from '../../lib/api';
+import { Grid, RefreshCw } from 'lucide-react';
 
 export default function HeatmapPage() {
   const router = useRouter();
+  const { activeScanId } = useAppStore();
+
+  const { data: findingsData, isLoading } = useQuery({
+    queryKey: ['findings', activeScanId],
+    queryFn: () => fetchScanFindings(activeScanId),
+  });
+
+  const findings = findingsData?.items ?? [];
 
   const surfaces = [
     'network-protocol',
@@ -24,7 +33,7 @@ export default function HeatmapPage() {
     return {
       surface,
       cells: families.map((family) => {
-        const matches = mockFindings.filter(
+        const matches = findings.filter(
           (f) => f.surface === surface && f.family.toUpperCase().includes(family)
         );
         if (matches.length === 0) return null;
@@ -67,73 +76,80 @@ export default function HeatmapPage() {
         </div>
       </div>
 
-      {/* Heatmap Matrix Grid */}
-      <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl p-5 overflow-x-auto shadow-xl">
-        <table className="w-full text-center border-collapse">
-          <thead>
-            <tr>
-              <th className="p-3 text-left font-bold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
-                ATTACK SURFACE
-              </th>
-              {families.map((fam) => (
-                <th
-                  key={fam}
-                  className="p-3 font-bold text-[var(--text-primary)] border-b border-[var(--border-subtle)]"
-                >
-                  {fam}
+      {isLoading ? (
+        <div className="flex items-center justify-center p-12 text-[var(--text-muted)] gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
+          <span>LOADING EXPOSURE MATRIX TELEMETRY...</span>
+        </div>
+      ) : (
+        /* Heatmap Matrix Grid */
+        <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl p-5 overflow-x-auto shadow-xl">
+          <table className="w-full text-center border-collapse">
+            <thead>
+              <tr>
+                <th className="p-3 text-left font-bold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
+                  ATTACK SURFACE
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border-subtle)]">
-            {matrixData.map(({ surface, cells }) => (
-              <tr key={surface} className="hover:bg-[var(--surface-raised)] transition-colors">
-                <td className="p-3 text-left font-semibold text-[var(--text-primary)]">
-                  {surface}
-                </td>
-                {cells.map((cell, idx) => {
-                  const fam = families[idx];
-                  if (!cell) {
+                {families.map((fam) => (
+                  <th
+                    key={fam}
+                    className="p-3 font-bold text-[var(--text-primary)] border-b border-[var(--border-subtle)]"
+                  >
+                    {fam}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-subtle)]">
+              {matrixData.map(({ surface, cells }) => (
+                <tr key={surface} className="hover:bg-[var(--surface-raised)] transition-colors">
+                  <td className="p-3 text-left font-semibold text-[var(--text-primary)]">
+                    {surface}
+                  </td>
+                  {cells.map((cell, idx) => {
+                    const fam = families[idx];
+                    if (!cell) {
+                      return (
+                        <td key={fam} className="p-3 text-[var(--text-muted)] opacity-30">
+                          —
+                        </td>
+                      );
+                    }
+
+                    let bgClass = 'bg-[oklch(0.62_0.14_150_/_0.15)] text-[var(--band-low)] border-[var(--band-low)]';
+                    if (cell.worstBand === 'critical') {
+                      bgClass = 'bg-[var(--crypto-shor-bg)] text-[var(--band-critical)] border-[var(--band-critical)]';
+                    } else if (cell.worstBand === 'high') {
+                      bgClass = 'bg-[oklch(0.62_0.21_45_/_0.2)] text-[var(--band-high)] border-[var(--band-high)]';
+                    } else if (cell.worstBand === 'medium') {
+                      bgClass = 'bg-[var(--crypto-grover-bg)] text-[var(--band-medium)] border-[var(--band-medium)]';
+                    }
+
                     return (
-                      <td key={fam} className="p-3 text-[var(--text-muted)] opacity-30">
-                        —
+                      <td key={fam} className="p-2">
+                        <button
+                          onClick={() => handleCellClick(surface, fam)}
+                          className={`w-full py-2.5 px-2 rounded border text-center transition-all hover:scale-105 ${bgClass} ${
+                            cell.isBroken ? 'hatch-broken font-bold' : ''
+                          }`}
+                          title={`${surface} × ${fam}: ${cell.count} finding(s), Worst score: ${cell.worstScore.toFixed(1)}`}
+                        >
+                          <div className="font-bold text-xs num-tabular">
+                            {cell.worstScore.toFixed(0)}
+                          </div>
+                          <div className="text-[9px] font-semibold mt-0.5">
+                            {cell.count} asset{cell.count > 1 ? 's' : ''}
+                          </div>
+                        </button>
                       </td>
                     );
-                  }
-
-                  let bgClass = 'bg-[oklch(0.62_0.14_150_/_0.15)] text-[var(--band-low)] border-[var(--band-low)]';
-                  if (cell.worstBand === 'critical') {
-                    bgClass = 'bg-[var(--crypto-shor-bg)] text-[var(--band-critical)] border-[var(--band-critical)]';
-                  } else if (cell.worstBand === 'high') {
-                    bgClass = 'bg-[oklch(0.62_0.21_45_/_0.2)] text-[var(--band-high)] border-[var(--band-high)]';
-                  } else if (cell.worstBand === 'medium') {
-                    bgClass = 'bg-[var(--crypto-grover-bg)] text-[var(--band-medium)] border-[var(--band-medium)]';
-                  }
-
-                  return (
-                    <td key={fam} className="p-2">
-                      <button
-                        onClick={() => handleCellClick(surface, fam)}
-                        className={`w-full py-2.5 px-2 rounded border text-center transition-all hover:scale-105 ${bgClass} ${
-                          cell.isBroken ? 'hatch-broken font-bold' : ''
-                        }`}
-                        title={`${surface} × ${fam}: ${cell.count} finding(s), Worst score: ${cell.worstScore.toFixed(1)}`}
-                      >
-                        <div className="font-bold text-xs num-tabular">
-                          {cell.worstScore.toFixed(0)}
-                        </div>
-                        <div className="text-[9px] opacity-80 mt-0.5">
-                          {cell.count} asset{cell.count > 1 ? 's' : ''}
-                        </div>
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

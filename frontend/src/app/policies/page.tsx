@@ -145,6 +145,7 @@ export default function PolicyEditorPage() {
               <select
                 value={selectedPolicyId}
                 onChange={(e) => setSelectedPolicyId(e.target.value)}
+                aria-label="Select active policy"
                 className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded px-2.5 py-1 text-xs text-[var(--text-primary)]"
               >
                 {policies.map((p) => (
@@ -172,6 +173,7 @@ export default function PolicyEditorPage() {
                   type="text"
                   value={policyName}
                   onChange={(e) => setPolicyName(e.target.value)}
+                  aria-label="Policy Name"
                   className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-prominent)]"
                 />
               </div>
@@ -183,6 +185,7 @@ export default function PolicyEditorPage() {
                 <select
                   value={defaultExposure}
                   onChange={(e) => setDefaultExposure(e.target.value as any)}
+                  aria-label="Default Exposure"
                   className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"
                 >
                   <option value="external">External (Perimeter / Internet)</option>
@@ -199,6 +202,7 @@ export default function PolicyEditorPage() {
                 <select
                   value={defaultCriticality}
                   onChange={(e) => setDefaultCriticality(e.target.value as any)}
+                  aria-label="Default Criticality"
                   className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"
                 >
                   <option value="mission-critical">Mission-Critical (K = 1.0)</option>
@@ -217,6 +221,7 @@ export default function PolicyEditorPage() {
                     type="number"
                     value={defaultShelfLife}
                     onChange={(e) => setDefaultShelfLife(parseInt(e.target.value, 10))}
+                    aria-label="Default Shelf Life in years"
                     className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2.5 py-1.5 text-xs text-[var(--text-primary)] num-tabular"
                   />
                 </div>
@@ -228,6 +233,7 @@ export default function PolicyEditorPage() {
                     type="number"
                     value={defaultMigration}
                     onChange={(e) => setDefaultMigration(parseInt(e.target.value, 10))}
+                    aria-label="Default Migration in years"
                     className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2.5 py-1.5 text-xs text-[var(--text-primary)] num-tabular"
                   />
                 </div>
@@ -277,6 +283,7 @@ export default function PolicyEditorPage() {
                           updated[idx] = { ...updated[idx], glob: e.target.value };
                           setRules(updated);
                         }}
+                        aria-label={`Rule ${idx + 1} Path Glob Matcher`}
                         className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--crypto-pqc)] font-bold font-mono"
                       />
                     </div>
@@ -291,6 +298,7 @@ export default function PolicyEditorPage() {
                           updated[idx] = { ...updated[idx], exposure: e.target.value as any };
                           setRules(updated);
                         }}
+                        aria-label={`Rule ${idx + 1} Exposure`}
                         className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)]"
                       >
                         <option value="external">External</option>
@@ -310,6 +318,7 @@ export default function PolicyEditorPage() {
                           updated[idx] = { ...updated[idx], criticality: e.target.value as any };
                           setRules(updated);
                         }}
+                        aria-label={`Rule ${idx + 1} Criticality`}
                         className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)]"
                       >
                         <option value="mission-critical">Mission-Critical</option>
@@ -331,6 +340,7 @@ export default function PolicyEditorPage() {
                             updated[idx] = { ...updated[idx], shelfLifeYears: parseInt(e.target.value, 10) };
                             setRules(updated);
                           }}
+                          aria-label={`Rule ${idx + 1} Shelf Life X in years`}
                           className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-1.5 py-1 text-xs text-[var(--text-primary)] num-tabular"
                         />
                       </div>
@@ -344,6 +354,7 @@ export default function PolicyEditorPage() {
                             updated[idx] = { ...updated[idx], migrationYears: parseInt(e.target.value, 10) };
                             setRules(updated);
                           }}
+                          aria-label={`Rule ${idx + 1} Migration Y in years`}
                           className="w-full bg-[var(--surface-base)] border border-[var(--border-subtle)] rounded px-1.5 py-1 text-xs text-[var(--text-primary)] num-tabular"
                         />
                       </div>
@@ -356,6 +367,7 @@ export default function PolicyEditorPage() {
                       </div>
                       <button
                         onClick={() => handleRemoveRule(idx)}
+                        aria-label={`Delete Rule ${idx + 1}`}
                         className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--band-critical)] hover:bg-[var(--surface-base)]"
                         title="Delete Rule"
                       >
