@@ -22,9 +22,15 @@
       for the first time (1.000/1.000 on 15 usages)
 - [x] tree-sitter grammar vendoring approach decided + documented (ADR 003:
       official per-language PyPI packages, not `tree-sitter-language-pack`)
-- [ ] First DEV/HOLD split (Loop B1) — **not done**. Needs real,
-      hand-labelled third-party projects (>=150 usages across 3 unseen
-      projects); this session only built starter synthetic fixtures.
+- [ ] First DEV/HOLD split (Loop B1) — **still not done at real scale**.
+      A small first step landed later (2026-09-18, `bench/real_world/`):
+      2 real, unseen, hand-labelled files (BSD/Apache-licensed, itsdangerous
+      + cryptography's own RSA doctest recipe), 4 labelled usages,
+      precision/recall 1.0/1.0, plus honestly-documented real gaps found
+      by reading the code (bare `hashlib.X` references without a call;
+      no intra-file type inference for `key.sign()`-style OO calls —
+      see `bench/real_world/README.md`). Still nowhere near the brief's
+      >=150-usages-across-3-unseen-projects target, and still Python-only.
 - [ ] Other languages (Java/Go/C/C++/JS/TS) — Python only so far.
 - [ ] Engine not wired into the API yet — `POST /scans` still returns
       Phase 0 stub data; that's Phase 3.
@@ -94,11 +100,10 @@ budget, sandboxed ingest, engine improvements via Loop B1, PQC catalog
 re-measurement, exports, security hardening). Not started.
 
 ## Next 3 tasks
-1. Source and hand-label a real DEV/HOLD corpus (Loop B1) from 3+ unseen
-   real projects to replace the synthetic starter fixtures with a
-   meaningful measured floor, and extend the Python detector's coverage
-   (ec.ECDH, hmac.HMAC object-oriented form, PEM/X.509 parsing) before
-   adding a second language.
+1. Grow `bench/real_world/` toward the brief's real Loop B1 scale
+   (>=150 labelled usages across 3 unseen projects), and fix the largest
+   documented gap (bare `hashlib.X` attribute references) as the next
+   Loop B1 iteration, before adding a second language.
 2. Phase 5: rescore performance budget (<200ms for 10,000 findings) now
    that findings live in a real (indexed) database — add a load test and
    an index on `FindingRecord.scan_id` if needed.
