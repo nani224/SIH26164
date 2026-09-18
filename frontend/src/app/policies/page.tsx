@@ -11,7 +11,7 @@ export default function PolicyEditorPage() {
   const { activeScanId } = useAppStore();
   const queryClient = useQueryClient();
 
-  const { data: policies, isLoading: policiesLoading } = useQuery({
+  const { data: policies, isLoading: policiesLoading, error: policiesError } = useQuery({
     queryKey: ['policies'],
     queryFn: fetchPolicies,
   });
@@ -135,6 +135,10 @@ export default function PolicyEditorPage() {
         <div className="p-12 text-center text-xs text-[var(--text-muted)] flex items-center justify-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
           <span>SYNCHRONIZING POLICIES FROM BACKEND...</span>
+        </div>
+      ) : policiesError ? (
+        <div className="p-8 text-center text-xs border border-[var(--band-critical)] rounded-lg bg-[var(--surface-card)]">
+          <p className="text-[var(--band-critical)]">Failed to synchronize policy parameters from backend.</p>
         </div>
       ) : (
         <>

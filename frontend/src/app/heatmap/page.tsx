@@ -10,7 +10,7 @@ export default function HeatmapPage() {
   const router = useRouter();
   const { activeScanId } = useAppStore();
 
-  const { data: findingsData, isLoading } = useQuery({
+  const { data: findingsData, isLoading, error } = useQuery({
     queryKey: ['findings', activeScanId],
     queryFn: () => fetchScanFindings(activeScanId),
   });
@@ -80,6 +80,10 @@ export default function HeatmapPage() {
         <div className="flex items-center justify-center p-12 text-[var(--text-muted)] gap-2">
           <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
           <span>LOADING EXPOSURE MATRIX TELEMETRY...</span>
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center text-xs border border-[var(--band-critical)] rounded-lg bg-[var(--surface-card)]">
+          <p className="text-[var(--band-critical)]">Failed to query exposure telemetry from API endpoint.</p>
         </div>
       ) : (
         /* Heatmap Matrix Grid */
