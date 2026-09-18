@@ -106,3 +106,21 @@ class AuditLogRecord(SQLModel, table=True):
     entity_type: str
     entity_id: str
     detail: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+
+class ScanEventRecord(SQLModel, table=True):
+    """Phase 4: the real, replayable event log for a scan's WS stream.
+
+    event_id is sequential *within* a scan (starts at 1), separate from
+    the global autoincrement `id` -- it's what clients pass back via the
+    `after` query param to resume.
+    """
+
+    __tablename__ = "scan_events"
+
+    id: int | None = Field(default=None, primary_key=True)
+    scan_id: str = Field(index=True)
+    event_id: int
+    type: str
+    payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=_utcnow)

@@ -44,3 +44,32 @@ def test_scan_empty_directory_produces_no_findings(tmp_path: Path) -> None:
     result = scan(tmp_path, _POLICY)
     assert result.findings == []
     assert result.stats.files == 0
+
+
+def test_scan_emits_real_events_via_on_event_callback(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text('import hashlib\nhashlib.md5(b"x")\n')
+
+    events: list[tuple[str, dict[str, object]]] = []
+    result = scan(tmp_path, _POLICY, on_event=lambda t, p: events.append((t, p)))
+
+    types = [t for t, _ in events]
+    assert types[0] == "stage"
+    assert ("stage", {"stage": "ingesting"}) in events
+    assert ("stage", {"stage": "scanning"}) in events
+    assert ("stage", {"stage": "scoring"}) in events
+    assert types[-1] == "stage"  # scoring is emitted last
+
+    finding_events = [p for t, p in events if t == "finding"]
+    assert len(finding_events) == 1
+    assert finding_events[0]["findingId"] == result.findings[0].id
+    assert finding_events[0]["family"] == "MD5"
+
+    progress_events = [p for t, p in events if t == "progress"]
+    assert len(progress_events) == 1
+    assert progress_events[0] == {"filesProcessed": 1, "totalFiles": 1, "bySurface": {"source": 1}}
+
+
+def test_scan_without_callback_still_works(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text('import hashlib\nhashlib.md5(b"x")\n')
+    result = scan(tmp_path, _POLICY)  # no on_event -- must not raise
+    assert len(result.findings) == 1

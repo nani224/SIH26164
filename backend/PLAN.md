@@ -1,6 +1,6 @@
 # ECDAT Backend — Plan
 
-## Status: Phases 0-3 complete, Phases 4-10 not started
+## Status: Phases 0-4 complete (Phase 4 scoped down, see below), Phases 5-10 not started
 
 ## Phase 0 — Contract & Skeleton (this session)
 - [x] Repo layout (backend/{engine,api,scripts,tests}, contracts/, docs/decisions/{backend,frontend}/, frontend/.gitkeep)
@@ -59,13 +59,39 @@
 - [ ] Multipart upload — still not implemented (contract only has
       `{path}`; that's Phase 6's sandboxed ingest)
 - [ ] No sandboxing of the scan itself yet (explicitly Phase 6)
-- [ ] Async/WS-driven progress — `POST /scans` is still synchronous
-      (Phase 4)
+- [x] Async/WS-driven progress — see Phase 4 (scoped down)
 
-## Phases 4-10
-See the SIH26164 brief for the full phase list (real-time WS, rescore
-performance budget, sandboxed ingest, engine improvements via Loop B1,
-PQC catalog re-measurement, exports, security hardening). Not started.
+## Phase 4 — Real-Time Events (done, this session, deliberately scoped down)
+User-approved scope decision: keep `POST /scans` synchronous (Phase 3's
+deterministic, tested behavior) rather than making scanning a background
+job. What's real:
+- [x] `engine.scanner.scan()` takes an optional `on_event` callback and
+      emits genuine `stage`/`progress`/`finding` events as it runs
+      (real stage transitions, real per-surface finding counters, real
+      finding ids) — not simulated.
+- [x] `ScanEventRecord` (`api/db_models.py`) + `store.list_events()`: the
+      full per-scan event log is persisted (same transaction as the scan
+      + its findings), with real sequential `eventId`s.
+- [x] `WS /scans/{id}/events` replays the *real* stored log instead of
+      the old canned sequence, rate-limited to <=10 msg/s, and supports
+      genuine resume via `?after=<eventId>` (verified manually: connecting
+      with `after` set mid-list returns only the later events).
+- [x] `contract: update ScanEvent schema...` PR landed first (separate
+      from the feature PR, per this repo's git rules) — added the real
+      field names (`filesProcessed`/`totalFiles`/`bySurface`/`family`/
+      `findingCount`) and documented `after`.
+- [ ] **Not real**: watching a scan live *while it's still running*.
+      Because `POST /scans` is synchronous, a WS client can only connect
+      *after* the scan (and its whole event log) already exists — this is
+      full replay-with-resume, not a live stream. Making that live needs
+      async scanning (a background task, status transitions, timing-aware
+      tests) — a bigger, separate change, deliberately deferred rather
+      than faked. Tracked below.
+
+## Phases 5-10
+See the SIH26164 brief for the full phase list (rescore performance
+budget, sandboxed ingest, engine improvements via Loop B1, PQC catalog
+re-measurement, exports, security hardening). Not started.
 
 ## Next 3 tasks
 1. Source and hand-label a real DEV/HOLD corpus (Loop B1) from 3+ unseen
@@ -73,9 +99,9 @@ PQC catalog re-measurement, exports, security hardening). Not started.
    meaningful measured floor, and extend the Python detector's coverage
    (ec.ECDH, hmac.HMAC object-oriented form, PEM/X.509 parsing) before
    adding a second language.
-2. Phase 4: real-time WS scan progress backed by the real engine run
-   (replacing the canned event sequence `/scans/{id}/events` still sends),
-   batched at <=10 msg/s per the brief.
-3. Phase 5: rescore performance budget (<200ms for 10,000 findings) now
+2. Phase 5: rescore performance budget (<200ms for 10,000 findings) now
    that findings live in a real (indexed) database — add a load test and
    an index on `FindingRecord.scan_id` if needed.
+3. Revisit async scanning (the Phase 4 gap above) if truly-live progress
+   during an in-flight scan matters before Phase 6's sandboxed ingest
+   makes scans long enough to need it.

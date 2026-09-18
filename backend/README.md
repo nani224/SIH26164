@@ -1,12 +1,15 @@
 # ECDAT Backend
 
 Backend for the Enterprise Cryptographic Discovery & Analysis Tool
-(SIH26164). **Phases 0-3 done**: `POST /scans` actually scans a real
-server-side Python path with a real tree-sitter detector and persists
-real, risk-scored findings to SQLite. No auth, no upload/sandboxing yet
-(Phase 6), no async progress yet (Phase 4 — scanning is synchronous). See
-`PLAN.md` for what's next and `docs/decisions/backend/` for why things
-are built the way they are.
+(SIH26164). **Phases 0-4 done**: `POST /scans` scans a real server-side
+Python path with a real tree-sitter detector and persists real,
+risk-scored findings to SQLite; `WS /scans/{id}/events` replays that
+scan's *real* recorded event log (stages, per-surface progress, finding
+events) with rate-limiting and resume-by-`eventId` — see `PLAN.md`'s
+Phase 4 entry for the one deliberate gap (no live streaming *during* an
+in-flight scan; `POST /scans` is still synchronous). No auth, no
+upload/sandboxing yet (Phase 6). See `PLAN.md` for what's next and
+`docs/decisions/backend/` for why things are built the way they are.
 
 ## Requirements
 
@@ -35,6 +38,10 @@ curl -X POST http://127.0.0.1:8000/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{"path": "/absolute/path/to/some/python/project"}'
 ```
+
+Then replay its real event log (`websockets` Python client, or any WS
+tool): connect to `ws://127.0.0.1:8000/api/v1/scans/<id>/events`; add
+`?after=<eventId>` to resume without re-receiving events already seen.
 
 ## Test / gates
 
