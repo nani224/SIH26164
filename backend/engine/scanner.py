@@ -31,13 +31,13 @@ from api.models import (
     Surface,
     Triage,
 )
-from engine import source_go, source_python
+from engine import source_go, source_java, source_python
 from engine.factors import derive_risk
 from engine.models import Detection, ScanResult
 from engine.recommend import recommend
 
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".mypy_cache", ".ruff_cache"}
-_SOURCE_EXTENSIONS = {".py", ".go", ".bin", ".elf", ".so"}
+_SOURCE_EXTENSIONS = {".py", ".go", ".java", ".bin", ".elf", ".so"}
 # Per-file cap: engine/ingest.py bounds the whole archive (5 GB uncompressed,
 # 50k files), but nothing previously bounded a single pathological file --
 # one huge source/binary file could still exhaust memory since read_bytes()
@@ -84,7 +84,7 @@ def _iter_source_files(target: Path) -> list[Path]:
     if target.is_file():
         return [target] if target.suffix in _SOURCE_EXTENSIONS else []
     files: list[Path] = []
-    for ext in ("*.py", "*.go", "*.bin", "*.elf", "*.so"):
+    for ext in ("*.py", "*.go", "*.java", "*.bin", "*.elf", "*.so"):
         files.extend(target.rglob(ext))
     return [
         p
@@ -147,6 +147,8 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         )
         if file_path.suffix == ".go":
             detections = source_go.detect_code(source, rel_path)
+        elif file_path.suffix == ".java":
+            detections = source_java.detect_code(source, rel_path)
         elif file_path.suffix in {".bin", ".elf", ".so"}:
             detections = _detect_binary(source, rel_path)
         else:

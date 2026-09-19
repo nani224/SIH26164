@@ -157,4 +157,37 @@ job. What's real:
 - [x] ADR 010 documented in `docs/decisions/backend/010-phase10-security-hardening.md`
 
 ## Status: All Phases 0-10 Complete!
+
+## Track CC — Detection engine, corpus, CI/CD (2026-09-19, in progress)
+
+Separate from the numbered Phases above (those were the original build;
+Track CC is the post-merge follow-on owning `engine/`, `bench/`,
+`.github/workflows/` exclusively — see root `CLAUDE.md`). Five
+dependency-ordered milestones:
+
+- [x] **M0** — Efficiency setup: root `CLAUDE.md` Track CC section,
+      `rule-author`/`bench-runner`/`corpus-labeler` subagents, `/precision`
+      command, PostToolUse ruff+mypy hook on edited `engine/`/`bench/`
+      Python files (proven to fire via a real Edit trigger before commit).
+- [x] **M1** — Java detection engine: `engine/source_java.py` +
+      `engine/queries/java_crypto.scm`. JCA/JCE (`Cipher`,
+      `KeyPairGenerator`/`KeyGenerator` w/ initialize-linkage,
+      `MessageDigest`, `Signature`, `KeyAgreement`, `Mac`, `SSLContext`,
+      `KeyStore`, `SecretKeySpec`) + direct BouncyCastle class usage. 9
+      fixture files, 25 new truth entries (Layer A: 15 -> 40 usages,
+      still 1.0/1.0). See ADR 013 and 2026-09-19 PROGRESS.md entry for
+      full command output.
+- [ ] **M2** — C/C++ hardening: OpenSSL 3.x `EVP_*_fetch` modern API,
+      mbedTLS `mbedtls_*`, wolfSSL `wc_*`; confirm existing
+      binary/vendored-constant detection still works. Not started.
+- [ ] **M3** — Grow HOLD corpus (`bench/real_world/`) to ~150 usages
+      across 4 languages (label-before-run, labels committed alone
+      first). Not started.
+- [ ] **M4** — Cluster M3's false negatives by root cause, fix the
+      largest cluster, re-measure, confirm precision stays >=0.95. Not
+      started.
+- [ ] **M5** — CI/CD: reusable GitHub Action, PR-comment findings table,
+      `.ecdat-policy.yml` policy-as-code, precision-floor enforcement, a
+      real deliberately-vulnerable demo repo with a real blocked PR. Not
+      started.
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.

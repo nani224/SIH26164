@@ -1,5 +1,58 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Track CC M1: Java detection engine
+
+New `engine/source_java.py` (`tree-sitter-java==0.23.5`, MIT, confirmed
+pinnable via `uv add` before writing any code). Covers JCA/JCE `Cipher`
+(transformation-string parsing: algo/mode/padding), `KeyPairGenerator`/
+`KeyGenerator` (linked to a later `.initialize()`/`.init()` call on the
+same variable for key size/curve -- real intra-method dataflow, see
+`docs/decisions/backend/013-java-detection-engine.md` for the exact
+mechanism and its documented limitation), `MessageDigest`, `Signature`
+(`"SHA256withRSA"` parsing), `KeyAgreement`, `Mac` (`"HmacSHA256"`
+parsing), `SSLContext`, `KeyStore`, `SecretKeySpec`, plus direct
+BouncyCastle lightweight-API class usage (`new SHA256Digest()`, `new
+AESEngine()`, `new RSAKeyPairGenerator()`, `new
+Ed25519KeyPairGenerator()`). `engine/scanner.py` wired `.java` into the
+per-file dispatch alongside `.py`/`.go`.
+
+9 new fixture files (`bench/fixtures/Java*.java`, incl. one true-negative
+file with `StringBuilder`/`ArrayList`/`Logger`), 25 new `truth.json`
+entries. Real command output:
+
+```
+$ uv run python bench/evaluate.py
+precision=1.0 recall=1.0 f1=1.0
+truth=40 detected=40 tp=40
+```
+(grew from 15 to 40 usages; still 1.0/1.0)
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 66 source files
+$ uv run pytest --cov -q
+131 passed, 4 warnings in 16.10s   (was 118 before this session's start;
+                                     +12 test_source_java.py, +1 scanner
+                                     integration test, +1 floor-count bump)
+TOTAL coverage 94%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/real_world/evaluate.py
+(unchanged: precision=1.0 recall=0.52 truth=25 detected=13 -- Java
+detector doesn't touch the Python/Go real-world corpus, as expected;
+growing that corpus to include Java is M3, not this milestone)
+```
+
+Not started this session: M2 (C/C++ hardening), M3 (HOLD corpus growth),
+M4 (largest false-negative cluster), M5 (CI/CD + real blocked PR). Known
+limitation recorded in the ADR rather than silently shipped: the
+`KeyPairGenerator`/`initialize` variable link is a single-slot `dict`, not
+scope-aware -- a reused variable name across two methods with different
+algorithms in the same file would lose the first link. Not exercised by
+current fixtures.
+
 ## 2026-09-19 — Functional proof for Phase 9 (PDF) and Phase 10 (audit chain)
 
 A passing test count doesn't prove a feature does something real for a

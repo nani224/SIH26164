@@ -88,6 +88,21 @@ def test_scan_go_files(tmp_path: Path) -> None:
     assert result.findings[0].location.path == "main.go"
 
 
+def test_scan_java_files(tmp_path: Path) -> None:
+    (tmp_path / "Foo.java").write_text(
+        "public class Foo {\n"
+        "  void run() throws Exception {\n"
+        '    MessageDigest md = MessageDigest.getInstance("SHA-256");\n'
+        "  }\n"
+        "}\n"
+    )
+    result = scan(tmp_path, _POLICY)
+    assert result.stats.files == 1
+    assert len(result.findings) == 1
+    assert result.findings[0].family == "SHA-2"
+    assert result.findings[0].location.path == "Foo.java"
+
+
 def test_scan_skips_oversized_file_without_reading_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A pathological single huge file must be skipped (counted in
     skippedPrefilter), not read whole into memory -- see engine.scanner's
