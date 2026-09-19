@@ -44,3 +44,6 @@ jobs:
 
       - name: Contract diff (generated OpenAPI vs contracts/openapi.yaml)
         run: uv run python scripts/contract_diff.py
+
+      - name: Detection precision floor (Track CC, 0.95, Layer A + real-world HOLD)
+        run: uv run python bench/check_precision_floor.py

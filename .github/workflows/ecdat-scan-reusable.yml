@@ -1,0 +1,53 @@
+name: ecdat-scan (reusable)
+
+# A consuming repo calls this with a single `uses:` line instead of
+# wiring the composite action itself, e.g.:
+#
+#   jobs:
+#     ecdat:
+#       uses: nani224/SIH26164/.github/workflows/ecdat-scan-reusable.yml@main
+#       with:
+#         scan-path: .
+#       secrets:
+#         github-token: ${{ secrets.GITHUB_TOKEN }}
+#
+# This workflow does its own checkout of the CALLING repo (workflow_call
+# runs in the caller's context but still needs an explicit checkout step,
+# same as any other job) before invoking .github/actions/ecdat-scan/.
+
+on:
+  workflow_call:
+    inputs:
+      scan-path:
+        type: string
+        required: false
+        default: "."
+      policy-file:
+        type: string
+        required: false
+        default: ".ecdat-policy.yml"
+      ecdat-ref:
+        type: string
+        required: false
+        default: "main"
+    secrets:
+      github-token:
+        required: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout calling repository
+        uses: actions/checkout@v4
+
+      - name: ECDAT scan
+        uses: nani224/SIH26164/.github/actions/ecdat-scan@main
+        with:
+          scan-path: ${{ inputs.scan-path }}
+          policy-file: ${{ inputs.policy-file }}
+          ecdat-ref: ${{ inputs.ecdat-ref }}
+          github-token: ${{ secrets.github-token }}

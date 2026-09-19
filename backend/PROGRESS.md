@@ -1,5 +1,67 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Track CC M5 (in progress): CI/CD precision gate + reusable Action
+
+Built the in-repo, fully-verifiable half of M5:
+
+- `backend/bench/check_precision_floor.py`: runs both `bench/evaluate.py`
+  and `bench/real_world/evaluate.py`, fails if either's precision drops
+  below 0.95. Wired into `.github/workflows/backend-ci.yml` as a real CI
+  step -- the 0.95 floor this session enforced by hand all along (and
+  which caught a real violation in M3) is now something a green CI run
+  actually proves, not something to re-derive from a PROGRESS.md entry.
+- `.ecdat-policy.yml` (repo root): policy-as-code -- the existing
+  risk-formula `Policy` shape plus a `gate:` section (`failOnBand`,
+  `precisionFloor`) for CI-specific rules.
+- `backend/bench/ci_scan.py`: loads the policy, runs
+  `engine.scanner.scan()` against a target path, writes JSON + Markdown
+  findings output, exits non-zero if any finding is at or above the gate
+  band. Verified end-to-end against a hand-built
+  `rsa.generate_private_key(key_size=1024)` sample:
+
+  ```
+  $ uv run python bench/ci_scan.py --path <sample dir> --policy ../.ecdat-policy.yml ...
+  ## ECDAT scan: 2 finding(s), worst band critical
+  | critical | 90.0 | RSA | keygen | vulnerable_app.py:5 | ML-KEM-768 |
+  | medium | 18.0 | MD5 | digest | vulnerable_app.py:8 | SHA-2-256 |
+  BLOCKED: 1 finding(s) at or above the gate band (critical).
+  $ echo $?
+  1
+  ```
+
+- `backend/bench/post_pr_comment.py`: posts/updates a PR comment via raw
+  `urllib.request` calls to the GitHub REST API using `GITHUB_TOKEN` --
+  no third-party comment action, per the brief. Idempotent (edits its
+  own previous comment via a hidden marker).
+- `.github/actions/ecdat-scan/action.yml` (composite Action) +
+  `.github/workflows/ecdat-scan-reusable.yml` (`workflow_call` wrapper)
+  -- a consuming repo needs one `uses:` line to get a real scan + PR
+  comment + gate.
+- 11 new unit tests (`test_check_precision_floor.py`, `test_ci_scan.py`,
+  `test_post_pr_comment.py`), PR-comment tests use a monkeypatched
+  `_api_request` -- no real network calls from the test suite.
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 74 source files
+$ uv run pytest --cov=api --cov=engine --cov=scripts --cov-report=term-missing --cov-fail-under=85 -q
+166 passed, 4 warnings in 16.20s
+Required test coverage of 85% reached. Total coverage: 87.72%
+```
+
+**Not done yet, and not silently skipped**: the brief's "create a
+deliberately-vulnerable demo repo and open a REAL PR that gets REALLY
+BLOCKED" step needs a new external GitHub repository and a real PR under
+the user's identity -- a visible, hard-to-reverse action outside this
+session's current repo scope (`nani224/SIH26164` only). Flagged to the
+user rather than done unilaterally. Full design + exact remaining steps
+once authorized in
+`docs/decisions/backend/017-ci-cd-precision-gate-and-reusable-action.md`.
+Also unverified: the composite Action's cross-repo checkout step has
+only been YAML-syntax-validated, not run on GitHub's actual infrastructure.
+
 ## 2026-09-19 — Track CC M4: close the largest false-negative cluster
 
 M3 left 12 real-world false negatives. Clustered by root cause: 8 in

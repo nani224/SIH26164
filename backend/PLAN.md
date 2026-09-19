@@ -211,8 +211,15 @@ dependency-ordered milestones:
       unaffected (56/56). See ADR 016 and 2026-09-19 PROGRESS.md entry.
       Go's 4-FN cluster untouched -- next candidate, not attempted this
       pass.
-- [ ] **M5** — CI/CD: reusable GitHub Action, PR-comment findings table,
-      `.ecdat-policy.yml` policy-as-code, precision-floor enforcement, a
-      real deliberately-vulnerable demo repo with a real blocked PR. Not
-      started.
+- [~] **M5** (partial) — Built and locally-verified: `.ecdat-policy.yml`
+      policy-as-code, `backend/bench/check_precision_floor.py` wired into
+      `backend-ci.yml` as a real CI gate, `backend/bench/ci_scan.py`
+      (verified end-to-end against a real RSA-1024 sample: correctly
+      blocks, exit 1), `backend/bench/post_pr_comment.py` (GITHUB_TOKEN,
+      no third-party action), `.github/actions/ecdat-scan/action.yml` +
+      `.github/workflows/ecdat-scan-reusable.yml`. 11 new tests, full
+      gates green. **Not done**: the real deliberately-vulnerable demo
+      repo + real blocked PR -- needs a new external GitHub repository,
+      flagged to the user for authorization rather than created
+      unilaterally (see ADR 017 and 2026-09-19 PROGRESS.md entry).
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.

@@ -1,0 +1,47 @@
+# ECDAT policy-as-code.
+#
+# Two things live in this one file:
+#   1. Risk-scoring inputs (crqcYears / default / contexts) -- fed straight
+#      into engine.factors.derive_risk() via api.models.Policy, same shape
+#      the running API's /policies endpoint uses. See root CLAUDE.md for the
+#      Mosca risk formula these drive.
+#   2. CI gate rules (under `gate:`) -- consumed by backend/bench/ci_scan.py,
+#      the script the reusable Action (.github/actions/ecdat-scan/) and this
+#      repo's own backend-ci.yml both run. Not part of the risk formula
+#      itself; purely "what makes this check fail."
+#
+# A consuming repo copies this file to its own root and edits `default`/
+# `contexts`/`gate` for its own environment -- the shape and defaults here
+# are ECDAT's own reasonable starting point, not a claim about any specific
+# codebase's real exposure.
+
+crqcYears: 10
+
+default:
+  exposure: internal
+  criticality: medium
+  shelfLifeYears: 5
+  migrationYears: 3
+
+contexts:
+  - glob: "**/test/**"
+    exposure: test
+    criticality: low
+    shelfLifeYears: 1
+    migrationYears: 1
+  - glob: "**/tests/**"
+    exposure: test
+    criticality: low
+    shelfLifeYears: 1
+    migrationYears: 1
+
+gate:
+  # A new finding at or above this Mosca risk band fails the check.
+  # Bands, per root CLAUDE.md: critical >= 60, high 35-59, medium 15-34, low < 15.
+  failOnBand: critical
+  # Detection precision floor Track CC enforces on the *detector itself*
+  # (informational here -- what's actually enforced is this repo's own
+  # Layer A + real_world corpora, via backend/bench/check_precision_floor.py).
+  # Listed here so a consuming repo's policy file documents the same
+  # commitment the scanner was built under.
+  precisionFloor: 0.95
