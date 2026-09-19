@@ -43,12 +43,17 @@ repo as a copied file.
 
 ```
 $ uv run python bench/real_world/evaluate.py
-precision=<paste real output here after running -- see PROGRESS.md for the actual number recorded this session>
+precision=1.0 recall=0.52 f1=0.6842
+truth=25 detected=13 tp=13
 ```
 
-See `backend/PROGRESS.md`'s 2026-09-19 entry for the real, current number
--- this file is prose and goes stale; PROGRESS.md's dated entries are the
-source of truth for what was actually measured when.
+**13/25, zero false positives.** Every false negative is one of the two
+documented gaps below (OO `key.sign()`/`key.verify()` type inference, or
+Go's generic `cipher.Block` interface) -- see `backend/PROGRESS.md`'s
+2026-09-19 entry for the full false-negative list and analysis. This
+number is a floor (`tests/test_bench_real_world.py`), not a target --
+don't chase it back to 1.0 by weakening the corpus or the labels; closing
+the two gaps above for real is what would honestly move it.
 
 ## What this did *not* find (real gaps, noted honestly, not silently fixed)
 

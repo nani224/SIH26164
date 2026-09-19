@@ -171,11 +171,73 @@ and the backend stays healthy afterward.
 `pnpm build` all clean. `pnpm exec playwright test`: **23/24 passed**
 (all 10 screens, MSW-off gate, cross-screen color consistency, CLS,
 finale integration x2 themes, Mosca flows, a11y audits). The one failure
-(`GATE 3.3: Estate Graph Performance Profile at 5,000 Nodes`) is a sandbox
-GPU limitation, not an app defect -- confirmed independently: WebGL
-context is available (software rasterizer, "WebKit WebGL"/no hardware
-GPU) and `requestAnimationFrame` fires normally on every other page
-(~66 fps on an empty page), but the same 5,000-instanced-mesh scene this
-test renders measured ~1.2 fps outside the test harness too. Real GPU
-hardware would very likely clear the 55 fps bar; not verifiable in this
-sandbox. Left as an honest known gap rather than lowering the budget.
+is `GATE 3.3: Estate Graph Performance Profile at 5,000 Nodes (Measured FPS)`
+in `e2e/gates-verification.spec.ts`.
+
+**2026-09-19 follow-up: this was under-diagnosed the first time around.**
+"Confirmed environment limitation" was asserted from a ~66fps-empty-page
+data point that doesn't actually distinguish an environment limit from a
+code defect, especially against `README.md`'s own prior claim of **60.1
+FPS on this identical scene** (`cd67fd4`, unverified whether that number
+was ever really measured or just written down). Redone properly this
+time, in order:
+
+1. **Same scene?** `git diff cd67fd4 HEAD -- frontend/src/app/graph/page.tsx`:
+   the only change since that claim is swapping `raw.band`/`raw.score`
+   property-access fallback chains for direct `node.band`/`node.score`
+   reads (the contract-fix from earlier this session) -- same object
+   count, same instancing, no bloom/postprocessing pass exists in the code
+   at all (`grep -n Bloom` -- zero results; "bloom" in the UI copy is a
+   text label, not an `EffectComposer`). `e2e/gates-verification.spec.ts`
+   itself has zero diff since `cd67fd4`. Ruled out: not a different/easier
+   test scene.
+2. **Real WebGL renderer, unmasked**: `gl.getExtension('WEBGL_debug_renderer_info')`
+   -> `UNMASKED_RENDERER_WEBGL` = `"ANGLE (Google, Vulkan 1.3.0 (SwiftShader
+   Device (Subzero) (0x0000C0DE)), SwiftShader driver)"`. Confirmed: this
+   sandbox has no hardware GPU, full stop -- SwiftShader is Google's
+   CPU-only software Vulkan/GL implementation.
+3. **Frame-time breakdown** (real instrumentation: wrapped
+   `HTMLCanvasElement.prototype.getContext` to time every
+   `gl.draw*`/`drawArrays`/`drawElements`/`*Instanced` call, and wrapped
+   `requestAnimationFrame` to time each callback, over a clean 5s window
+   on the exact 5,000-node scene): the `requestAnimationFrame` callback
+   (all per-frame JS: 2 scalar rotation updates + the `renderer.render()`
+   call) took **~0.42ms/frame** -- ~0.04% of the ~1000ms/frame wall time.
+   ~99.96% of frame time is spent outside JS entirely, in the browser's
+   own render pipeline. Not CPU/JS-scripting-bound.
+4. **Draw-call count and scaling curve** (same instrumentation, corrected
+   to also wrap `drawArraysInstanced`/`drawElementsInstanced` -- missing
+   those undercounted the batched `InstancedMesh` call in an earlier pass
+   this same session): **exactly 3 draw calls per frame at every scale
+   measured** (500, 1,000, 2,500, 5,000 nodes) -- the "5,000+ nodes in 1
+   single draw call" instancing claim in the code is real, not
+   aspirational; there is no missing-batching defect. FPS across the same
+   4 scales: 500 -> 8.50 fps (117.7ms/frame), 1,000 -> 4.50 fps
+   (222.4ms/frame), 2,500 -> 2.00 fps (500.1ms/frame), 5,000 -> 1.00 fps
+   (1000.3ms/frame) -- frame time scales almost exactly linearly with
+   node count (~0.20ms/instance at the 2,500/5,000 points: doubling nodes
+   almost exactly doubles frame time), and does not "crater" at low
+   scale (500 nodes is a perfectly reasonable 8.5fps, not broken). With
+   draw-call count flat at 3/frame regardless of scale, this linear
+   growth can only be real per-instance vertex/fragment rasterization
+   cost -- exactly what you'd expect from a CPU software rasterizer with
+   no parallel shader cores, not a per-node JS or draw-call leak (which
+   step 4's own draw-call count already rules out).
+
+**Conclusion: genuine sandbox-hardware (no GPU) limitation, not a code
+defect** -- supported jointly by steps 2 (SwiftShader confirmed), 3
+(JS time negligible), and 4 (draw calls flat, linear-in-node-count frame
+time consistent with per-instance rasterization cost on a CPU rasterizer).
+Step 1 additionally rules out "different/easier test scene" as the
+explanation for the gap against the prior 60.1 FPS claim. Whether that
+prior number was ever actually measured is still unverified (no raw
+test-results artifact for it exists in this repo, only the README line);
+given the diagnostic above shows a genuinely efficient, correctly-batched
+scene, a real GPU clearing 55fps on it is entirely plausible, but this
+session cannot confirm the 60.1 figure specifically. `README.md`'s
+"Spatial Graph Framerate" row is left as-is with this caveat rather than
+either deleting it (it may well be real) or leaving it implicitly
+re-endorsed (it isn't independently confirmed).
+`frontend/scripts/bench_graph_fps.md` (new) gives a human with real GPU
+hardware the exact steps and a copy-pasteable diagnostic script to get
+the authoritative number and update the README/PROGRESS.md with it.

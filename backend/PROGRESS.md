@@ -1,5 +1,90 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Resolution pass: real-world benchmark corpus was too small to trust
+
+A review of the 2026-09-18 audit found the "F1 1.000 (Synthetic & Real-World)"
+claim wasn't well-supported: only 7 real-world usages across 3 files,
+smaller than even the original task brief's own honest reference point
+(31 real usages scoring 0.964/0.774 -- a lower, more credible number than
+a perfect 1.0 on a sample this thin), and nowhere near the brief's actual
+target (>=150 usages across 3 unseen projects, one Java/Go/C each).
+
+**What's actually in `bench/` right now** (verified by listing, not
+assumed): `bench/fixtures/` = 8 hand-written synthetic files, 15 labelled
+usages (`bench/evaluate.py`, unchanged, still legitimately 1.0/1.0 on its
+own small synthetic set -- not touched this pass). `bench/real_world/samples/`
+had 3 files / 7 usages before this session.
+
+**Git history search** (`git log --all -S "150"/"HOLD"/"Layer A" -- backend/`,
+across both branches that exist in this repo) found **no evidence a
+larger corpus or a genuine HOLD set was ever built and then lost** --
+it never existed. That's a real, permanent gap, not something reduced.
+Also found: `backend/PLAN.md`'s Phase 1 entry already documents the
+brief's original "~70 usages, 0.986 recall" reference honestly as
+unmeasured-in-this-repo, so this gap was known, just not closed.
+
+**Grew the corpus properly**, per Loop B1's methodology (label from
+reading the code, before running the detector, commit the labels first):
+fetched two more real, unseen, permissively-licensed files --
+`jwt/algorithms.py` (jpadilla/pyjwt, MIT -- previously flagged in this
+project's own README as a known gap source and explicitly not vendored,
+now vendored) and `securecookie.go` (gorilla/securecookie, BSD-3-Clause).
+Hand-labelled 18 new usages (12 Python, 6 Go) by reading both files in
+full, committed as `0545dbd` before ever running the detector on them.
+(A third candidate, paramiko's key-handling modules, was fetched and read
+but discarded unvendored -- LGPL-2.1, and the licence gate only allows
+LGPL as an unmodified dependency, never vendored into this repo.)
+
+Corpus is now **5 files / 2 languages / 25 usages** -- still well short
+of >=150/3-languages, and said plainly rather than rounded up. Java and C
+have zero detector coverage (`engine/` only has `source_python.py` and
+`source_go.py`), so a HOLD set in either language would only demonstrate
+that, not detection quality -- not attempted, recorded as a gap instead.
+
+**Real result** (`uv run python bench/real_world/evaluate.py`, run once,
+after committing labels):
+```
+precision=1.0 recall=0.52 f1=0.6842
+truth=25 detected=13 tp=13
+  false negative: ('gorilla_securecookie.go', 'AES', 'decrypt', 420)
+  false negative: ('gorilla_securecookie.go', 'AES', 'encrypt', 148)
+  false negative: ('gorilla_securecookie.go', 'AES', 'encrypt', 402)
+  false negative: ('gorilla_securecookie.go', 'SHA-2', 'digest', 139)
+  false negative: ('pyjwt_algorithms.py', 'ECDSA', 'sign', 761)
+  false negative: ('pyjwt_algorithms.py', 'ECDSA', 'verify', 777)
+  false negative: ('pyjwt_algorithms.py', 'Ed25519', 'sign', 994)
+  false negative: ('pyjwt_algorithms.py', 'Ed25519', 'verify', 1018)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'sign', 683)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'sign', 914)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'verify', 688)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'verify', 926)
+```
+**This is a genuinely more informative number than the old 1.0/1.0.** Zero
+false positives (the detector doesn't hallucinate crypto). Every single
+false negative is one of two already-documented gaps, not a surprise:
+(1) OO `key.sign()`/`key.verify()` calls where the key's concrete type
+isn't known from the call site (no intra-file type inference -- listed as
+future work since Phase 7), and (2) Go's generic `cipher.NewCTR(block, iv)`
+taking a `cipher.Block` interface rather than a literal `aes.X(...)` call,
+same root cause. Interestingly, the Python bare-attribute-reference
+detector (Phase 7) and both direct `hmac.new`/`hmac.New` calls *did* get
+found correctly (not in the false-negative list) -- confirms that specific
+Phase 7 claim was real, not just the real-world recall number.
+
+Updated: `tests/test_bench_real_world.py` (floor is now precision 1.0 /
+recall 0.52 / truth 25, not the old fabricated-looking 1.0/1.0/7 -- a
+regression floor, not a target to force back up by weakening anything),
+`bench/real_world/README.md` (was itself stale -- said "4/4, two Python
+files" after a later commit had already made it 7/7 across three without
+updating this file; rewritten to point at this dated entry instead of
+quoting a number that will go stale again), `README.md`'s quality-gate
+table (also corrected pytest count 112->117 and rescore perf number,
+which was showing a stale 2.47s/300ms-kernel figure against the real
+current `[PERF RESULT] 10,000 findings rescore time: 70.64 ms`).
+
+Gates re-run after all of this: `ruff`, `mypy --strict`, `pytest`
+(117 passed) all clean.
+
 ## 2026-09-18 — Whole-repo cross-track audit + fix pass
 
 Backend and frontend were built by two separate agent tracks and merged

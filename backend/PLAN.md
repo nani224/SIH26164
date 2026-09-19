@@ -122,7 +122,12 @@ job. What's real:
       `crypto/rsa`, `crypto/ecdsa`, `crypto/aes`, `crypto/des`, `crypto/md5`, `crypto/sha1`, `crypto/sha256`, `crypto/sha512`, `crypto/hmac`, `crypto/ed25519`
 - [x] Python bare attribute reference detection: `hashlib.X` references passed to functions/variables without direct calls
 - [x] Router multi-language support in `engine/scanner.py` handling both `.py` and `.go`
-- [x] Real-world benchmark expansion in `bench/real_world/` with `go_crypto_sample.go` (precision 1.000, recall 1.000, F1 1.000 across 7 real usages)
+- [x] Real-world benchmark expansion in `bench/real_world/` with `go_crypto_sample.go` (precision 1.000, recall 1.000, F1 1.000 across 7 real usages
+      -- this was the state as of this phase; corpus grew again 2026-09-19 to
+      25 usages/5 files, which surfaced real recall gaps (0.52) this smaller
+      sample was too thin to catch. See `PROGRESS.md`'s 2026-09-19 entry and
+      `bench/real_world/README.md` for the current number -- don't quote this
+      line as current.)
 - [x] ADR 007 documented in `docs/decisions/backend/007-phase7-multi-language-detection.md`
 
 ## Phase 8 — PQC Catalog & Algorithm Agility Metrics (done, this session)
