@@ -1,5 +1,63 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Functional proof for Phase 9 (PDF) and Phase 10 (audit chain)
+
+A passing test count doesn't prove a feature does something real for a
+user -- the same session that found the contract-fabrication defect (a
+test suite that stayed green around a fictional API shape) means
+"112/117 tests pass" isn't, by itself, proof either Phase 9 or Phase 10
+does anything real. Got actual functional proof for both.
+
+**Phase 9 (CBOM + executive PDF report)**: ran a real scan
+(`POST /scans` against a 2-line real file with an `hashlib.md5(...)` call
+and a real `rsa.generate_private_key(public_exponent=65537, key_size=2048)`
+call -- `scan_7f992921ce0e`), fetched `GET /scans/{id}/report.pdf` for
+real, and extracted its text with `pypdf` rather than trusting that a
+200 response with the right content-type means the content is real.
+It is: page 1's "Overall Mosca Quantum Risk Score: 90.0 / 100 CRITICAL"
+and band counts (Critical 1 / Medium 1 / High 0 / Low 0) exactly match
+`GET /scans/{id}/findings`'s real data; page 2's table row
+`RSA key generation | vulnerable_app.py:8 | RSA | keygen | 90.0 | CRITICAL`
+and `hashlib.md5 digest | vulnerable_app.py:5 | MD5 | digest | 18.0 | MEDIUM`
+match the two real findings exactly (displayName, location, family,
+function, score, band); page 3's remediation cost deltas
+(`PKBYTESDELTA=928 WIREBYTESDELTA=832 OPMSDELTA=0.04` for the RSA->ML-KEM-768
+migration) match `recommendation.cost` in the API response byte-for-byte.
+Not lorem ipsum, not a placeholder -- genuinely this scan's data, correctly
+laid out. (Bonus: this same scan is what caught the private-key floor fix
+from earlier this session working live outside its unit test -- the RSA
+keygen finding really did get forced to score >=90 with the "forced to
+score >= 90 per policy" reason text showing up verbatim in the PDF.)
+
+**Phase 10 (tamper-evident audit chaining)**: took the real, file-backed
+`ecdat.db` this session's live backend was writing to, verified the chain
+was intact (`verify_audit_log_integrity` -> `(True, None)`), then tampered
+with a real row directly via `sqlite3` -- bypassing the FastAPI app, the
+SQLModel ORM, and Python entirely (`UPDATE audit_log SET entity_id =
+'scan_ATTACKER_MODIFIED' WHERE id = 2`, executed from a separate raw
+`sqlite3` connection, the actual threat model for a tamper-evident log:
+an attacker or misbehaving script with direct file access). Re-verified:
+`(False, "Tampered record at id=2: stored hash=0296810b...4c6 != computed
+eb944917...0f")` -- caught immediately and precisely. Restored the row and
+confirmed the chain reports intact again. This exact scenario (raw-SQL
+tamper against a real on-disk file, not an ORM-mediated mutation in an
+in-memory test DB) wasn't covered by the existing test suite -- the two
+existing tests both tamper by going through the SQLModel session
+(`rec.detail = {...}; session.add(rec); session.commit()`), which is a
+meaningfully different (weaker) attack model. Added
+`tests/test_audit_chain.py::test_verify_audit_log_detects_tampering_via_raw_sql`
+as a permanent regression for the real threat model, against a real temp
+SQLite file. **118 tests now pass** (up from 117).
+
+**Real gap found, not fixed this pass**: `verify_audit_log_integrity` is
+never called from any HTTP route (`grep -rn "verify_audit_log_integrity"
+api/routes/`) -- it's real, correct, and unit-tested, but there is
+currently no way for an operator to actually invoke this check against a
+running deployment without writing a one-off Python script the way this
+verification did. Worth a `GET /api/v1/audit/verify` (or similar) admin
+endpoint in a future pass -- noted here rather than silently left implied
+by the passing tests.
+
 ## 2026-09-19 — Resolution pass: real-world benchmark corpus was too small to trust
 
 A review of the 2026-09-18 audit found the "F1 1.000 (Synthetic & Real-World)"

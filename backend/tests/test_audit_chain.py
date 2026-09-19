@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlmodel import Session
 
 from api import db
@@ -67,3 +69,48 @@ def test_verify_audit_log_detects_tampering() -> None:
         session.commit()
         valid, error = db.verify_audit_log_integrity(session)
         assert valid is True
+
+
+def test_verify_audit_log_detects_tampering_via_raw_sql(tmp_path: Path) -> None:
+    """The existing tamper test above mutates through the SQLModel ORM
+    (rec.detail = ...; session.add(rec); session.commit()) -- still a
+    write that bypasses log_audit()'s normal creation path, but it's not
+    the real threat model for a tamper-evident log: an attacker (or a
+    misbehaving ops script) with direct file-level access to the SQLite
+    database, going through raw SQL, never touching this Python process
+    at all. This test simulates exactly that against a real on-disk file,
+    proving the hash chain catches tampering it never itself wrote.
+    """
+    import sqlite3
+
+    from sqlmodel import SQLModel, create_engine
+
+    db_path = tmp_path / "tamper_test.db"
+    test_engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+    SQLModel.metadata.create_all(test_engine)
+
+    with Session(test_engine) as session:
+        rec1 = db.log_audit(session, action="scan.create", entity_type="scan", entity_id="scan_real_1")
+        session.commit()
+        session.refresh(rec1)
+        rec2 = db.log_audit(session, action="finding.triage", entity_type="finding", entity_id="finding_real_1")
+        session.commit()
+        session.refresh(rec2)
+
+        valid, error = db.verify_audit_log_integrity(session)
+        assert valid is True
+        assert error is None
+
+    # Attacker with raw filesystem/DB access -- no Python, no ORM, no app process.
+    raw_conn = sqlite3.connect(str(db_path))
+    raw_conn.execute(
+        "UPDATE audit_log SET entity_id = 'scan_ATTACKER_MODIFIED' WHERE id = ?", (rec2.id,)
+    )
+    raw_conn.commit()
+    raw_conn.close()
+
+    with Session(test_engine) as session:
+        valid, error = db.verify_audit_log_integrity(session)
+        assert valid is False
+        assert error is not None
+        assert f"Tampered record at id={rec2.id}" in error
