@@ -7,6 +7,9 @@ from engine.source_c import detect_code
 
 
 def test_openssl_evp_cipher_fetch_algorithm_string_parsing() -> None:
+    # A fetch never consumed by any Init call in the snippet still gets
+    # reported once (as a fallback, direction unresolved -> ENCRYPT) --
+    # not silently dropped just because the whole flow isn't visible.
     code = b'void f(){ EVP_CIPHER *c = EVP_CIPHER_fetch(NULL, "AES-256-GCM", NULL); }'
     detections = detect_code(code)
     assert len(detections) == 1
@@ -15,6 +18,99 @@ def test_openssl_evp_cipher_fetch_algorithm_string_parsing() -> None:
     assert d.function == CryptoFunction.ENCRYPT
     assert d.key_size == 256
     assert d.mode == "GCM"
+
+
+def test_openssl_cipher_fetch_alone_is_not_an_operation() -> None:
+    # Regression test for a real precision-floor violation (0.89 < 0.95)
+    # caught by the real_world/ HOLD run against OpenSSL's own
+    # demos/cipher/aesgcm.c: EVP_CIPHER_fetch used to fire as ENCRYPT
+    # unconditionally, duplicate of the real operation at
+    # EVP_EncryptUpdate. Once the fetched handle is consumed by an Init
+    # call, the fetch itself must not also produce a detection.
+    code = b"""
+    void f(EVP_CIPHER_CTX *ctx) {
+        EVP_CIPHER *cipher = EVP_CIPHER_fetch(NULL, "AES-256-GCM", NULL);
+        EVP_EncryptInit_ex2(ctx, cipher, key, iv, NULL);
+        EVP_EncryptUpdate(ctx, outbuf, &outlen, pt, ptlen);
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 1
+    assert detections[0].symbol == "EVP_EncryptUpdate"
+    assert detections[0].function == CryptoFunction.ENCRYPT
+
+
+def test_openssl_cipher_fetch_used_for_decrypt_not_misclassified_as_encrypt() -> None:
+    # The other half of the same regression: a fetched cipher handle used
+    # for EVP_DecryptInit_ex2 must resolve to DECRYPT, not the ENCRYPT
+    # default the old (buggy) standalone-fetch heuristic always produced.
+    code = b"""
+    void f(EVP_CIPHER_CTX *ctx) {
+        EVP_CIPHER *cipher = EVP_CIPHER_fetch(NULL, "AES-256-GCM", NULL);
+        EVP_DecryptInit_ex2(ctx, cipher, key, iv, NULL);
+        EVP_DecryptUpdate(ctx, outbuf, &outlen, ct, ctlen);
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 1
+    assert detections[0].function == CryptoFunction.DECRYPT
+
+
+def test_openssl_gcm_full_lifecycle_encrypt_and_tag() -> None:
+    # fetch -> Init -> AAD Update (skipped, NULL output) -> real Update
+    # (the encrypt) -> get_params (the tag) -- exactly 2 detections, at
+    # the real Update/get_params lines, not the fetch/Init lines.
+    code = b"""
+    void f(EVP_CIPHER_CTX *ctx) {
+        EVP_CIPHER *cipher = EVP_CIPHER_fetch(NULL, "AES-256-GCM", NULL);
+        EVP_EncryptInit_ex2(ctx, cipher, key, iv, NULL);
+        EVP_EncryptUpdate(ctx, NULL, &outlen, aad, aadlen);
+        EVP_EncryptUpdate(ctx, outbuf, &outlen, pt, ptlen);
+        EVP_CIPHER_CTX_get_params(ctx, params);
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 2
+    encrypt = next(d for d in detections if d.function == CryptoFunction.ENCRYPT)
+    assert encrypt.symbol == "EVP_EncryptUpdate"
+    tag = next(d for d in detections if d.function == CryptoFunction.TAG)
+    assert tag.family == Family.AES
+
+
+def test_openssl_gcm_full_lifecycle_decrypt_and_verify() -> None:
+    code = b"""
+    void f(EVP_CIPHER_CTX *ctx) {
+        EVP_CIPHER *cipher = EVP_CIPHER_fetch(NULL, "AES-256-GCM", NULL);
+        EVP_DecryptInit_ex2(ctx, cipher, key, iv, NULL);
+        EVP_DecryptUpdate(ctx, NULL, &outlen, aad, aadlen);
+        EVP_DecryptUpdate(ctx, outbuf, &outlen, ct, ctlen);
+        EVP_DecryptFinal_ex(ctx, outbuf, &outlen);
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 2
+    decrypt = next(d for d in detections if d.function == CryptoFunction.DECRYPT)
+    assert decrypt.symbol == "EVP_DecryptUpdate"
+    verify = next(d for d in detections if d.function == CryptoFunction.VERIFY)
+    assert verify.family == Family.AES
+
+
+def test_openssl_non_aead_mode_gets_no_tag_or_verify() -> None:
+    # get_params/DecryptFinal_ex are only meaningful as tag/verify for
+    # AEAD modes (GCM/CCM) -- a CBC context must not spuriously produce a
+    # tag/verify finding just because the app happens to call these APIs
+    # for an unrelated reason (e.g. IV retrieval).
+    code = b"""
+    void f(EVP_CIPHER_CTX *ctx) {
+        EVP_CIPHER *cipher = EVP_CIPHER_fetch(NULL, "AES-256-CBC", NULL);
+        EVP_EncryptInit_ex2(ctx, cipher, key, iv, NULL);
+        EVP_EncryptUpdate(ctx, outbuf, &outlen, pt, ptlen);
+        EVP_CIPHER_CTX_get_params(ctx, params);
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 1
+    assert detections[0].function == CryptoFunction.ENCRYPT
 
 
 def test_openssl_evp_md_fetch_digest_string_parsing() -> None:

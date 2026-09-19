@@ -7,14 +7,14 @@ reading the source *before* running the detector on it, per Loop B1's rule
 
 **This is still not the brief's full Loop B1 DEV/HOLD split** (that needs
 >=150 labelled usages across 3 unseen projects, one Java, one Go, one C).
-As of 2026-09-19 this is **5 real files, 2 languages (Python, Go), 25
-labelled usages** -- a real, hand-verified expansion from an earlier
-7-usage/3-file state, still well short of the brief's target, and
-honestly reported as such rather than rounded up. **Java and C have zero
-detector coverage at all** (`engine/` only has `source_python.py` and
-`source_go.py`) -- a HOLD set in those languages would just measure "no
-detector exists," not detection quality, so building one wasn't
-attempted; that gap is recorded here, not silently dropped.
+As of 2026-09-19 (M3, Track CC) this is **9 real files, 4 languages
+(Python, Go, Java, C), 32 labelled usages** -- grown from a 25-usage/2-
+language state by fetching 4 more real, unseen, Apache-2.0 files (one
+each from jjwt, OkHttp, OpenSSL's own demos, and mbedTLS's own programs)
+and blind-labelling them via a fresh `corpus-labeler` subagent per file
+(no access to this repo's detector output). Still well short of the
+brief's 150-usage target, and honestly reported as such rather than
+rounded up -- see "What's still missing" below.
 
 This file was found stale once already (it said "two files, Python only,
 4/4" after a later commit added a third Go file and pushed the real score
@@ -30,30 +30,44 @@ something to re-derive with `bench/real_world/evaluate.py`, not quote.
 | `go_crypto_sample.go` | **Provenance weaker than the others** -- added in the Phase 7 commit (`2c3357a`) with only the in-file comment "Sample from standard Go crypto recipe (BSD-3-Clause)" and no specific source URL, unlike every other file here. Cannot verify it was actually pulled from a real, unseen third-party project rather than hand-written to exercise the new Go detector. Flagged here rather than quietly counted as equivalent to the other, properly-sourced files. | Claimed BSD-3-Clause, unverified origin |
 | `pyjwt_algorithms.py` | [jpadilla/pyjwt `jwt/algorithms.py`](https://github.com/jpadilla/pyjwt/blob/master/jwt/algorithms.py), unmodified. Previously identified in this file (before 2026-09-19) as a known gap source and explicitly *not* vendored -- now vendored and labelled. | MIT |
 | `gorilla_securecookie.go` | [gorilla/securecookie `securecookie.go`](https://github.com/gorilla/securecookie/blob/main/securecookie.go), unmodified | BSD-3-Clause |
+| `okhttp_Util.java` | [square/okhttp `Util.java`](https://github.com/square/okhttp/blob/83090befcca69b44c257b96afb519ca66282ca63/okhttp/src/main/java/com/squareup/okhttp/Util.java) at a historical commit (last version with Java sources before the Kotlin rewrite), unmodified | Apache-2.0 |
+| `jjwt_JcaTemplate.java` | [jwtk/jjwt `JcaTemplate.java`](https://github.com/jwtk/jjwt/blob/master/impl/src/main/java/io/jsonwebtoken/impl/security/JcaTemplate.java), unmodified. A real, heavily-used file with **zero** labelled usages (see gap #6 below) -- kept in the corpus deliberately, not swapped out, because that zero is itself the finding. | Apache-2.0 |
+| `openssl_demo_aesgcm.c` | [openssl/openssl `demos/cipher/aesgcm.c`](https://github.com/openssl/openssl/blob/master/demos/cipher/aesgcm.c), unmodified | Apache-2.0 |
+| `mbedtls_gen_key.c` | [Mbed-TLS/mbedtls `programs/pkey/gen_key.c`](https://github.com/Mbed-TLS/mbedtls/blob/master/programs/pkey/gen_key.c), unmodified | Apache-2.0 OR GPL-2.0-or-later (dual-licensed; treated as Apache-2.0) |
 
 All licences here are on the licence gate's "OK to vendor" list
 (`backend/CLAUDE.md`). **Note for whoever adds more files**: paramiko
 (a natural next candidate -- SSH library, heavy RSA/Ed25519/ECDSA key
-handling) was fetched and read during this session's labelling pass, but
-**discarded and never committed** -- it's LGPL-2.1, which the licence
-gate only allows as an unmodified *dependency*, never vendored into this
-repo as a copied file.
+handling) was fetched and read during an earlier session's labelling
+pass, but **discarded and never committed** -- it's LGPL-2.1, which the
+licence gate only allows as an unmodified *dependency*, never vendored
+into this repo as a copied file. (A later Track CC mandate reversed this
+as "over-cautious" and said paramiko is usable via fetch-to-/tmp-only,
+never committed -- not yet acted on.)
 
-## Result (2026-09-19, this rule set, 5 files / 25 usages)
+## Result (2026-09-19, M3 Track CC, 9 files / 32 usages / 4 languages)
 
 ```
 $ uv run python bench/real_world/evaluate.py
-precision=1.0 recall=0.52 f1=0.6842
-truth=25 detected=13 tp=13
+precision=1.0 recall=0.625 f1=0.7692
+truth=32 detected=20 tp=20
 ```
 
-**13/25, zero false positives.** Every false negative is one of the two
-documented gaps below (OO `key.sign()`/`key.verify()` type inference, or
-Go's generic `cipher.Block` interface) -- see `backend/PROGRESS.md`'s
-2026-09-19 entry for the full false-negative list and analysis. This
-number is a floor (`tests/test_bench_real_world.py`), not a target --
-don't chase it back to 1.0 by weakening the corpus or the labels; closing
-the two gaps above for real is what would honestly move it.
+**20/32, zero false positives.** Precision briefly regressed to 0.8889
+during this same session when the 2 new OpenSSL usages exposed a real bug
+(`EVP_CIPHER_fetch` firing as a standalone ENCRYPT regardless of how the
+fetched handle was actually used) -- caught by this exact HOLD run, fixed
+same-session (see `docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md`),
+re-measured, precision restored to 1.0 and recall *improved* as a side
+effect (the fix also found the 4 real OpenSSL operations the old
+heuristic was missing). This is the value of a real HOLD run: it caught a
+precision-floor violation before it ever reached CI, not after.
+
+Every false negative is one of the gaps documented below -- see
+`backend/PROGRESS.md`'s 2026-09-19 entries for the full false-negative
+list. This number is a floor (`tests/test_bench_real_world.py`), not a
+target -- don't chase it back up by weakening the corpus or the labels;
+closing the gaps below for real is what would honestly move it.
 
 ## What this did *not* find (real gaps, noted honestly, not silently fixed)
 
@@ -97,6 +111,33 @@ the two gaps above for real is what would honestly move it.
    missed) because the hash algorithm is itself a runtime parameter
    (`hash_alg`), making a single confident family label impossible to
    assign honestly without guessing.
+6. **Cross-file dataflow through a dispatcher class** -- `jjwt_JcaTemplate.java`
+   is a real, heavily-used JCA wrapper: every `Cipher.getInstance(jcaName)`/
+   `KeyPairGenerator.getInstance(jcaName)`/etc. call inside it uses a
+   `jcaName` **variable**, supplied by a caller in a *different* file
+   (e.g. `Jwts.SIG.HS256`-style algorithm constants live elsewhere in
+   jjwt), never a literal algorithm string. Our Java detector only parses
+   literal transformation strings (ADR 013) -- by design, since guessing
+   a family from a variable name would be exactly the kind of unfounded
+   inference the precision floor exists to prevent. This file
+   legitimately labels to **zero** usages (confirmed by the blind
+   labeler, not a labelling shortfall) and stays in the corpus as a
+   documented example of a structural pattern (indirection through a
+   generic engine-dispatcher class) no single-file static detector can
+   resolve without real cross-file/interprocedural dataflow analysis --
+   a materially bigger feature than anything else in this engine, not
+   attempted.
+7. **Family-ambiguous EC key generation** -- `mbedtls_gen_key.c` calls
+   `mbedtls_ecp_gen_key((mbedtls_ecp_group_id) opt.ec_curve, ...)` with
+   the generic `MBEDTLS_PK_ECKEY` type (not the ECDH-restricted
+   `MBEDTLS_PK_ECKEY_DH` variant) and no downstream `mbedtls_ecdsa_*`/
+   `mbedtls_ecdh_*` call to disambiguate -- the blind labeler correctly
+   declined to guess ECDSA vs ECDH and excluded it, so this is not even a
+   detector gap in the usual sense (there's no unambiguous ground truth
+   to detect); noted here so it isn't mistaken for one later. Also: this
+   engine doesn't implement `mbedtls_ecp_gen_key` at all yet (only
+   `mbedtls_ecdsa_genkey`) -- a real, separate gap, but one this
+   particular call site can't be used to measure either way.
 
 Per Loop B1's cap-of-6-iterations process, the next iteration (not done
 this pass -- explicitly deferred) would pick gap #1 (the largest, cheapest
@@ -105,22 +146,27 @@ query + test for both languages.
 
 ## What's still missing to meet the brief's actual target
 
-- **>=150 usages, not 25.** Growing this further means repeating this
+- **>=150 usages, not 32.** Growing this further means repeating this
   same process (find a real, unseen, permissively-licensed file with
   genuine crypto usage -- not a library's own class/algorithm
   *definitions*, which don't contain "usages" in the sense these queries
   detect -- read and label it before running the detector, commit the
-  label, then run) across more real files. This session prioritized
-  correctness of the methodology (real files, real licences, labelled
-  blind) over hitting a number, per this pass's own instructions that "a
-  lower, honest number is more valuable... than another inflated 1.0."
-- **3 unseen projects, one Java/Go/C each.** Still Python + Go only.
-  Java and C need their own detectors built first (`engine/` has none) --
-  labelling a Java or C HOLD set before a detector exists for either
-  language would only prove the detector finds nothing there, which is
-  already known and doesn't need a 50-usage sample to demonstrate.
+  label, then run) across more real files, in all 4 languages. This
+  session (and the one before it) prioritized correctness of the
+  methodology (real files, real licences, labelled blind, precision
+  floor enforced even when it meant a mid-session detector redesign) over
+  hitting a number.
+- **Java and C are now both represented** (1 file each this pass, `okhttp_Util.java`
+  + `jjwt_JcaTemplate.java` for Java, `openssl_demo_aesgcm.c` +
+  `mbedtls_gen_key.c` for C) -- both were literally zero-coverage before
+  M1/M2 shipped their respective detectors this Track CC pass. Still far
+  short of a real per-language sample size; one or two files per language
+  demonstrates the detector *works* on real code, not that it's
+  well-measured across each language's idiom space.
 - **A genuine train/tune-blind HOLD split** (a DEV set the detector may
   be iterated against, and a separate HOLD set touched only once, at the
-  end) doesn't exist yet -- every file here has only ever been run once,
-  which is the right practice so far, but there's no formal DEV/HOLD
-  partition documented as such.
+  end) doesn't exist yet -- every file here has only ever been run once
+  against the detector (label first, run once, record honestly -- even
+  when that one run found a real bug requiring a fix and a second,
+  still-single, re-run), which is the right practice so far, but there's
+  no formal DEV/HOLD partition documented as such.

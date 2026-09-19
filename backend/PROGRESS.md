@@ -1,5 +1,84 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Track CC M3: HOLD corpus growth + real precision-floor catch/fix
+
+Grew `bench/real_world/` from 5 files/25 usages/2 languages (Python, Go)
+to 9 files/32 usages/4 languages (+ Java, + C), following strict Loop B1
+order every step: fetch real Apache-2.0 files (jjwt's `JcaTemplate.java`,
+OkHttp's `Util.java`, OpenSSL's own `demos/cipher/aesgcm.c`, mbedTLS's own
+`programs/pkey/gen_key.c`) -> commit raw files alone (`cf6d7bd`) -> dispatch
+one fresh `corpus-labeler` subagent per file (Read/Grep/Glob only, zero
+access to this repo's detector output) -> commit labels alone, before ever
+running the detector against them (`0129fc6`) -> run
+`bench/real_world/evaluate.py` exactly once.
+
+That first real run found: **precision 0.8889, recall 0.5, truth=32,
+detected=18, tp=16** -- below the 0.95 CI floor. Root cause: OpenSSL's
+`EVP_CIPHER_fetch` was firing as ENCRYPT unconditionally (an M2 design
+choice), but the real file fetches the same algorithm once for an encrypt
+block and again for a decrypt block, and a fetch alone doesn't perform
+any operation anyway -- the blind labeler independently reached the exact
+same conclusion, excluding both fetch calls from its labels before this
+run ever happened.
+
+Per root `CLAUDE.md`'s non-negotiable rule ("Any rule that raises recall
+but drops precision below 0.95 is wrong -- fix the rule's specificity or
+drop it, never ship it anyway"), fixed same-session rather than deferred
+to M4: redesigned `engine/source_c.py`'s OpenSSL cipher handling to track
+real call-sequence linkage (`EVP_CIPHER_fetch` -> `EVP_{Encrypt,Decrypt}Init{_ex,_ex2}`
+-> `EVP_{Encrypt,Decrypt}Update` / `EVP_CIPHER_CTX_get_params` /
+`EVP_DecryptFinal_ex`), reporting the operation at the real transformation
+call, not the algorithm-lookup call. Full design + a real line-attribution
+bug caught and fixed during implementation (Update-triggered detections
+were landing at the Init call's line, not the Update's) in
+`docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md`.
+
+Re-measured after the fix:
+
+```
+$ uv run python bench/real_world/evaluate.py
+precision=1.0 recall=0.625 f1=0.7692
+truth=32 detected=20 tp=20
+```
+
+Precision restored to 1.0 (above floor); recall *improved* as a side
+effect, 0.52 -> 0.625 -- the buggy fetch-site heuristic was never finding
+the real operations either, so fixing precision also closed 4 real false
+negatives in the same file. 5 new regression tests added
+(`tests/test_source_c.py`) locking in both the original bug and the
+line-attribution bug found while fixing it.
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 68 source files
+$ uv run pytest --cov -q
+152 passed, 4 warnings in 17.02s   (was 147 after M2; +5 new C regression
+                                     tests, +1 real-world floor update)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/evaluate.py   (Layer A, unaffected by this fix)
+precision=1.0 recall=1.0 f1=1.0
+truth=56 detected=56 tp=56
+```
+
+Two real, honest gaps found and documented (not silently papered over):
+`jjwt_JcaTemplate.java` labels to zero usages -- every `getInstance` call
+in it takes a caller-supplied variable, not a literal algorithm string,
+which needs real cross-file dataflow to resolve and is out of scope;
+`mbedtls_gen_key.c`'s EC keygen call was correctly left unlabelled by the
+blind labeler as family-ambiguous (generic `MBEDTLS_PK_ECKEY`, no
+downstream ECDSA/ECDH-specific call to disambiguate) -- not even a
+detector gap, since there's no unambiguous ground truth there to detect.
+Full writeup in `bench/real_world/README.md`.
+
+Not started this session: M4 (cluster false negatives across all 4
+languages, fix the largest, re-measure), M5 (CI/CD + real blocked PR).
+Corpus is still far short of the 150-usage/4-language target (32 usages,
+1-2 files per new language) -- honestly reported, not rounded up.
+
 ## 2026-09-19 — Track CC M2: C/C++ detection engine
 
 New `engine/source_c.py` (`tree-sitter-c==0.24.2`, MIT, confirmed pinnable

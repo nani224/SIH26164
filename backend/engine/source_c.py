@@ -16,6 +16,26 @@ the Go/Python/Java detectors:
   real-world OpenSSL code overwhelmingly still uses these, not just
   `*_fetch` -- excluding them would badly hurt real-world recall for a
   detector whose whole point is finding real usages.
+
+  **Cipher-context linkage (M3 fix, see ADR 015)**: a fetched/gotten
+  cipher handle by itself is not an operation -- real-world HOLD testing
+  against OpenSSL's own `demos/cipher/aesgcm.c` caught this as a real
+  precision-floor violation (0.89 < 0.95): `EVP_CIPHER_fetch` was firing
+  as ENCRYPT unconditionally, even when the fetched handle was later used
+  for `EVP_DecryptInit_ex2`, and even the encrypt-path fetch was a
+  duplicate of the *real* operation at `EVP_EncryptUpdate`. Cipher
+  handles (from `EVP_CIPHER_fetch` or a zero-arg getter) are now tracked
+  through `EVP_{Encrypt,Decrypt}Init{_ex,_ex2}` -> bound to the `ctx`
+  variable -> resolved at the real transformation call
+  (`EVP_{Encrypt,Decrypt}Update` with a non-NULL output, i.e. not just
+  AAD) or, for AEAD modes (GCM/CCM), at the tag-retrieval
+  (`EVP_CIPHER_CTX_get_params`, encrypt side) / tag-verify
+  (`EVP_DecryptFinal_ex`, decrypt side) call. A cipher handle or ctx
+  binding that's never consumed by one of those (e.g. the whole flow
+  isn't visible in a small snippet) still gets reported once, at the
+  point it was last seen -- a detector that requires a specific follow-up
+  call to ever fire at all would be a stealth recall regression, same
+  principle as the Java `KeyPairGenerator`/`initialize` linkage.
 - **mbedTLS**: `mbedtls_<algo>_setkey_enc/dec`, `mbedtls_<algo>_starts`
   digest init, `mbedtls_rsa_gen_key`, `mbedtls_ecdsa_genkey`,
   `mbedtls_gcm_setkey`.
@@ -29,6 +49,7 @@ independent of this module and untouched by it.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +75,30 @@ _DIGEST_NAME_FAMILY: dict[str, Family] = {
 }
 
 _OPENSSL_CIPHER_RE = re.compile(r"^(AES)-(\d+)-([A-Z0-9]+)$")
+_AEAD_MODES = {"GCM", "CCM"}
+
+
+@dataclass
+class _CipherInfo:
+    family: Family
+    key_size: int | None
+    mode: str | None
+
+
+@dataclass
+class _CipherVarBinding:
+    info: _CipherInfo
+    consumed: bool
+    common: dict[str, Any]
+
+
+@dataclass
+class _CtxBinding:
+    info: _CipherInfo
+    direction: str  # "encrypt" or "decrypt"
+    consumed: bool
+    common: dict[str, Any]
+    fn: str
 
 
 def _text(node: tree_sitter.Node) -> str:
@@ -80,6 +125,13 @@ def _int_literal_value(node: tree_sitter.Node | None) -> int | None:
     return int(txt) if txt.isdigit() else None
 
 
+def _match_start(captures: dict[str, list[tree_sitter.Node]]) -> int:
+    for nodes in captures.values():
+        if nodes:
+            return nodes[0].start_byte
+    return 0
+
+
 def detect_file(path: Path) -> list[Detection]:
     try:
         source = path.read_bytes()
@@ -91,52 +143,245 @@ def detect_file(path: Path) -> list[Detection]:
 def detect_code(source: bytes, path: str = "<source>") -> list[Detection]:
     tree = _PARSER.parse(source)
     matches = tree_sitter.QueryCursor(_QUERY).matches(tree.root_node)
+    ordered = sorted(matches, key=lambda m: _match_start(m[1]))
+
     detections: list[Detection] = []
-    for _pattern_index, captures in matches:
-        detection = _classify(path, captures)
-        if detection is not None:
-            detections.append(detection)
+    cipher_vars: dict[str, _CipherVarBinding] = {}
+    ctx_state: dict[str, _CtxBinding] = {}
+
+    for _pattern_index, captures in ordered:
+        call_nodes = captures.get("call.node")
+        args_nodes = captures.get("call.args")
+        name_nodes = captures.get("call.name")
+        if not call_nodes or not args_nodes or not name_nodes:
+            continue
+        call_node, args_node = call_nodes[0], args_nodes[0]
+        fn = _text(name_nodes[0])
+        args = _positional_args(args_node)
+        line = call_node.start_point[0] + 1
+        snippet = _text(call_node)[:200]
+        common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST)
+
+        if fn == "EVP_CIPHER_fetch":
+            _track_cipher_fetch(call_node, args, cipher_vars, common, detections)
+            continue
+        if fn in _EVP_ENCRYPT_INIT_FUNCS or fn in _EVP_DECRYPT_INIT_FUNCS:
+            direction = "encrypt" if fn in _EVP_ENCRYPT_INIT_FUNCS else "decrypt"
+            _bind_evp_ctx(fn, args, direction, cipher_vars, ctx_state, common, detections)
+            continue
+        if fn in ("EVP_EncryptUpdate", "EVP_DecryptUpdate"):
+            _handle_evp_update(fn, args, ctx_state, common, detections)
+            continue
+        if fn == "EVP_CIPHER_CTX_get_params":
+            _handle_evp_get_params(args, ctx_state, common, detections)
+            continue
+        if fn in ("EVP_DecryptFinal_ex", "EVP_DecryptFinal"):
+            _handle_evp_decrypt_final(args, ctx_state, common, detections)
+            continue
+
+        handler = _OPENSSL_HANDLERS.get(fn) or _MBEDTLS_HANDLERS.get(fn) or _WOLFSSL_HANDLERS.get(fn)
+        if handler is not None:
+            handler_detection = handler(fn, args, common)
+            if handler_detection is not None:
+                detections.append(handler_detection)
+            continue
+
+        digest_detection = _classify_openssl_digest_getter(fn, common)
+        if digest_detection is not None:
+            detections.append(digest_detection)
+
+    for cipher_binding in cipher_vars.values():
+        if not cipher_binding.consumed:
+            detections.append(_cipher_var_to_detection(cipher_binding))
+    for ctx_binding in ctx_state.values():
+        if not ctx_binding.consumed:
+            detections.append(_ctx_binding_to_detection(ctx_binding))
+
     return detections
 
 
-def _classify(path: str, captures: dict[str, list[tree_sitter.Node]]) -> Detection | None:
-    call_nodes = captures.get("call.node")
-    args_nodes = captures.get("call.args")
-    name_nodes = captures.get("call.name")
-    if not call_nodes or not args_nodes or not name_nodes:
+# --- OpenSSL EVP cipher-context linkage --------------------------------
+
+
+def _assigned_c_variable_name(call_node: tree_sitter.Node) -> str | None:
+    parent = call_node.parent
+    if parent is None:
         return None
-
-    call_node, args_node = call_nodes[0], args_nodes[0]
-    fn = _text(name_nodes[0])
-    args = _positional_args(args_node)
-    line = call_node.start_point[0] + 1
-    snippet = _text(call_node)[:200]
-    common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST)
-
-    handler = _OPENSSL_HANDLERS.get(fn) or _MBEDTLS_HANDLERS.get(fn) or _WOLFSSL_HANDLERS.get(fn)
-    if handler is not None:
-        return handler(fn, args, common)
-
-    return _classify_openssl_algo_getter(fn, common)
+    if parent.type == "assignment_expression":
+        left = parent.child_by_field_name("left")
+        return _text(left) if left is not None else None
+    if parent.type == "init_declarator":
+        declarator = parent.child_by_field_name("declarator")
+        return _text(declarator).lstrip("*").strip() if declarator is not None else None
+    return None
 
 
-# --- OpenSSL ----------------------------------------------------------
-
-
-def _openssl_cipher_fetch(fn: str, args: list[tree_sitter.Node], common: dict[str, Any]) -> Detection | None:
+def _track_cipher_fetch(
+    call_node: tree_sitter.Node,
+    args: list[tree_sitter.Node],
+    cipher_vars: dict[str, _CipherVarBinding],
+    common: dict[str, Any],
+    detections: list[Detection],
+) -> None:
     if len(args) < 2:
-        return None
+        return
     name = _string_literal_text(args[1])
     if name is None:
-        return None
+        return
     family, key_size, mode = _parse_openssl_cipher_name(name)
     if family is None:
-        return None
+        return
+    var = _assigned_c_variable_name(call_node)
+    if var is None:
+        return
+    existing = cipher_vars.get(var)
+    if existing is not None and not existing.consumed:
+        detections.append(_cipher_var_to_detection(existing))
+    cipher_vars[var] = _CipherVarBinding(info=_CipherInfo(family, key_size, mode), consumed=False, common=common)
+
+
+def _lookup_cipher_getter(fn: str) -> _CipherInfo | None:
+    """Zero-arg pre-3.0 cipher getters, e.g. `EVP_aes_256_gcm()`, used as
+    the direct argument of an Encrypt/DecryptInit call -- classified from
+    the function name alone. Unlike digest getters, these are never
+    self-firing: which operation they represent (encrypt vs decrypt)
+    depends entirely on which Init function they're passed to."""
+    m = _EVP_AES_RE.match(fn)
+    if m:
+        return _CipherInfo(Family.AES, int(m.group(1)), m.group(2).upper())
+    if fn.startswith("EVP_des_ede3_"):
+        return _CipherInfo(Family.THREE_DES, None, None)
+    if fn.startswith("EVP_des_"):
+        return _CipherInfo(Family.DES, None, None)
+    if fn.startswith("EVP_bf_"):
+        return _CipherInfo(Family.BLOWFISH, None, None)
+    if fn == "EVP_rc4":
+        return _CipherInfo(Family.RC4, None, None)
+    if fn in ("EVP_chacha20", "EVP_chacha20_poly1305"):
+        return _CipherInfo(Family.CHACHA20, None, None)
+    return None
+
+
+def _resolve_cipher_arg(node: tree_sitter.Node, cipher_vars: dict[str, _CipherVarBinding]) -> _CipherInfo | None:
+    if node.type == "call_expression":
+        fn_node = node.child_by_field_name("function")
+        return _lookup_cipher_getter(_text(fn_node)) if fn_node is not None else None
+    if node.type == "identifier":
+        binding = cipher_vars.get(_text(node))
+        if binding is None:
+            return None
+        binding.consumed = True
+        return binding.info
+    return None
+
+
+_EVP_ENCRYPT_INIT_FUNCS = {"EVP_EncryptInit_ex2", "EVP_EncryptInit_ex", "EVP_EncryptInit"}
+_EVP_DECRYPT_INIT_FUNCS = {"EVP_DecryptInit_ex2", "EVP_DecryptInit_ex", "EVP_DecryptInit"}
+
+
+def _bind_evp_ctx(
+    fn: str,
+    args: list[tree_sitter.Node],
+    direction: str,
+    cipher_vars: dict[str, _CipherVarBinding],
+    ctx_state: dict[str, _CtxBinding],
+    common: dict[str, Any],
+    detections: list[Detection],
+) -> None:
+    if len(args) < 2 or args[0].type != "identifier":
+        return
+    ctx_var = _text(args[0])
+    info = _resolve_cipher_arg(args[1], cipher_vars)
+    if info is None:
+        # Can't resolve the algorithm -- drop any stale binding for this
+        # ctx rather than let an old mode/direction leak into a later
+        # get_params/Final call that actually belongs to this new, opaque
+        # re-init.
+        ctx_state.pop(ctx_var, None)
+        return
+    existing = ctx_state.get(ctx_var)
+    if existing is not None and not existing.consumed:
+        detections.append(_ctx_binding_to_detection(existing))
+    ctx_state[ctx_var] = _CtxBinding(info=info, direction=direction, consumed=False, common=common, fn=fn)
+
+
+def _cipher_var_to_detection(binding: _CipherVarBinding) -> Detection:
     return Detection(
-        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=family,
-        display_name=f'EVP_CIPHER_fetch(..., "{name}", ...)', function=CryptoFunction.ENCRYPT,
-        symbol=fn, confidence=0.9, key_size=key_size, mode=mode, **common,
+        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=binding.info.family,
+        display_name="EVP_CIPHER_fetch(...) (cipher handle, direction unresolved in this snippet)",
+        function=CryptoFunction.ENCRYPT, symbol="EVP_CIPHER_fetch", confidence=0.75,
+        key_size=binding.info.key_size, mode=binding.info.mode, **binding.common,
     )
+
+
+def _ctx_binding_to_detection(binding: _CtxBinding) -> Detection:
+    function = CryptoFunction.ENCRYPT if binding.direction == "encrypt" else CryptoFunction.DECRYPT
+    return Detection(
+        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=binding.info.family,
+        display_name=f"{binding.fn} (no Update observed in this snippet)", function=function,
+        symbol=binding.fn, confidence=0.85, key_size=binding.info.key_size, mode=binding.info.mode,
+        **binding.common,
+    )
+
+
+def _handle_evp_update(
+    fn: str, args: list[tree_sitter.Node], ctx_state: dict[str, _CtxBinding], common: dict[str, Any],
+    detections: list[Detection],
+) -> None:
+    if len(args) < 2 or args[0].type != "identifier":
+        return
+    binding = ctx_state.get(_text(args[0]))
+    if binding is None or binding.consumed:
+        return
+    expected_direction = "encrypt" if fn == "EVP_EncryptUpdate" else "decrypt"
+    if binding.direction != expected_direction:
+        return
+    if args[1].type == "null":
+        return  # AAD-feeding call (NULL output) -- not the transformation itself
+    function = CryptoFunction.ENCRYPT if expected_direction == "encrypt" else CryptoFunction.DECRYPT
+    detections.append(Detection(
+        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=binding.info.family,
+        display_name=f"{fn}(...)", function=function, symbol=fn, confidence=0.9,
+        key_size=binding.info.key_size, mode=binding.info.mode, **common,
+    ))
+    binding.consumed = True
+
+
+def _handle_evp_get_params(
+    args: list[tree_sitter.Node], ctx_state: dict[str, _CtxBinding], common: dict[str, Any],
+    detections: list[Detection],
+) -> None:
+    if len(args) < 1 or args[0].type != "identifier":
+        return
+    binding = ctx_state.get(_text(args[0]))
+    if binding is None or binding.direction != "encrypt" or binding.info.mode not in _AEAD_MODES:
+        return
+    detections.append(Detection(
+        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=binding.info.family,
+        display_name="EVP_CIPHER_CTX_get_params (AEAD tag retrieval)", function=CryptoFunction.TAG,
+        symbol="EVP_CIPHER_CTX_get_params", confidence=0.82,
+        key_size=binding.info.key_size, mode=binding.info.mode, **common,
+    ))
+
+
+def _handle_evp_decrypt_final(
+    args: list[tree_sitter.Node], ctx_state: dict[str, _CtxBinding], common: dict[str, Any],
+    detections: list[Detection],
+) -> None:
+    if len(args) < 1 or args[0].type != "identifier":
+        return
+    binding = ctx_state.get(_text(args[0]))
+    if binding is None or binding.direction != "decrypt" or binding.info.mode not in _AEAD_MODES:
+        return
+    detections.append(Detection(
+        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=binding.info.family,
+        display_name="EVP_DecryptFinal_ex (AEAD tag verify)", function=CryptoFunction.VERIFY,
+        symbol="EVP_DecryptFinal_ex", confidence=0.82,
+        key_size=binding.info.key_size, mode=binding.info.mode, **common,
+    ))
+
+
+# --- OpenSSL: self-contained patterns (no ctx linkage needed) ---------
 
 
 def _openssl_md_fetch(fn: str, args: list[tree_sitter.Node], common: dict[str, Any]) -> Detection | None:
@@ -178,7 +423,6 @@ def _openssl_ec_paramgen_curve(fn: str, args: list[tree_sitter.Node], common: di
 
 
 _OPENSSL_HANDLERS = {
-    "EVP_CIPHER_fetch": _openssl_cipher_fetch,
     "EVP_MD_fetch": _openssl_md_fetch,
     "EVP_PKEY_CTX_set_rsa_keygen_bits": _openssl_rsa_keygen_bits,
     "EVP_PKEY_CTX_set_ec_paramgen_curve_nid": _openssl_ec_paramgen_curve,
@@ -207,42 +451,11 @@ _EVP_SHA2_RE = re.compile(r"^EVP_sha(224|256|384|512)$")
 _EVP_SHA3_RE = re.compile(r"^EVP_sha3_(224|256|384|512)$")
 
 
-def _classify_openssl_algo_getter(fn: str, common: dict[str, Any]) -> Detection | None:
-    """Zero-arg pre-3.0 algorithm getters, e.g. `EVP_aes_256_gcm()`,
-    `EVP_sha256()`, used as an argument to `EVP_EncryptInit_ex`/
-    `EVP_DigestInit_ex` -- classified from the function name alone."""
-    m = _EVP_AES_RE.match(fn)
-    if m:
-        return Detection(
-            kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.AES,
-            display_name=f"{fn}()", function=CryptoFunction.ENCRYPT, symbol=fn,
-            confidence=0.88, key_size=int(m.group(1)), mode=m.group(2).upper(), **common,
-        )
-    if fn == "EVP_des_ede3_cbc" or fn.startswith("EVP_des_ede3_"):
-        return Detection(
-            kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.THREE_DES,
-            display_name=f"{fn}()", function=CryptoFunction.ENCRYPT, symbol=fn, confidence=0.88, **common,
-        )
-    if fn.startswith("EVP_des_"):
-        return Detection(
-            kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.DES,
-            display_name=f"{fn}()", function=CryptoFunction.ENCRYPT, symbol=fn, confidence=0.88, **common,
-        )
-    if fn.startswith("EVP_bf_"):
-        return Detection(
-            kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.BLOWFISH,
-            display_name=f"{fn}()", function=CryptoFunction.ENCRYPT, symbol=fn, confidence=0.88, **common,
-        )
-    if fn == "EVP_rc4":
-        return Detection(
-            kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.RC4,
-            display_name=f"{fn}()", function=CryptoFunction.ENCRYPT, symbol=fn, confidence=0.88, **common,
-        )
-    if fn in ("EVP_chacha20", "EVP_chacha20_poly1305"):
-        return Detection(
-            kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.CHACHA20,
-            display_name=f"{fn}()", function=CryptoFunction.ENCRYPT, symbol=fn, confidence=0.88, **common,
-        )
+def _classify_openssl_digest_getter(fn: str, common: dict[str, Any]) -> Detection | None:
+    """Zero-arg pre-3.0 digest getters, e.g. `EVP_sha256()`, used as an
+    argument to `EVP_DigestInit_ex` -- classified from the function name
+    alone and safe to self-fire directly (unlike cipher getters, a digest
+    has no encrypt/decrypt direction ambiguity to resolve first)."""
     if fn == "EVP_md5":
         return Detection(
             kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.MD5,

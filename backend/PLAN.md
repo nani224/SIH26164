@@ -189,9 +189,17 @@ dependency-ordered milestones:
       none). 8 fixture files (16 usages, incl. one `.cpp`), Layer A:
       40 -> 56 usages, still 1.0/1.0. See ADR 014 and 2026-09-19
       PROGRESS.md entry for full command output.
-- [ ] **M3** — Grow HOLD corpus (`bench/real_world/`) to ~150 usages
-      across 4 languages (label-before-run, labels committed alone
-      first). Not started.
+- [x] **M3** (partial, honestly not at target) — Grew HOLD corpus
+      (`bench/real_world/`) from 5 files/25 usages/2 languages to 9
+      files/32 usages/4 languages (added Java + C), strict label-before-
+      run order via 4 fresh `corpus-labeler` subagent dispatches, labels
+      committed alone before the detector ever ran against them. The
+      resulting real run caught a genuine precision-floor violation
+      (0.8889 < 0.95, OpenSSL `EVP_CIPHER_fetch` heuristic) -- fixed
+      same-session (ADR 015), re-measured: precision 1.0, recall 0.625
+      (up from 0.52). Still far short of the 150-usage target -- see
+      2026-09-19 PROGRESS.md entry and `bench/real_world/README.md` for
+      full numbers and remaining gaps.
 - [ ] **M4** — Cluster M3's false negatives by root cause, fix the
       largest cluster, re-measure, confirm precision stays >=0.95. Not
       started.
