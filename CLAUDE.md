@@ -55,6 +55,33 @@ frontend TS types and re-running the frontend gate.
   -> export flow. This had never been done as of the last audit — treat it
   as the highest-priority unverified claim in the project.
 
+## Track CC (detection engine, corpus, CI/CD) — ownership and rules
+
+Track CC owns EXCLUSIVELY `backend/engine/**`, `backend/bench/**`, and
+`.github/workflows/**`. Never edit `backend/api/`, `backend/scheduler/`,
+`backend/probes/`, `frontend/`, or `contracts/openapi.yaml` from this
+track — a contract need goes into `contracts/PROPOSALS.md`, not a live
+edit.
+
+- **Precision floor: 0.95, enforced in CI.** A false positive wastes an
+  analyst's time on a non-risk and destroys trust in the whole tool; a
+  miss is just a documented, honest gap. Any rule that raises recall but
+  drops precision below 0.95 is wrong — fix the rule's specificity or
+  drop it, never ship it anyway.
+- **Label before running, always.** For any HOLD/DEV corpus addition:
+  read the source and write the truth-table labels first, commit the
+  labels alone in their own commit, only then run the detector. Never
+  invert this order — it's the only thing standing between a real
+  accuracy number and tuning-on-HOLD.
+- **Licence gate for `bench/`**: only MIT/Apache-2.0/BSD/ISC-licensed
+  source gets committed into `backend/bench/`. Fetching an LGPL/GPL
+  project to a scratch/temp path to read and hand-label against the
+  detector is fine and is not "vendoring" — just never commit their
+  source into this repo.
+- **Honest numbers only.** A recall of 0.52 with the false negatives
+  clustered and explained is worth more than a fabricated or
+  cherry-picked 0.95. Never round a measured number up.
+
 ## Known bookkeeping hazard
 
 `backend/PROGRESS.md` has gone stale before (described Phase 0 state while
