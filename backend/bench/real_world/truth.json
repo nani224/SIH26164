@@ -33,5 +33,19 @@
     {"family": "HMAC", "function": "tag", "line": 325},
     {"family": "AES", "function": "encrypt", "line": 402},
     {"family": "AES", "function": "decrypt", "line": 420}
+  ],
+  "okhttp_Util.java": [
+    {"family": "MD5", "function": "digest", "line": 192},
+    {"family": "SHA-1", "function": "digest", "line": 205}
+  ],
+  "jjwt_JcaTemplate.java": [],
+  "mbedtls_gen_key.c": [
+    {"family": "RSA", "function": "keygen", "line": 377}
+  ],
+  "openssl_demo_aesgcm.c": [
+    {"family": "AES", "function": "encrypt", "line": 114},
+    {"family": "AES", "function": "tag", "line": 129},
+    {"family": "AES", "function": "decrypt", "line": 186},
+    {"family": "AES", "function": "verify", "line": 201}
   ]
 }
