@@ -1,0 +1,28 @@
+name: ecdat-demo-vulnerable-check
+
+# Demonstrates the M5 (Track CC) CI/CD gate for real: any PR touching
+# demo/vulnerable-app/ gets scanned by the same reusable workflow an
+# external consuming repo would call, and is blocked if it introduces a
+# finding at or above .ecdat-policy.yml's gate.failOnBand (critical).
+#
+# Uses a local reusable-workflow reference (./.github/workflows/...)
+# rather than the cross-repo nani224/SIH26164/... form, since this *is*
+# nani224/SIH26164 -- an external repo would instead write:
+#   uses: nani224/SIH26164/.github/workflows/ecdat-scan-reusable.yml@main
+
+on:
+  pull_request:
+    paths:
+      - "demo/vulnerable-app/**"
+      - ".ecdat-policy.yml"
+      - ".github/workflows/demo-vulnerable-check.yml"
+
+jobs:
+  ecdat-demo:
+    uses: ./.github/workflows/ecdat-scan-reusable.yml
+    with:
+      scan-path: demo/vulnerable-app
+      policy-file: .ecdat-policy.yml
+      ecdat-ref: main
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
