@@ -156,6 +156,13 @@ def _extract_zip(archive_path: Path, target_dir: Path) -> tuple[int, int]:
                     f"Archive exceeds uncompressed size limit ({total_uncompressed} > {MAX_UNCOMPRESSED_BYTES})"
                 )
 
+            if info.compress_size > 0 and info.file_size / info.compress_size > MAX_COMPRESSION_RATIO:
+                ratio = info.file_size / info.compress_size
+                raise DecompressionBombError(
+                    f"Zip entry {info.filename!r} exceeds max compression ratio "
+                    f"({ratio:.1f}x > {MAX_COMPRESSION_RATIO}x)"
+                )
+
             if _is_suspicious_path(info.filename):
                 raise ZipSlipError(f"Suspicious path in zip archive: {info.filename}")
 
@@ -186,6 +193,11 @@ def _extract_tar(archive_path: Path, target_dir: Path) -> tuple[int, int]:
     file_count = 0
     total_uncompressed = 0
     target_root_str = str(target_dir)
+    # tar's compression (gzip) wraps the whole stream, not each member, so
+    # there's no per-entry compressed size the way zip has -- the ratio
+    # bomb defense here is aggregate: the archive's own on-disk (compressed)
+    # size vs. everything it claims to expand to.
+    compressed_size = archive_path.stat().st_size
 
     with tarfile.open(archive_path, "r:*") as tf:
         members = tf.getmembers()
@@ -202,6 +214,12 @@ def _extract_tar(archive_path: Path, target_dir: Path) -> tuple[int, int]:
             if total_uncompressed > MAX_UNCOMPRESSED_BYTES:
                 raise DecompressionBombError(
                     f"Archive exceeds uncompressed size limit ({total_uncompressed} > {MAX_UNCOMPRESSED_BYTES})"
+                )
+
+            if compressed_size > 0 and total_uncompressed / compressed_size > MAX_COMPRESSION_RATIO:
+                ratio = total_uncompressed / compressed_size
+                raise DecompressionBombError(
+                    f"Archive exceeds max compression ratio ({ratio:.1f}x > {MAX_COMPRESSION_RATIO}x)"
                 )
 
             if _is_suspicious_path(member.name):
@@ -222,6 +240,11 @@ def _extract_tar(archive_path: Path, target_dir: Path) -> tuple[int, int]:
                     err_msg = f"Symlink points outside target sandbox: {member.name} -> {link_target}"
                     raise SymlinkTraversalError(err_msg)
 
-        tf.extractall(target_dir)
+        # filter="data" (Python 3.12+): rejects device files/absolute
+        # links and strips ownership metadata on extraction, on top of
+        # the manual path/symlink checks already done above -- adopting
+        # the safer default now silences tarfile's own deprecation
+        # warning about the pending 3.14 behavior change.
+        tf.extractall(target_dir, filter="data")
 
     return file_count, total_uncompressed

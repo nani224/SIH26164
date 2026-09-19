@@ -27,5 +27,78 @@
     {"family": "ChaCha20", "function": "encrypt", "line": 4}
   ],
   "no_crypto.py": [],
-  "pqc_mentions.py": []
+  "pqc_mentions.py": [],
+  "JavaWeakHash.java": [
+    {"family": "MD5", "function": "digest", "line": 5},
+    {"family": "SHA-1", "function": "digest", "line": 6},
+    {"family": "SHA-2", "function": "digest", "line": 7},
+    {"family": "MD5", "function": "digest", "line": 8}
+  ],
+  "JavaHmac.java": [
+    {"family": "HMAC", "function": "tag", "line": 5},
+    {"family": "HMAC", "function": "tag", "line": 6}
+  ],
+  "JavaRsaKeygen.java": [
+    {"family": "RSA", "function": "keygen", "line": 5},
+    {"family": "RSA", "function": "keygen", "line": 7}
+  ],
+  "JavaEcKeygen.java": [
+    {"family": "ECDSA", "function": "keygen", "line": 6},
+    {"family": "ECDSA", "function": "keygen", "line": 8}
+  ],
+  "JavaWeakCiphers.java": [
+    {"family": "DES", "function": "encrypt", "line": 5},
+    {"family": "3DES", "function": "encrypt", "line": 6},
+    {"family": "Blowfish", "function": "encrypt", "line": 7}
+  ],
+  "JavaSafeCipher.java": [
+    {"family": "AES", "function": "encrypt", "line": 5},
+    {"family": "ChaCha20", "function": "encrypt", "line": 6}
+  ],
+  "JavaSignatureKeyAgreement.java": [
+    {"family": "RSA", "function": "sign", "line": 6},
+    {"family": "ECDSA", "function": "sign", "line": 7},
+    {"family": "ECDH", "function": "keyderive", "line": 8}
+  ],
+  "JavaBouncyCastle.java": [
+    {"family": "SHA-2", "function": "digest", "line": 8},
+    {"family": "AES", "function": "encrypt", "line": 9},
+    {"family": "RSA", "function": "keygen", "line": 10},
+    {"family": "Ed25519", "function": "keygen", "line": 11}
+  ],
+  "JavaKeyMaterial.java": [
+    {"family": "AES", "function": "unknown", "line": 7},
+    {"family": "", "function": "unknown", "line": 8},
+    {"family": "", "function": "unknown", "line": 9}
+  ],
+  "JavaNoCrypto.java": [],
+  "openssl_fetch.c": [
+    {"family": "AES", "function": "encrypt", "line": 4},
+    {"family": "SHA-2", "function": "digest", "line": 5}
+  ],
+  "openssl_keygen.c": [
+    {"family": "RSA", "function": "keygen", "line": 4},
+    {"family": "ECDSA", "function": "keygen", "line": 5}
+  ],
+  "openssl_legacy_getters.c": [
+    {"family": "AES", "function": "encrypt", "line": 4},
+    {"family": "3DES", "function": "encrypt", "line": 5},
+    {"family": "SHA-1", "function": "digest", "line": 6}
+  ],
+  "mbedtls_usage.c": [
+    {"family": "AES", "function": "encrypt", "line": 9},
+    {"family": "SHA-2", "function": "digest", "line": 10},
+    {"family": "RSA", "function": "keygen", "line": 11},
+    {"family": "ECDSA", "function": "keygen", "line": 12}
+  ],
+  "wolfssl_usage.c": [
+    {"family": "AES", "function": "encrypt", "line": 7},
+    {"family": "RSA", "function": "keygen", "line": 8},
+    {"family": "SHA-2", "function": "digest", "line": 9},
+    {"family": "HMAC", "function": "tag", "line": 10}
+  ],
+  "openssl_cpp_wrapper.cpp": [
+    {"family": "AES", "function": "encrypt", "line": 6}
+  ],
+  "no_crypto.c": []
 }

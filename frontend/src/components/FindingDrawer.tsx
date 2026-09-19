@@ -41,19 +41,42 @@ export function FindingDrawer() {
   if (!isDrawerOpen || !selectedFinding) return null;
 
   const finding = selectedFinding;
-  const semanticClass = classifyAlgorithm(
-    finding.family,
-    finding.displayName,
-    finding.risk.classicallyBroken
-  );
+  const { risk, recommendation } = finding;
   const activeStatus = triageStatus || finding.triage.status;
+
+  if (!risk || !recommendation) {
+    // Nullable per contract (an unscored finding); this drawer is
+    // risk/recommendation-focused, so show a minimal fallback rather than
+    // fabricate numbers.
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true" aria-label="Cryptographic finding details drawer">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDrawer} />
+        <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+          <div className="w-screen max-w-md bg-[var(--surface-base)] border-l border-[var(--border-prominent)] shadow-2xl flex flex-col p-6 font-mono text-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">{finding.displayName}</h2>
+              <button onClick={closeDrawer} aria-label="Close drawer" className="p-1.5 rounded hover:bg-[var(--surface-card-hover)]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-[var(--text-muted)]">
+              This finding has not been risk-scored yet (scan still in progress, or scoring failed for
+              this asset). No risk waterfall or PQC recommendation is available.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const semanticClass = classifyAlgorithm(finding.family, finding.displayName, risk.classicallyBroken);
 
   const handleTriageSave = async () => {
     setIsSaving(true);
     try {
       await triageFinding(finding.id, {
         status: activeStatus,
-        note: triageNote || finding.triage.note,
+        note: triageNote || finding.triage.note || undefined,
       });
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 2000);
@@ -81,9 +104,9 @@ export function FindingDrawer() {
                 <CryptoBadge
                   semanticClass={semanticClass}
                   displayName={finding.displayName}
-                  needsReview={finding.risk.needsReview}
+                  needsReview={risk.needsReview}
                 />
-                <RiskBandBadge band={finding.risk.band} score={finding.risk.score} />
+                <RiskBandBadge band={risk.band} score={risk.score} />
               </div>
               <h2 className="text-lg font-mono font-bold text-[var(--text-primary)]">
                 {finding.displayName} in {finding.location.path}
@@ -110,9 +133,9 @@ export function FindingDrawer() {
                 <span>Quantum & Classical Threat Assessment</span>
               </div>
               <p className="text-sm text-[var(--text-primary)] leading-relaxed">
-                {finding.risk.reason}
+                {risk.reason}
               </p>
-              {finding.risk.hndl && (
+              {risk.hndl && (
                 <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--crypto-shor-bg)] text-[var(--crypto-shor)] border border-[var(--crypto-shor-border)] text-[10px] font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
                   <span>HARVEST NOW, DECRYPT LATER (HNDL) ACTIVE EXPOSURE</span>
@@ -128,34 +151,34 @@ export function FindingDrawer() {
                   <span>Risk Score Mathematical Waterfall</span>
                 </span>
                 <span className="text-[var(--text-primary)] font-bold text-sm num-tabular">
-                  {finding.risk.score.toFixed(1)} / 100
+                  {risk.score.toFixed(1)} / 100
                 </span>
               </div>
               <div className="grid grid-cols-5 gap-2 text-center py-2 border-y border-[var(--border-subtle)]">
                 <div>
                   <div className="text-[10px] text-[var(--text-muted)]">V (Vuln)</div>
-                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{finding.risk.V}</div>
+                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{risk.V}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[var(--text-muted)]">F (Func)</div>
-                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{finding.risk.F}</div>
+                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{risk.F}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[var(--text-muted)]">U (Urgency)</div>
-                  <div className="font-bold text-[var(--crypto-pqc)] text-sm num-tabular">{finding.risk.U.toFixed(2)}</div>
+                  <div className="font-bold text-[var(--crypto-pqc)] text-sm num-tabular">{risk.U.toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[var(--text-muted)]">E (Exposure)</div>
-                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{finding.risk.E}</div>
+                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{risk.E}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[var(--text-muted)]">K (Crit)</div>
-                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{finding.risk.K}</div>
+                  <div className="font-bold text-[var(--text-primary)] text-sm num-tabular">{risk.K}</div>
                 </div>
               </div>
               <div className="text-[10px] text-[var(--text-secondary)] flex justify-between">
                 <span>Formula: $100 \times V \times F \times U \times E \times K$</span>
-                <span>Mosca Margin: $X({finding.risk.X}y) + Y({finding.risk.Y}y) - Z({finding.risk.Z}y) = {finding.risk.moscaMargin}y$</span>
+                <span>Mosca Margin: $X({risk.X}y) + Y({risk.Y}y) - Z({risk.Z}y) = {risk.moscaMargin}y$</span>
               </div>
             </div>
 
@@ -181,10 +204,10 @@ export function FindingDrawer() {
               </div>
               <div className="p-2.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)]">
                 <div className="text-xs font-semibold text-[var(--crypto-pqc)]">
-                  Target: {finding.recommendation.target}
+                  Target: {recommendation.target}
                 </div>
                 <div className="text-[11px] text-[var(--text-secondary)] mt-1">
-                  {finding.recommendation.action}
+                  {recommendation.action}
                 </div>
               </div>
 
@@ -193,19 +216,19 @@ export function FindingDrawer() {
                 <div className="bg-[var(--surface-raised)] p-2 rounded border border-[var(--border-subtle)]">
                   <div className="text-[var(--text-muted)]">Δ Public Key</div>
                   <div className="font-bold text-[var(--text-primary)] text-xs mt-0.5 num-tabular">
-                    {finding.recommendation.cost.pkBytesDelta > 0 ? `+${finding.recommendation.cost.pkBytesDelta}` : finding.recommendation.cost.pkBytesDelta} B
+                    {recommendation.cost.pkBytesDelta > 0 ? `+${recommendation.cost.pkBytesDelta}` : recommendation.cost.pkBytesDelta} B
                   </div>
                 </div>
                 <div className="bg-[var(--surface-raised)] p-2 rounded border border-[var(--border-subtle)]">
                   <div className="text-[var(--text-muted)]">Δ Wire / Ciphertext</div>
                   <div className="font-bold text-[var(--text-primary)] text-xs mt-0.5 num-tabular">
-                    {finding.recommendation.cost.wireBytesDelta > 0 ? `+${finding.recommendation.cost.wireBytesDelta}` : finding.recommendation.cost.wireBytesDelta} B
+                    {recommendation.cost.wireBytesDelta > 0 ? `+${recommendation.cost.wireBytesDelta}` : recommendation.cost.wireBytesDelta} B
                   </div>
                 </div>
                 <div className="bg-[var(--surface-raised)] p-2 rounded border border-[var(--border-subtle)]">
                   <div className="text-[var(--text-muted)]">Δ Op Latency</div>
                   <div className="font-bold text-[var(--text-primary)] text-xs mt-0.5 num-tabular">
-                    {finding.recommendation.cost.opMsDelta > 0 ? `+${finding.recommendation.cost.opMsDelta}` : finding.recommendation.cost.opMsDelta} ms
+                    {recommendation.cost.opMsDelta > 0 ? `+${recommendation.cost.opMsDelta}` : recommendation.cost.opMsDelta} ms
                   </div>
                 </div>
               </div>

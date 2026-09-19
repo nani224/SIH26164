@@ -31,13 +31,20 @@ from api.models import (
     Surface,
     Triage,
 )
-from engine import source_go, source_python
+from engine import source_c, source_go, source_java, source_python
 from engine.factors import derive_risk
 from engine.models import Detection, ScanResult
 from engine.recommend import recommend
 
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".mypy_cache", ".ruff_cache"}
-_SOURCE_EXTENSIONS = {".py", ".go", ".bin", ".elf", ".so"}
+_C_FAMILY_EXTENSIONS = {".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hxx"}
+_SOURCE_EXTENSIONS = {".py", ".go", ".java", ".bin", ".elf", ".so"} | _C_FAMILY_EXTENSIONS
+# Per-file cap: engine/ingest.py bounds the whole archive (5 GB uncompressed,
+# 50k files), but nothing previously bounded a single pathological file --
+# one huge source/binary file could still exhaust memory since read_bytes()
+# loads it whole. 100 MB is generous for any single source/binary file this
+# engine's detectors are meant to parse.
+_MAX_FILE_BYTES = 100 * 1024 * 1024
 
 _AES_SBOX_16 = bytes([
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5,
@@ -78,7 +85,10 @@ def _iter_source_files(target: Path) -> list[Path]:
     if target.is_file():
         return [target] if target.suffix in _SOURCE_EXTENSIONS else []
     files: list[Path] = []
-    for ext in ("*.py", "*.go", "*.bin", "*.elf", "*.so"):
+    extensions = ("*.py", "*.go", "*.java", "*.bin", "*.elf", "*.so") + tuple(
+        f"*{ext}" for ext in sorted(_C_FAMILY_EXTENSIONS)
+    )
+    for ext in extensions:
         files.extend(target.rglob(ext))
     return [
         p
@@ -120,6 +130,7 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
 
     total_bytes = 0
     errors = 0
+    skipped_oversized = 0
     findings: list[Finding] = []
     by_surface: dict[str, int] = {}
 
@@ -127,6 +138,9 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         if i == 1:
             emit("stage", stage="scanning")
         try:
+            if file_path.stat().st_size > _MAX_FILE_BYTES:
+                skipped_oversized += 1
+                continue
             source = file_path.read_bytes()
         except OSError:
             errors += 1
@@ -137,6 +151,10 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         )
         if file_path.suffix == ".go":
             detections = source_go.detect_code(source, rel_path)
+        elif file_path.suffix == ".java":
+            detections = source_java.detect_code(source, rel_path)
+        elif file_path.suffix in _C_FAMILY_EXTENSIONS:
+            detections = source_c.detect_code(source, rel_path)
         elif file_path.suffix in {".bin", ".elf", ".so"}:
             detections = _detect_binary(source, rel_path)
         else:
@@ -159,6 +177,6 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         seconds=round(elapsed, 4),
         mbPerSec=round((total_bytes / 1_000_000) / elapsed, 4),
         errors=errors,
-        skippedPrefilter=0,
+        skippedPrefilter=skipped_oversized,
     )
     return ScanResult(findings=findings, stats=stats)

@@ -27,6 +27,32 @@ def test_scan_of_directory_with_crypto_returns_scored_finding(client: TestClient
     assert finding["risk"]["V"] == 1.0  # RSA is Shor-vulnerable regardless of context
 
 
+def test_real_rsa_keygen_scan_triggers_private_key_floor(client: TestClient, tmp_path: Path) -> None:
+    """Real, end-to-end regression for the "unencrypted private key outside
+    a test path -> score >= 90" domain rule (root CLAUDE.md) -- goes through
+    an actual scan + the real tree-sitter detector, not a hand-built
+    Detection, since a hand-built one can claim any kind/function combo
+    whether or not any real detector ever produces it.
+    """
+    (tmp_path / "keyservice.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "key = rsa.generate_private_key(public_exponent=65537, key_size=2048)\n"
+    )
+
+    resp = client.post("/api/v1/scans", json={"path": str(tmp_path)})
+    assert resp.status_code == 201
+    scan = resp.json()
+
+    findings = client.get(f"/api/v1/scans/{scan['id']}/findings").json()
+    finding = findings["items"][0]
+    assert finding["family"] == "RSA"
+    assert finding["function"] == "keygen"
+    # Default policy's default context is exposure=internal (not test) --
+    # see api/stub_data.DEFAULT_POLICY -- so the floor must apply.
+    assert finding["risk"]["score"] >= 90.0
+    assert finding["risk"]["band"] == "critical"
+
+
 def test_scan_of_directory_with_no_python_files_is_empty(client: TestClient, tmp_path: Path) -> None:
     (tmp_path / "notes.txt").write_text("nothing to see here\n")
 

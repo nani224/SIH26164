@@ -131,10 +131,10 @@ All numbers below represent **actual, verified test outputs** produced on the in
 | **Strict Type Checking** | `uv run mypy --strict .` | `Success: no issues found in 62 source files` | **PASS** |
 | **Air-Gap Invariants** | `uv run python scripts/verify_airgap.py` | `Zero banned network, telemetry, or external AI/LLM imports. All dependencies pinned.` | **PASS** |
 | **Contract Synchronization** | `uv run python scripts/contract_diff.py` | `No contract drift.` | **PASS** |
-| **Unit & Integration Suite** | `uv run pytest` | `112 passed, 5 warnings in 12.71s` | **PASS** |
-| **Synthetic Benchmark** | `uv run python bench/evaluate.py` | `P = 1.000, R = 1.000, F1 = 1.000 (truth=15, detected=15, tp=15)` | **PASS** |
-| **Real-World Benchmark** | `uv run python bench/real_world/evaluate.py` | `P = 1.000, R = 1.000, F1 = 1.000 (truth=7, detected=7, tp=7)` | **PASS** |
-| **Rescore Performance** | `uv run pytest tests/test_rescore_perf.py` | `10,000 findings rescored in 2.47s (kernel < 300ms)` | **PASS** |
+| **Unit & Integration Suite** | `uv run pytest` | `117 passed, 4 warnings in 6.6s` (2026-09-19) | **PASS** |
+| **Synthetic Benchmark** | `uv run python bench/evaluate.py` | `P = 1.000, R = 1.000, F1 = 1.000 (truth=15, detected=15, tp=15)` -- 8 small hand-written fixture files, not a real-world corpus | **PASS** |
+| **Real-World Benchmark** | `uv run python bench/real_world/evaluate.py` | `P = 1.000, R = 0.520, F1 = 0.684 (truth=25, detected=13, tp=13)` on 5 real, unseen, hand-labelled files (2026-09-19, grown from an earlier 7-usage/3-file corpus). Zero false positives; every one of the 12 misses is a documented, already-known gap (bare attribute references, no intra-file type inference for OO `key.sign()`/`key.verify()`/generic `cipher.Block` calls) -- see `backend/bench/real_world/README.md`. Still far short of the brief's >=150-usages-across-3-projects target; Java and C have no detector at all. This replaces an earlier, less-tested "F1 1.000 (Synthetic & Real-World)" claim that combined a 15-usage synthetic set with only 7 real usages -- a sample too small for that perfect a score to mean much. | **P 1.0 / R 0.52** |
+| **Rescore Performance** | `uv run pytest tests/test_rescore_perf.py -s` | `[PERF RESULT] 10,000 findings rescore time: 70.64 ms` (budget < 200ms) (2026-09-19) | **PASS** |
 
 ### Frontend Quality Gates
 
@@ -143,9 +143,9 @@ All numbers below represent **actual, verified test outputs** produced on the in
 | **Code Style & Linting** | `pnpm lint` (`eslint .`) | `Exit code 0` (0 errors, 0 warnings) | **PASS** |
 | **Type Check** | `pnpm typecheck` (`tsc --noEmit`) | `Exit code 0` (0 errors) | **PASS** |
 | **Unit & Component Tests** | `pnpm test:unit` (`vitest run`) | `37 passed (37 tests across 10 test files in 29.4s)` | **PASS** |
-| **Playwright E2E Suite** | `pnpm test:e2e` (`playwright test`) | `24 passed (24 tests in 1.1m)` | **PASS** |
+| **Playwright E2E Suite** | `pnpm test:e2e` (`playwright test`) | Re-run 2026-09-19 against a real backend: **23/24 passed** (see Spatial Graph Framerate row below for the one failure) | **23/24** |
 | **Production Build** | `pnpm build` (`next build`) | `14 static routes compiled and prerendered, exit code 0` | **PASS** |
-| **Spatial Graph Framerate** | `e2e/gates-verification.spec.ts` | `60.1 FPS at 5,000 nodes (60 frames in 997.8ms)` | **PASS** |
+| **Spatial Graph Framerate** | `e2e/gates-verification.spec.ts` | `60.1 FPS` claim unverified as of 2026-09-19 -- re-run in a GPU-less sandbox measured ~1.0 fps on the identical scene, root-caused to a confirmed software rasterizer (no hardware GPU), not a code defect (draw calls verified flat at 3/frame through 5,000 nodes; JS scripting ~0.4ms/frame). See `frontend/PROGRESS.md`'s 2026-09-19 entry and `frontend/scripts/bench_graph_fps.md` for the full diagnostic and how to get an authoritative number on real GPU hardware. | **NEEDS REAL-GPU RE-RUN** |
 | **Axe Accessibility Audit** | `@axe-core/playwright` across 10 screens | `0 critical, 0 serious violations in Dark & Light modes` | **PASS** |
 | **Layout Stability** | Core Web Vitals CLS Budget | `CLS < 0.1 across all 10 views` | **PASS** |
 

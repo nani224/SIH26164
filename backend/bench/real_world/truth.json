@@ -11,5 +11,41 @@
     {"family": "RSA", "function": "keygen", "line": 12},
     {"family": "SHA-2", "function": "digest", "line": 16},
     {"family": "AES", "function": "encrypt", "line": 22}
+  ],
+  "pyjwt_algorithms.py": [
+    {"family": "SHA-2", "function": "digest", "line": 320},
+    {"family": "SHA-2", "function": "digest", "line": 321},
+    {"family": "SHA-2", "function": "digest", "line": 322},
+    {"family": "HMAC", "function": "tag", "line": 494},
+    {"family": "RSA", "function": "sign", "line": 683},
+    {"family": "RSA", "function": "verify", "line": 688},
+    {"family": "ECDSA", "function": "sign", "line": 761},
+    {"family": "ECDSA", "function": "verify", "line": 777},
+    {"family": "RSA", "function": "sign", "line": 914},
+    {"family": "RSA", "function": "verify", "line": 926},
+    {"family": "Ed25519", "function": "sign", "line": 994},
+    {"family": "Ed25519", "function": "verify", "line": 1018}
+  ],
+  "gorilla_securecookie.go": [
+    {"family": "SHA-2", "function": "digest", "line": 139},
+    {"family": "AES", "function": "encrypt", "line": 148},
+    {"family": "HMAC", "function": "tag", "line": 282},
+    {"family": "HMAC", "function": "tag", "line": 325},
+    {"family": "AES", "function": "encrypt", "line": 402},
+    {"family": "AES", "function": "decrypt", "line": 420}
+  ],
+  "okhttp_Util.java": [
+    {"family": "MD5", "function": "digest", "line": 192},
+    {"family": "SHA-1", "function": "digest", "line": 205}
+  ],
+  "jjwt_JcaTemplate.java": [],
+  "mbedtls_gen_key.c": [
+    {"family": "RSA", "function": "keygen", "line": 377}
+  ],
+  "openssl_demo_aesgcm.c": [
+    {"family": "AES", "function": "encrypt", "line": 114},
+    {"family": "AES", "function": "tag", "line": 129},
+    {"family": "AES", "function": "decrypt", "line": 186},
+    {"family": "AES", "function": "verify", "line": 201}
   ]
 }

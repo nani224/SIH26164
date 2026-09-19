@@ -69,9 +69,15 @@ def derive_risk(detection: Detection, policy: Policy) -> Risk:
     needs_review = detection.confidence < 0.75
     hndl = x > 0 and v > 0.5
 
+    # "Unencrypted private key outside a test path -> score >= 90" (root
+    # CLAUDE.md). The engine has no PEM/key-file parser yet (kind=KEY is
+    # only ever seeded stub data, never produced by a real detector), so
+    # the only real signal available today is a freshly generated private
+    # key for a Shor-broken asymmetric family (function=KEYGEN, V=1.0) --
+    # see docs/decisions/backend/012-private-key-floor-reachability.md.
     forced_private_key = (
-        detection.kind == "key"
-        and detection.function in (CryptoFunction.SIGN, CryptoFunction.DECRYPT, CryptoFunction.KEYDERIVE)
+        detection.function == CryptoFunction.KEYGEN
+        and v == 1.0
         and ctx.exposure != "test"
         and score < _PRIVATE_KEY_FLOOR
     )

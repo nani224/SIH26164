@@ -1,5 +1,560 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Track CC M5 (in progress): CI/CD precision gate + reusable Action
+
+Built the in-repo, fully-verifiable half of M5:
+
+- `backend/bench/check_precision_floor.py`: runs both `bench/evaluate.py`
+  and `bench/real_world/evaluate.py`, fails if either's precision drops
+  below 0.95. Wired into `.github/workflows/backend-ci.yml` as a real CI
+  step -- the 0.95 floor this session enforced by hand all along (and
+  which caught a real violation in M3) is now something a green CI run
+  actually proves, not something to re-derive from a PROGRESS.md entry.
+- `.ecdat-policy.yml` (repo root): policy-as-code -- the existing
+  risk-formula `Policy` shape plus a `gate:` section (`failOnBand`,
+  `precisionFloor`) for CI-specific rules.
+- `backend/bench/ci_scan.py`: loads the policy, runs
+  `engine.scanner.scan()` against a target path, writes JSON + Markdown
+  findings output, exits non-zero if any finding is at or above the gate
+  band. Verified end-to-end against a hand-built
+  `rsa.generate_private_key(key_size=1024)` sample:
+
+  ```
+  $ uv run python bench/ci_scan.py --path <sample dir> --policy ../.ecdat-policy.yml ...
+  ## ECDAT scan: 2 finding(s), worst band critical
+  | critical | 90.0 | RSA | keygen | vulnerable_app.py:5 | ML-KEM-768 |
+  | medium | 18.0 | MD5 | digest | vulnerable_app.py:8 | SHA-2-256 |
+  BLOCKED: 1 finding(s) at or above the gate band (critical).
+  $ echo $?
+  1
+  ```
+
+- `backend/bench/post_pr_comment.py`: posts/updates a PR comment via raw
+  `urllib.request` calls to the GitHub REST API using `GITHUB_TOKEN` --
+  no third-party comment action, per the brief. Idempotent (edits its
+  own previous comment via a hidden marker).
+- `.github/actions/ecdat-scan/action.yml` (composite Action) +
+  `.github/workflows/ecdat-scan-reusable.yml` (`workflow_call` wrapper)
+  -- a consuming repo needs one `uses:` line to get a real scan + PR
+  comment + gate.
+- 11 new unit tests (`test_check_precision_floor.py`, `test_ci_scan.py`,
+  `test_post_pr_comment.py`), PR-comment tests use a monkeypatched
+  `_api_request` -- no real network calls from the test suite.
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 74 source files
+$ uv run pytest --cov=api --cov=engine --cov=scripts --cov-report=term-missing --cov-fail-under=85 -q
+166 passed, 4 warnings in 16.20s
+Required test coverage of 85% reached. Total coverage: 87.72%
+```
+
+**Not done yet, and not silently skipped**: the brief's "create a
+deliberately-vulnerable demo repo and open a REAL PR that gets REALLY
+BLOCKED" step needs a new external GitHub repository and a real PR under
+the user's identity -- a visible, hard-to-reverse action outside this
+session's current repo scope (`nani224/SIH26164` only). Flagged to the
+user rather than done unilaterally. Full design + exact remaining steps
+once authorized in
+`docs/decisions/backend/017-ci-cd-precision-gate-and-reusable-action.md`.
+Also unverified: the composite Action's cross-repo checkout step has
+only been YAML-syntax-validated, not run on GitHub's actual infrastructure.
+
+## 2026-09-19 — Track CC M4: close the largest false-negative cluster
+
+M3 left 12 real-world false negatives. Clustered by root cause: 8 in
+`pyjwt_algorithms.py` (`key.sign(...)`/`key.verify(...)` where `key`'s
+concrete type isn't known from the call site), 4 in
+`gorilla_securecookie.go` (bare function-value references + a generic
+`cipher.Block` interface parameter). The pyjwt cluster is the largest
+(8/12) -- picked as M4's target per the mandate.
+
+The obvious fix (track `key = rsa.generate_private_key(...)`-style local
+assignments, mirroring the Java/C linkage patterns from M1/M3) doesn't
+apply: `key` in every one of PyJWT's `sign`/`verify` methods is a
+**function parameter**, not a local variable with a constructor call to
+link back to. Real fix: Python parameters can carry type annotations, and
+PyJWT's real code does (`key: RSAPrivateKey`, `key: EllipticCurvePrivateKey`,
+`key: Ed25519PrivateKey | Ed448PrivateKey`, ...) -- a genuine static fact,
+not a guess. `engine/source_python.py` now resolves `X.sign(...)`/
+`X.verify(...)` by walking up to the enclosing `function_definition`,
+finding `X`'s `typed_parameter`, and matching its type annotation text
+against real `cryptography`-library class names (`"RSA"`, `"EllipticCurve"`,
+`"Ed25519"` substrings). No match -> no detection; never guesses. Full
+design + the two cases deliberately left unresolved (a project-specific
+type alias, and a call on a local variable rather than a parameter) in
+`docs/decisions/backend/016-python-key-method-type-annotation.md`.
+
+```
+$ uv run python bench/real_world/evaluate.py
+precision=1.0 recall=0.8125 f1=0.8966
+truth=32 detected=26 tp=26
+```
+
+Recall 0.625 -> 0.8125 (6 new true positives: RSA sign/verify x2, ECDSA
+sign, Ed25519 sign), **zero new false positives** -- precision stays 1.0.
+Layer A unaffected (56/56, no existing fixture exercises this pattern);
+5 new unit tests added instead (positive cases per family, a deliberate-
+non-match case for the unresolved type alias, an unrelated-`.sign()`-call
+negative case proving the "no guessing" property directly).
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 68 source files
+$ uv run pytest --cov -q
+155 passed, 4 warnings in 17.18s   (was 152 after M3; +5 new Python tests,
+                                     +1 real-world floor update)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/evaluate.py   (Layer A, unaffected)
+precision=1.0 recall=1.0 f1=1.0
+truth=56 detected=56 tp=56
+```
+
+While updating `bench/real_world/README.md` to reflect this, also caught
+and corrected a stale claim left over from an earlier session: gap #1
+said Python's bare `hashlib.sha256` attribute-reference pattern (lines
+320-322 of `pyjwt_algorithms.py`) was undetected -- it's actually already
+correctly detected (a `source_python.py` capture that landed in an
+earlier session without this file being updated to match, the exact
+"known bookkeeping hazard" root `CLAUDE.md` warns about). Corrected
+rather than left to compound; the Go equivalent of that same pattern
+(`hashFunc: sha256.New,`) is confirmed still a real, open gap.
+
+Not started this session: M5 (CI/CD + real blocked PR). Two of the
+original 8 pyjwt false negatives remain, honestly unresolved (not
+hardcoded around): a project-specific type alias, and a `.verify()` call
+on a local variable rather than a typed parameter. The Go
+bare-function-value-reference and generic-interface-parameter gaps (4
+FNs) are untouched -- next candidate cluster for a future M4-style pass,
+not attempted this session (time/scope).
+
+## 2026-09-19 — Track CC M3: HOLD corpus growth + real precision-floor catch/fix
+
+Grew `bench/real_world/` from 5 files/25 usages/2 languages (Python, Go)
+to 9 files/32 usages/4 languages (+ Java, + C), following strict Loop B1
+order every step: fetch real Apache-2.0 files (jjwt's `JcaTemplate.java`,
+OkHttp's `Util.java`, OpenSSL's own `demos/cipher/aesgcm.c`, mbedTLS's own
+`programs/pkey/gen_key.c`) -> commit raw files alone (`cf6d7bd`) -> dispatch
+one fresh `corpus-labeler` subagent per file (Read/Grep/Glob only, zero
+access to this repo's detector output) -> commit labels alone, before ever
+running the detector against them (`0129fc6`) -> run
+`bench/real_world/evaluate.py` exactly once.
+
+That first real run found: **precision 0.8889, recall 0.5, truth=32,
+detected=18, tp=16** -- below the 0.95 CI floor. Root cause: OpenSSL's
+`EVP_CIPHER_fetch` was firing as ENCRYPT unconditionally (an M2 design
+choice), but the real file fetches the same algorithm once for an encrypt
+block and again for a decrypt block, and a fetch alone doesn't perform
+any operation anyway -- the blind labeler independently reached the exact
+same conclusion, excluding both fetch calls from its labels before this
+run ever happened.
+
+Per root `CLAUDE.md`'s non-negotiable rule ("Any rule that raises recall
+but drops precision below 0.95 is wrong -- fix the rule's specificity or
+drop it, never ship it anyway"), fixed same-session rather than deferred
+to M4: redesigned `engine/source_c.py`'s OpenSSL cipher handling to track
+real call-sequence linkage (`EVP_CIPHER_fetch` -> `EVP_{Encrypt,Decrypt}Init{_ex,_ex2}`
+-> `EVP_{Encrypt,Decrypt}Update` / `EVP_CIPHER_CTX_get_params` /
+`EVP_DecryptFinal_ex`), reporting the operation at the real transformation
+call, not the algorithm-lookup call. Full design + a real line-attribution
+bug caught and fixed during implementation (Update-triggered detections
+were landing at the Init call's line, not the Update's) in
+`docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md`.
+
+Re-measured after the fix:
+
+```
+$ uv run python bench/real_world/evaluate.py
+precision=1.0 recall=0.625 f1=0.7692
+truth=32 detected=20 tp=20
+```
+
+Precision restored to 1.0 (above floor); recall *improved* as a side
+effect, 0.52 -> 0.625 -- the buggy fetch-site heuristic was never finding
+the real operations either, so fixing precision also closed 4 real false
+negatives in the same file. 5 new regression tests added
+(`tests/test_source_c.py`) locking in both the original bug and the
+line-attribution bug found while fixing it.
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 68 source files
+$ uv run pytest --cov -q
+152 passed, 4 warnings in 17.02s   (was 147 after M2; +5 new C regression
+                                     tests, +1 real-world floor update)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/evaluate.py   (Layer A, unaffected by this fix)
+precision=1.0 recall=1.0 f1=1.0
+truth=56 detected=56 tp=56
+```
+
+Two real, honest gaps found and documented (not silently papered over):
+`jjwt_JcaTemplate.java` labels to zero usages -- every `getInstance` call
+in it takes a caller-supplied variable, not a literal algorithm string,
+which needs real cross-file dataflow to resolve and is out of scope;
+`mbedtls_gen_key.c`'s EC keygen call was correctly left unlabelled by the
+blind labeler as family-ambiguous (generic `MBEDTLS_PK_ECKEY`, no
+downstream ECDSA/ECDH-specific call to disambiguate) -- not even a
+detector gap, since there's no unambiguous ground truth there to detect.
+Full writeup in `bench/real_world/README.md`.
+
+Not started this session: M4 (cluster false negatives across all 4
+languages, fix the largest, re-measure), M5 (CI/CD + real blocked PR).
+Corpus is still far short of the 150-usage/4-language target (32 usages,
+1-2 files per new language) -- honestly reported, not rounded up.
+
+## 2026-09-19 — Track CC M2: C/C++ detection engine
+
+New `engine/source_c.py` (`tree-sitter-c==0.24.2`, MIT, confirmed pinnable
+before writing rules; `tree-sitter-cpp` was also test-installed then
+removed -- a real test proved the plain C grammar already parses the
+plain-function-call patterns these libraries use even inside a `.cpp`
+file with `class`/access-specifier syntax it doesn't understand, so a
+second grammar bought nothing). Covers OpenSSL 3.x `EVP_CIPHER_fetch`/
+`EVP_MD_fetch` (algorithm-string parsing) + `EVP_PKEY_CTX_set_rsa_keygen_bits`/
+`_set_ec_paramgen_curve_nid`, the pre-3.0 zero-arg algorithm getters
+(`EVP_aes_256_gcm()`, `EVP_sha256()`, ...) -- a deliberate scope expansion
+beyond the brief's literal wording since real C code still mostly uses
+these, not `*_fetch` -- mbedTLS (`mbedtls_aes_setkey_enc/dec`,
+`mbedtls_{sha256,sha1,md5}_starts`, `mbedtls_rsa_gen_key`,
+`mbedtls_ecdsa_genkey`, `mbedtls_gcm_setkey`), and wolfSSL
+(`wc_AesSetKey`, `wc_Des3_SetKey`, `wc_MakeRsaKey`, `wc_ecc_make_key`,
+`wc_{Sha256,Sha,Md5}Hash`, `wc_HmacSetKey`). See
+`docs/decisions/backend/014-c-cpp-detection-engine.md` for the exact
+mapping and two things caught during development, not after:
+
+1. wolfSSL's `wc_AesSetKey`/`wc_ecc_make_key` pass key size in **bytes**,
+   unlike OpenSSL/mbedTLS's bits -- handled with an explicit x8
+   conversion so `Detection.key_size` means the same thing everywhere.
+2. A real substring-matching bug in the HMAC underlying-hash lookup
+   (`WC_SHA256` was matching the generic `"SHA"` key before reaching
+   `"SHA256"`, misclassifying every SHA-2/3 HMAC as SHA-1) -- caught by
+   direct manual testing *before* fixtures were written, fixed by
+   matching digest names longest-first, and locked down with a named
+   regression test (`test_wolfssl_hmac_underlying_hash_not_confused_by_substring`).
+
+Also closed a real pre-existing gap unrelated to this milestone's own
+code: the binary AES S-box constant detector
+(`engine/scanner.py::_detect_binary`, live since Phase 7) had **zero**
+test coverage anywhere in the suite. Added
+`test_scan_binary_constant_detection_still_works_alongside_source_detectors`
+-- both to satisfy M2's explicit "binary detection still works" exit
+criterion and to close a real coverage hole that had nothing to do with
+C/C++.
+
+7 new crypto fixture files + 1 true-negative file under `bench/fixtures/`
+(16 labelled usages, incl. one `.cpp` file), 13 new unit tests in
+`tests/test_source_c.py`. Real command output:
+
+```
+$ uv run python bench/evaluate.py
+precision=1.0 recall=1.0 f1=1.0
+truth=56 detected=56 tp=56
+```
+(grew from 40 to 56 usages; still 1.0/1.0)
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 68 source files
+$ uv run pytest --cov -q
+147 passed, 4 warnings in 16.99s   (was 131 after M1; +13 test_source_c.py,
+                                     +3 scanner integration tests incl. the
+                                     binary-detection regression test,
+                                     +1 floor-count bump)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/real_world/evaluate.py
+(unchanged: precision=1.0 recall=0.52 truth=25 detected=13 -- the C/C++
+detector doesn't touch the Python/Go real-world corpus, as expected)
+```
+
+Not started this session: M3 (HOLD corpus growth to ~150 usages/4
+languages), M4 (largest false-negative cluster), M5 (CI/CD + real blocked
+PR). Known gap recorded rather than silently shipped: `mbedtls_gcm_setkey`
+only fires when its cipher-id argument's text contains `"AES"` (the
+function is generic over the underlying block cipher, and guessing wrong
+would be a false positive) -- a non-AES GCM usage via this function is a
+deliberate miss, not a bug.
+
+## 2026-09-19 — Track CC M1: Java detection engine
+
+New `engine/source_java.py` (`tree-sitter-java==0.23.5`, MIT, confirmed
+pinnable via `uv add` before writing any code). Covers JCA/JCE `Cipher`
+(transformation-string parsing: algo/mode/padding), `KeyPairGenerator`/
+`KeyGenerator` (linked to a later `.initialize()`/`.init()` call on the
+same variable for key size/curve -- real intra-method dataflow, see
+`docs/decisions/backend/013-java-detection-engine.md` for the exact
+mechanism and its documented limitation), `MessageDigest`, `Signature`
+(`"SHA256withRSA"` parsing), `KeyAgreement`, `Mac` (`"HmacSHA256"`
+parsing), `SSLContext`, `KeyStore`, `SecretKeySpec`, plus direct
+BouncyCastle lightweight-API class usage (`new SHA256Digest()`, `new
+AESEngine()`, `new RSAKeyPairGenerator()`, `new
+Ed25519KeyPairGenerator()`). `engine/scanner.py` wired `.java` into the
+per-file dispatch alongside `.py`/`.go`.
+
+9 new fixture files (`bench/fixtures/Java*.java`, incl. one true-negative
+file with `StringBuilder`/`ArrayList`/`Logger`), 25 new `truth.json`
+entries. Real command output:
+
+```
+$ uv run python bench/evaluate.py
+precision=1.0 recall=1.0 f1=1.0
+truth=40 detected=40 tp=40
+```
+(grew from 15 to 40 usages; still 1.0/1.0)
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 66 source files
+$ uv run pytest --cov -q
+131 passed, 4 warnings in 16.10s   (was 118 before this session's start;
+                                     +12 test_source_java.py, +1 scanner
+                                     integration test, +1 floor-count bump)
+TOTAL coverage 94%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/real_world/evaluate.py
+(unchanged: precision=1.0 recall=0.52 truth=25 detected=13 -- Java
+detector doesn't touch the Python/Go real-world corpus, as expected;
+growing that corpus to include Java is M3, not this milestone)
+```
+
+Not started this session: M2 (C/C++ hardening), M3 (HOLD corpus growth),
+M4 (largest false-negative cluster), M5 (CI/CD + real blocked PR). Known
+limitation recorded in the ADR rather than silently shipped: the
+`KeyPairGenerator`/`initialize` variable link is a single-slot `dict`, not
+scope-aware -- a reused variable name across two methods with different
+algorithms in the same file would lose the first link. Not exercised by
+current fixtures.
+
+## 2026-09-19 — Functional proof for Phase 9 (PDF) and Phase 10 (audit chain)
+
+A passing test count doesn't prove a feature does something real for a
+user -- the same session that found the contract-fabrication defect (a
+test suite that stayed green around a fictional API shape) means
+"112/117 tests pass" isn't, by itself, proof either Phase 9 or Phase 10
+does anything real. Got actual functional proof for both.
+
+**Phase 9 (CBOM + executive PDF report)**: ran a real scan
+(`POST /scans` against a 2-line real file with an `hashlib.md5(...)` call
+and a real `rsa.generate_private_key(public_exponent=65537, key_size=2048)`
+call -- `scan_7f992921ce0e`), fetched `GET /scans/{id}/report.pdf` for
+real, and extracted its text with `pypdf` rather than trusting that a
+200 response with the right content-type means the content is real.
+It is: page 1's "Overall Mosca Quantum Risk Score: 90.0 / 100 CRITICAL"
+and band counts (Critical 1 / Medium 1 / High 0 / Low 0) exactly match
+`GET /scans/{id}/findings`'s real data; page 2's table row
+`RSA key generation | vulnerable_app.py:8 | RSA | keygen | 90.0 | CRITICAL`
+and `hashlib.md5 digest | vulnerable_app.py:5 | MD5 | digest | 18.0 | MEDIUM`
+match the two real findings exactly (displayName, location, family,
+function, score, band); page 3's remediation cost deltas
+(`PKBYTESDELTA=928 WIREBYTESDELTA=832 OPMSDELTA=0.04` for the RSA->ML-KEM-768
+migration) match `recommendation.cost` in the API response byte-for-byte.
+Not lorem ipsum, not a placeholder -- genuinely this scan's data, correctly
+laid out. (Bonus: this same scan is what caught the private-key floor fix
+from earlier this session working live outside its unit test -- the RSA
+keygen finding really did get forced to score >=90 with the "forced to
+score >= 90 per policy" reason text showing up verbatim in the PDF.)
+
+**Phase 10 (tamper-evident audit chaining)**: took the real, file-backed
+`ecdat.db` this session's live backend was writing to, verified the chain
+was intact (`verify_audit_log_integrity` -> `(True, None)`), then tampered
+with a real row directly via `sqlite3` -- bypassing the FastAPI app, the
+SQLModel ORM, and Python entirely (`UPDATE audit_log SET entity_id =
+'scan_ATTACKER_MODIFIED' WHERE id = 2`, executed from a separate raw
+`sqlite3` connection, the actual threat model for a tamper-evident log:
+an attacker or misbehaving script with direct file access). Re-verified:
+`(False, "Tampered record at id=2: stored hash=0296810b...4c6 != computed
+eb944917...0f")` -- caught immediately and precisely. Restored the row and
+confirmed the chain reports intact again. This exact scenario (raw-SQL
+tamper against a real on-disk file, not an ORM-mediated mutation in an
+in-memory test DB) wasn't covered by the existing test suite -- the two
+existing tests both tamper by going through the SQLModel session
+(`rec.detail = {...}; session.add(rec); session.commit()`), which is a
+meaningfully different (weaker) attack model. Added
+`tests/test_audit_chain.py::test_verify_audit_log_detects_tampering_via_raw_sql`
+as a permanent regression for the real threat model, against a real temp
+SQLite file. **118 tests now pass** (up from 117).
+
+**Real gap found, not fixed this pass**: `verify_audit_log_integrity` is
+never called from any HTTP route (`grep -rn "verify_audit_log_integrity"
+api/routes/`) -- it's real, correct, and unit-tested, but there is
+currently no way for an operator to actually invoke this check against a
+running deployment without writing a one-off Python script the way this
+verification did. Worth a `GET /api/v1/audit/verify` (or similar) admin
+endpoint in a future pass -- noted here rather than silently left implied
+by the passing tests.
+
+## 2026-09-19 — Resolution pass: real-world benchmark corpus was too small to trust
+
+A review of the 2026-09-18 audit found the "F1 1.000 (Synthetic & Real-World)"
+claim wasn't well-supported: only 7 real-world usages across 3 files,
+smaller than even the original task brief's own honest reference point
+(31 real usages scoring 0.964/0.774 -- a lower, more credible number than
+a perfect 1.0 on a sample this thin), and nowhere near the brief's actual
+target (>=150 usages across 3 unseen projects, one Java/Go/C each).
+
+**What's actually in `bench/` right now** (verified by listing, not
+assumed): `bench/fixtures/` = 8 hand-written synthetic files, 15 labelled
+usages (`bench/evaluate.py`, unchanged, still legitimately 1.0/1.0 on its
+own small synthetic set -- not touched this pass). `bench/real_world/samples/`
+had 3 files / 7 usages before this session.
+
+**Git history search** (`git log --all -S "150"/"HOLD"/"Layer A" -- backend/`,
+across both branches that exist in this repo) found **no evidence a
+larger corpus or a genuine HOLD set was ever built and then lost** --
+it never existed. That's a real, permanent gap, not something reduced.
+Also found: `backend/PLAN.md`'s Phase 1 entry already documents the
+brief's original "~70 usages, 0.986 recall" reference honestly as
+unmeasured-in-this-repo, so this gap was known, just not closed.
+
+**Grew the corpus properly**, per Loop B1's methodology (label from
+reading the code, before running the detector, commit the labels first):
+fetched two more real, unseen, permissively-licensed files --
+`jwt/algorithms.py` (jpadilla/pyjwt, MIT -- previously flagged in this
+project's own README as a known gap source and explicitly not vendored,
+now vendored) and `securecookie.go` (gorilla/securecookie, BSD-3-Clause).
+Hand-labelled 18 new usages (12 Python, 6 Go) by reading both files in
+full, committed as `0545dbd` before ever running the detector on them.
+(A third candidate, paramiko's key-handling modules, was fetched and read
+but discarded unvendored -- LGPL-2.1, and the licence gate only allows
+LGPL as an unmodified dependency, never vendored into this repo.)
+
+Corpus is now **5 files / 2 languages / 25 usages** -- still well short
+of >=150/3-languages, and said plainly rather than rounded up. Java and C
+have zero detector coverage (`engine/` only has `source_python.py` and
+`source_go.py`), so a HOLD set in either language would only demonstrate
+that, not detection quality -- not attempted, recorded as a gap instead.
+
+**Real result** (`uv run python bench/real_world/evaluate.py`, run once,
+after committing labels):
+```
+precision=1.0 recall=0.52 f1=0.6842
+truth=25 detected=13 tp=13
+  false negative: ('gorilla_securecookie.go', 'AES', 'decrypt', 420)
+  false negative: ('gorilla_securecookie.go', 'AES', 'encrypt', 148)
+  false negative: ('gorilla_securecookie.go', 'AES', 'encrypt', 402)
+  false negative: ('gorilla_securecookie.go', 'SHA-2', 'digest', 139)
+  false negative: ('pyjwt_algorithms.py', 'ECDSA', 'sign', 761)
+  false negative: ('pyjwt_algorithms.py', 'ECDSA', 'verify', 777)
+  false negative: ('pyjwt_algorithms.py', 'Ed25519', 'sign', 994)
+  false negative: ('pyjwt_algorithms.py', 'Ed25519', 'verify', 1018)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'sign', 683)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'sign', 914)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'verify', 688)
+  false negative: ('pyjwt_algorithms.py', 'RSA', 'verify', 926)
+```
+**This is a genuinely more informative number than the old 1.0/1.0.** Zero
+false positives (the detector doesn't hallucinate crypto). Every single
+false negative is one of two already-documented gaps, not a surprise:
+(1) OO `key.sign()`/`key.verify()` calls where the key's concrete type
+isn't known from the call site (no intra-file type inference -- listed as
+future work since Phase 7), and (2) Go's generic `cipher.NewCTR(block, iv)`
+taking a `cipher.Block` interface rather than a literal `aes.X(...)` call,
+same root cause. Interestingly, the Python bare-attribute-reference
+detector (Phase 7) and both direct `hmac.new`/`hmac.New` calls *did* get
+found correctly (not in the false-negative list) -- confirms that specific
+Phase 7 claim was real, not just the real-world recall number.
+
+Updated: `tests/test_bench_real_world.py` (floor is now precision 1.0 /
+recall 0.52 / truth 25, not the old fabricated-looking 1.0/1.0/7 -- a
+regression floor, not a target to force back up by weakening anything),
+`bench/real_world/README.md` (was itself stale -- said "4/4, two Python
+files" after a later commit had already made it 7/7 across three without
+updating this file; rewritten to point at this dated entry instead of
+quoting a number that will go stale again), `README.md`'s quality-gate
+table (also corrected pytest count 112->117 and rescore perf number,
+which was showing a stale 2.47s/300ms-kernel figure against the real
+current `[PERF RESULT] 10,000 findings rescore time: 70.64 ms`).
+
+Gates re-run after all of this: `ruff`, `mypy --strict`, `pytest`
+(117 passed) all clean.
+
+## 2026-09-18 — Whole-repo cross-track audit + fix pass
+
+Backend and frontend were built by two separate agent tracks and merged
+onto `main`; this pass re-verified every claim in this file against real
+command output (not commit messages), found and fixed real defects, and
+ran the first genuine backend+frontend end-to-end integration test this
+project has had. See root `CLAUDE.md`, `.claude/agents/*.md` for the audit
+methodology.
+
+Real defects found and fixed:
+- `GET /scans/{id}/graph` always returned the same Phase 0 canned stub
+  regardless of scan id. Added `api/graph.py::build_graph()` -- a real
+  system->file->asset graph derived from `store.list_findings(scan_id)`,
+  with real band/score/occurrences. `tests/test_graph_real.py` (new)
+  proves two different scans now produce different graphs.
+- The "unencrypted private key -> score >= 90" domain rule
+  (`engine/factors.py`) was unreachable from any real scan: it guarded on
+  `kind=FindingKind.KEY`, which no real detector ever emits (only
+  `api/stub_data.py`'s example data uses it). Retargeted to
+  `function=KEYGEN` + a Shor-broken family (the real, reachable signal) --
+  see `docs/decisions/backend/012-private-key-floor-reachability.md`. New
+  end-to-end test `test_real_rsa_keygen_scan_triggers_private_key_floor`
+  proves it now fires from an actual `POST /scans` + real detector run,
+  not a hand-built `Detection`.
+- `api/rate_limiter.py` trusted a client-supplied `X-Test-Client-Id` header
+  unconditionally, letting any external caller bypass rate limiting by
+  varying it. Gated behind `ECDAT_RATE_LIMIT_TRUST_TEST_HEADER=1`
+  (test-only, set in `tests/conftest.py`), never trusted by default.
+- `engine/ingest.py`: `MAX_COMPRESSION_RATIO` was declared but never
+  enforced (per-entry for zip via `compress_size`, aggregate archive-size
+  vs. total-uncompressed for tar, since tar's gzip wraps the whole stream
+  not each member). Tar extraction now passes `filter="data"` (adopts
+  Python 3.12's safer default early, silences the 3.14 deprecation
+  warning).
+- `engine/scanner.py` had no per-file size cap -- one pathological huge
+  file could still be read whole into memory even though the aggregate
+  archive quota was enforced. Added a 100 MB per-file cap, counted in
+  `ScanStats.skippedPrefilter` (not `errors`, since it's a policy skip,
+  not an I/O failure).
+
+Real end-to-end integration (real `uvicorn` backend + real `next build &&
+next start` frontend, MSW structurally cannot run in a production build):
+verified via `frontend/e2e/finale-integration.spec.ts` (real upload -> WS
+stage events -> Overview band counts matched against the API directly ->
+real `POST /rescore` -> real finding drawer + triage PATCH persisted ->
+real CBOM fetched and shape-checked -> real graph with 2D fallback), both
+themes, run against the live backend, not mocks. Also manually verified a
+hostile path-traversal tar.gz is rejected by the real running
+`POST /scans/upload` (400, traversal target never created, backend stays
+healthy afterward) -- see the matching frontend note for the UI-side gap
+this surfaced (launcher never showed upload errors) and fix.
+
+Security scanners run for real this session (previously blocked on no
+network access): `bandit` (3 findings, all reviewed as false positives --
+see below), `pip-audit` (clean), `gitleaks` (clean, 26 commits scanned).
+Bandit's 2 SQL-injection warnings in `api/store.py` are on
+`f"...{ph}..."` strings where `{ph}` is only the dialect placeholder
+character (`?`/`%s`); the actual values are always passed as parameterized
+query args, never interpolated -- bandit's static check can't distinguish
+that pattern. Its `tarfile_unsafe_members` warning on `zf.extractall()` in
+`engine/ingest.py` (zip path) is pre-mitigated by this file's own manual
+zip-slip/symlink validation of every entry before extraction (zipfile has
+no `filter=` parameter the way tarfile does in 3.12+); the tar path was
+given `filter="data"` as belt-and-suspenders on top of the same manual
+checks.
+
+Gates: `ruff`, `mypy --strict`, `pytest` (117 passed, up from 112),
+`contract_diff.py`, `verify_airgap.py`, `bandit`, `pip-audit`, `gitleaks`
+all clean/reviewed.
+
 ## 2026-09-18 — Phase 10: Security Hardening, Audit Log Hash-Chaining & Air-Gap Verification
 
 Completed enterprise security hardening, tamper-evident audit logging, and automated air-gap verification:

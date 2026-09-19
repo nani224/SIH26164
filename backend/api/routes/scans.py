@@ -22,9 +22,10 @@ from fastapi import (
     status,
 )
 
-from api import store, stub_data
+from api import store
 from api.cbom import build_cbom
 from api.filtering import filter_findings, paginate
+from api.graph import build_graph
 from api.models import (
     ErrorDetail,
     FindingPage,
@@ -183,8 +184,9 @@ async def rescore_scan(scan_id: str, payload: RescoreRequest) -> Response:
 
 @router.get("/scans/{scan_id}/graph", response_model=Graph)
 async def get_graph(scan_id: str) -> Graph:
-    _get_scan_or_404(scan_id)
-    return Graph(nodes=stub_data.default_graph_nodes(), edges=stub_data.default_graph_edges())
+    scan = _get_scan_or_404(scan_id)
+    findings = store.list_findings(scan_id)
+    return build_graph(scan, findings)
 
 
 @router.get("/scans/{scan_id}/cbom")

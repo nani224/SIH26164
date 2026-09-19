@@ -7,13 +7,15 @@ import type { Finding } from '../../types/crypto';
 const denseFindings: Finding[] = [];
 for (let i = 0; i < 125; i++) {
   mockFindings.forEach((base, idx) => {
+    // mockFindings fixtures are always fully scored -- base.risk! is safe here.
+    const baseRisk = base.risk!;
     denseFindings.push({
       ...base,
       id: `f-dense-${i * 8 + idx}`,
       risk: {
-        ...base.risk,
-        X: Math.max(1, (base.risk.X + i) % 25),
-        Y: Math.max(1, (base.risk.Y + i * 2) % 15),
+        ...baseRisk,
+        X: Math.max(1, (baseRisk.X + i) % 25),
+        Y: Math.max(1, (baseRisk.Y + i * 2) % 15),
       },
     });
   });

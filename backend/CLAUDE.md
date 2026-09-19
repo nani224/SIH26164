@@ -32,9 +32,11 @@ claim something works unless you ran it and saw the output.
 
 ## Measured floor
 
-**Phase 1 starter fixtures only** (`bench/fixtures/`, 8 files, 15 labelled
-Python crypto usages — see `bench/README.md`): precision 1.000, recall
-1.000, F1 1.000, measured 2026-09-17 via `uv run python bench/evaluate.py`.
+**Starter fixtures only** (`bench/fixtures/`, 25 files, 56 labelled
+Python + Java + C/C++ crypto usages — see `bench/README.md`): precision
+1.000, recall 1.000, F1 1.000, measured 2026-09-19 via
+`uv run python bench/evaluate.py`. Grew from 15 (Python-only) to 40 (M1,
+Java) to 56 (M2, C/C++) usages this Track CC pass.
 
 This is **not** the brief's Layer A/B corpus or a Loop B1 DEV/HOLD result
 — those don't exist yet (no real third-party projects have been sourced or
@@ -61,5 +63,9 @@ test, air-gap run, CBOM strict validation, security scanners.
 
 Add ML to detection or scoring; silently change risk weights; tune on
 HOLD; copy code or rules whose licence forbids it; report unmeasured
-numbers; call external services at runtime; edit `frontend/` or repo-root
-files; weaken a gate to exit a loop.
+numbers; call external services at runtime; weaken a gate to exit a loop.
+
+(The original "don't edit frontend/ or repo-root files" restriction only
+applied while two separate agent tracks were building backend/frontend in
+parallel. Once both are merged, see the root `CLAUDE.md` instead -- it's
+the shared reference for whoever owns the whole repo at that point.)

@@ -51,10 +51,14 @@ export default function OverviewPage() {
   const findings = useMemo(() => findingsData?.items ?? [], [findingsData]);
 
   // Derive urgent counts
-  const hndlCount = useMemo(() => findings.filter((f) => f.risk.hndl).length, [findings]);
-  const brokenCount = useMemo(() => findings.filter((f) => f.risk.classicallyBroken).length, [findings]);
+  const hndlCount = useMemo(() => findings.filter((f) => f.risk?.hndl).length, [findings]);
+  const brokenCount = useMemo(() => findings.filter((f) => f.risk?.classicallyBroken).length, [findings]);
   const topRisks = useMemo(
-    () => [...findings].sort((a, b) => b.risk.score - a.risk.score).slice(0, 5),
+    () =>
+      findings
+        .filter((f): f is typeof f & { risk: NonNullable<(typeof f)['risk']> } => f.risk != null)
+        .sort((a, b) => b.risk.score - a.risk.score)
+        .slice(0, 5),
     [findings]
   );
 
@@ -291,7 +295,7 @@ export default function OverviewPage() {
                       </span>
                       <CryptoBadge
                         cryptoClass={classifyAlgorithm(f.family, f.displayName, f.risk.classicallyBroken)}
-                        label={f.family}
+                        label={f.family ?? undefined}
                         size="sm"
                       />
                       {f.risk.hndl && (

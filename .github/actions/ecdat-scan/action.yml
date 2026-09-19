@@ -1,0 +1,88 @@
+name: "ECDAT crypto scan"
+description: >-
+  Scans a repository for cryptographic assets, scores quantum risk (Mosca
+  formula), and blocks a PR when a finding is at or above the policy's
+  gate band. Posts a findings table as a PR comment via GITHUB_TOKEN (no
+  third-party comment action). See the root .ecdat-policy.yml in
+  nani224/SIH26164 for the policy-as-code schema.
+
+inputs:
+  scan-path:
+    description: "Directory (relative to the calling workflow's checkout) to scan"
+    required: false
+    default: "."
+  policy-file:
+    description: "Path to a .ecdat-policy.yml (relative to the calling workflow's checkout)"
+    required: false
+    default: ".ecdat-policy.yml"
+  ecdat-ref:
+    description: "Branch/tag/sha of nani224/SIH26164 to pull the scanner engine from"
+    required: false
+    default: "main"
+  github-token:
+    description: "Token used to post/update the PR findings comment (usually secrets.GITHUB_TOKEN)"
+    required: true
+
+outputs:
+  passed:
+    description: "'true' if no finding was at or above the gate band"
+    value: ${{ steps.scan.outputs.passed }}
+  finding-count:
+    description: "Total number of findings"
+    value: ${{ steps.scan.outputs.finding-count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout ECDAT scanner (nani224/SIH26164)
+      uses: actions/checkout@v4
+      with:
+        repository: nani224/SIH26164
+        ref: ${{ inputs.ecdat-ref }}
+        path: _ecdat-scanner
+        sparse-checkout: |
+          backend
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "0.8.17"
+
+    - name: Set up Python
+      shell: bash
+      run: uv python install 3.12
+      working-directory: _ecdat-scanner/backend
+
+    - name: Install ECDAT scanner dependencies
+      shell: bash
+      run: uv sync --locked
+      working-directory: _ecdat-scanner/backend
+
+    - name: Run scan + gate
+      id: scan
+      shell: bash
+      working-directory: _ecdat-scanner/backend
+      run: |
+        set +e
+        uv run python bench/ci_scan.py \
+          --path "${GITHUB_WORKSPACE}/${{ inputs.scan-path }}" \
+          --policy "${GITHUB_WORKSPACE}/${{ inputs.policy-file }}" \
+          --json-output "${GITHUB_WORKSPACE}/ecdat-findings.json" \
+          --markdown-output "${GITHUB_WORKSPACE}/ecdat-findings.md"
+        scan_exit=$?
+        finding_count=$(python3 -c "import json; print(json.load(open('${GITHUB_WORKSPACE}/ecdat-findings.json'))['findingCount'])")
+        echo "finding-count=${finding_count}" >> "$GITHUB_OUTPUT"
+        if [ "$scan_exit" -eq 0 ]; then
+          echo "passed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "passed=false" >> "$GITHUB_OUTPUT"
+        fi
+        exit "$scan_exit"
+
+    - name: Post PR comment
+      if: always()
+      shell: bash
+      working-directory: _ecdat-scanner/backend
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: uv run python bench/post_pr_comment.py --markdown-file "${GITHUB_WORKSPACE}/ecdat-findings.md"

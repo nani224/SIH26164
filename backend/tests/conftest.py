@@ -7,6 +7,9 @@ from collections.abc import Iterator
 # module load time) -- gives the whole test session one shared in-memory
 # SQLite database (see api/db.py's StaticPool handling for "sqlite://").
 os.environ.setdefault("DATABASE_URL", "sqlite://")
+# Test-only: lets tests isolate rate-limit buckets per test via
+# X-Test-Client-Id (see api/rate_limiter.py) -- never set in production.
+os.environ.setdefault("ECDAT_RATE_LIMIT_TRUST_TEST_HEADER", "1")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

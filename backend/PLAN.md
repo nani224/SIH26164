@@ -122,7 +122,12 @@ job. What's real:
       `crypto/rsa`, `crypto/ecdsa`, `crypto/aes`, `crypto/des`, `crypto/md5`, `crypto/sha1`, `crypto/sha256`, `crypto/sha512`, `crypto/hmac`, `crypto/ed25519`
 - [x] Python bare attribute reference detection: `hashlib.X` references passed to functions/variables without direct calls
 - [x] Router multi-language support in `engine/scanner.py` handling both `.py` and `.go`
-- [x] Real-world benchmark expansion in `bench/real_world/` with `go_crypto_sample.go` (precision 1.000, recall 1.000, F1 1.000 across 7 real usages)
+- [x] Real-world benchmark expansion in `bench/real_world/` with `go_crypto_sample.go` (precision 1.000, recall 1.000, F1 1.000 across 7 real usages
+      -- this was the state as of this phase; corpus grew again 2026-09-19 to
+      25 usages/5 files, which surfaced real recall gaps (0.52) this smaller
+      sample was too thin to catch. See `PROGRESS.md`'s 2026-09-19 entry and
+      `bench/real_world/README.md` for the current number -- don't quote this
+      line as current.)
 - [x] ADR 007 documented in `docs/decisions/backend/007-phase7-multi-language-detection.md`
 
 ## Phase 8 — PQC Catalog & Algorithm Agility Metrics (done, this session)
@@ -152,4 +157,69 @@ job. What's real:
 - [x] ADR 010 documented in `docs/decisions/backend/010-phase10-security-hardening.md`
 
 ## Status: All Phases 0-10 Complete!
+
+## Track CC — Detection engine, corpus, CI/CD (2026-09-19, in progress)
+
+Separate from the numbered Phases above (those were the original build;
+Track CC is the post-merge follow-on owning `engine/`, `bench/`,
+`.github/workflows/` exclusively — see root `CLAUDE.md`). Five
+dependency-ordered milestones:
+
+- [x] **M0** — Efficiency setup: root `CLAUDE.md` Track CC section,
+      `rule-author`/`bench-runner`/`corpus-labeler` subagents, `/precision`
+      command, PostToolUse ruff+mypy hook on edited `engine/`/`bench/`
+      Python files (proven to fire via a real Edit trigger before commit).
+- [x] **M1** — Java detection engine: `engine/source_java.py` +
+      `engine/queries/java_crypto.scm`. JCA/JCE (`Cipher`,
+      `KeyPairGenerator`/`KeyGenerator` w/ initialize-linkage,
+      `MessageDigest`, `Signature`, `KeyAgreement`, `Mac`, `SSLContext`,
+      `KeyStore`, `SecretKeySpec`) + direct BouncyCastle class usage. 9
+      fixture files, 25 new truth entries (Layer A: 15 -> 40 usages,
+      still 1.0/1.0). See ADR 013 and 2026-09-19 PROGRESS.md entry for
+      full command output.
+- [x] **M2** — C/C++ detection: `engine/source_c.py` +
+      `engine/queries/c_crypto.scm`. OpenSSL 3.x `EVP_CIPHER_fetch`/
+      `EVP_MD_fetch` + `EVP_PKEY_CTX_set_rsa_keygen_bits`/
+      `_set_ec_paramgen_curve_nid` + pre-3.0 zero-arg algorithm getters;
+      mbedTLS (`mbedtls_aes_setkey_*`, `_starts` digests, `rsa_gen_key`,
+      `ecdsa_genkey`, `gcm_setkey`); wolfSSL (`wc_AesSetKey`,
+      `wc_Des3_SetKey`, `wc_MakeRsaKey`, `wc_ecc_make_key`, `wc_*Hash`,
+      `wc_HmacSetKey`). Confirmed existing binary AES S-box detection
+      still works (and added its first-ever regression test — it had
+      none). 8 fixture files (16 usages, incl. one `.cpp`), Layer A:
+      40 -> 56 usages, still 1.0/1.0. See ADR 014 and 2026-09-19
+      PROGRESS.md entry for full command output.
+- [x] **M3** (partial, honestly not at target) — Grew HOLD corpus
+      (`bench/real_world/`) from 5 files/25 usages/2 languages to 9
+      files/32 usages/4 languages (added Java + C), strict label-before-
+      run order via 4 fresh `corpus-labeler` subagent dispatches, labels
+      committed alone before the detector ever ran against them. The
+      resulting real run caught a genuine precision-floor violation
+      (0.8889 < 0.95, OpenSSL `EVP_CIPHER_fetch` heuristic) -- fixed
+      same-session (ADR 015), re-measured: precision 1.0, recall 0.625
+      (up from 0.52). Still far short of the 150-usage target -- see
+      2026-09-19 PROGRESS.md entry and `bench/real_world/README.md` for
+      full numbers and remaining gaps.
+- [x] **M4** — Clustered M3's 12 false negatives by root cause (8 in
+      pyjwt's `key.sign()`/`key.verify()`, 4 in Go's bare function-value
+      references + generic `cipher.Block` interface). Fixed the largest
+      (pyjwt, 8): resolved `key`'s family from the enclosing function's
+      own parameter type annotation (`key: RSAPrivateKey`, a real static
+      fact, not dataflow) -- 6/8 closed, 2 deliberately left unresolved
+      (project-specific type alias; call on a local var, not a
+      parameter). Recall 0.625 -> 0.8125, precision held at 1.0, Layer A
+      unaffected (56/56). See ADR 016 and 2026-09-19 PROGRESS.md entry.
+      Go's 4-FN cluster untouched -- next candidate, not attempted this
+      pass.
+- [~] **M5** (partial) — Built and locally-verified: `.ecdat-policy.yml`
+      policy-as-code, `backend/bench/check_precision_floor.py` wired into
+      `backend-ci.yml` as a real CI gate, `backend/bench/ci_scan.py`
+      (verified end-to-end against a real RSA-1024 sample: correctly
+      blocks, exit 1), `backend/bench/post_pr_comment.py` (GITHUB_TOKEN,
+      no third-party action), `.github/actions/ecdat-scan/action.yml` +
+      `.github/workflows/ecdat-scan-reusable.yml`. 11 new tests, full
+      gates green. **Not done**: the real deliberately-vulnerable demo
+      repo + real blocked PR -- needs a new external GitHub repository,
+      flagged to the user for authorization rather than created
+      unilaterally (see ADR 017 and 2026-09-19 PROGRESS.md entry).
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.

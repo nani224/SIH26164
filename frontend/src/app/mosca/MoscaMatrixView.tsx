@@ -36,6 +36,13 @@ export function MoscaMatrixView({
   const [crqcZ, setCrqcZ] = useState<number>(initialZ);
   const [hoveredFinding, setHoveredFinding] = useState<Finding | null>(null);
 
+  // risk is nullable per contract (an unscored finding); this matrix plots
+  // by risk score/band, so unscored findings have nothing to plot.
+  const scoredFindings = useMemo(
+    () => findings.filter((f): f is Finding & { risk: NonNullable<Finding['risk']> } => f.risk != null),
+    [findings]
+  );
+
   // Server-driven re-scoring state (ZERO local formula calculation)
   const [serverBands, setServerBands] = useState<RiskBands | null>(null);
   const [changedFindingsList, setChangedFindingsList] = useState<
@@ -59,7 +66,26 @@ export function MoscaMatrixView({
     },
     onSuccess: (data) => {
       setServerBands(data.bands);
-      setChangedFindingsList(data.changedFindings);
+      // `data.changed` (contract shape) only carries the NEW state. The
+      // `findings` prop is the pre-rescore snapshot (fetched once, not
+      // re-fetched on rescore), so it's the source of the "previous" side
+      // of the diff -- never derive both sides from the same response.
+      const previousById = new Map(scoredFindings.map((f) => [f.id, f]));
+      setChangedFindingsList(
+        data.changed
+          .filter((f): f is Finding & { risk: NonNullable<Finding['risk']> } => f.risk != null)
+          .map((f) => {
+            const previous = previousById.get(f.id);
+            return {
+              id: f.id,
+              displayName: f.displayName,
+              previousBand: previous?.risk.band ?? f.risk.band,
+              newBand: f.risk.band,
+              previousScore: previous?.risk.score ?? f.risk.score,
+              newScore: f.risk.score,
+            };
+          })
+      );
     },
   });
 
@@ -75,7 +101,7 @@ export function MoscaMatrixView({
   const currentFindings = useMemo(() => {
     const changeMap = new Map(changedFindingsList.map((c) => [c.id, c]));
 
-    return findings.map((f) => {
+    return scoredFindings.map((f) => {
       const change = changeMap.get(f.id);
       const score = change ? change.newScore : f.risk.score;
       const band = change ? change.newBand : f.risk.band;
@@ -86,15 +112,15 @@ export function MoscaMatrixView({
         calculatedBand: band,
       };
     });
-  }, [findings, changedFindingsList]);
+  }, [scoredFindings, changedFindingsList]);
 
   // Derive band counts from server response or fallback to findings
   const bands = useMemo(() => {
     if (serverBands) return serverBands;
     const counts = { critical: 0, high: 0, medium: 0, low: 0 };
-    findings.forEach((f) => counts[f.risk.band]++);
+    scoredFindings.forEach((f) => counts[f.risk.band]++);
     return counts;
-  }, [findings, serverBands]);
+  }, [scoredFindings, serverBands]);
 
   // Matrix dimensions for SVG scatter plot
   const width = 800;
