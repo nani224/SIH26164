@@ -11,12 +11,38 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlmodel import select
+from sqlmodel import col, select
 
 from api import db, stub_data
-from api.db_models import FindingRecord, PolicyRecord, ScanEventRecord, ScanRecord
+from api.db_models import (
+    AlertRecord,
+    FindingRecord,
+    PolicyRecord,
+    ProbeResultRecord,
+    ScanEventRecord,
+    ScanRecord,
+    ScanSnapshotRecord,
+    TargetRecord,
+)
 from api.filtering import band_counts
-from api.models import Finding, Policy, Scan, ScanCreate, ScanStatus
+from api.models import (
+    Alert,
+    Drift,
+    DriftChangedItem,
+    DriftSummary,
+    Finding,
+    Policy,
+    ProbeResult,
+    RiskBand,
+    Scan,
+    ScanCreate,
+    ScanSnapshot,
+    ScanStats,
+    ScanStatus,
+    Target,
+    TargetCreate,
+    TargetPatch,
+)
 from engine.models import ScanResult
 
 
@@ -228,15 +254,48 @@ def rescore_scan_findings(
         FROM banded
         WHERE findings.id = banded.id
           AND (ABS(findings.risk_score - banded.new_score) > 1e-6 OR findings.risk_band != banded.new_band)
-        RETURNING
-            findings.id, findings.family, findings.display_name, findings.kind, findings.surface, findings.function,
-            findings.location_path, findings.location_line,
-            findings.risk_score, findings.risk_band, findings.risk_v, findings.risk_f, findings.risk_u,
-            findings.risk_e, findings.risk_k, findings.risk_x, findings.risk_y, findings.risk_z,
-            findings.risk_mosca_margin, findings.risk_reason, findings.risk_hndl, findings.risk_needs_review
+        RETURNING json_object(
+            'id', findings.id,
+            'family', findings.family,
+            'displayName', findings.display_name,
+            'kind', findings.kind,
+            'surface', findings.surface,
+            'function', findings.function,
+            'keySize', findings.key_size,
+            'mode', findings.mode,
+            'curve', findings.curve,
+            'location', json_object(
+                'path', findings.location_path,
+                'line', findings.location_line,
+                'offset', findings.location_offset,
+                'layer', findings.location_layer
+            ),
+            'symbol', findings.symbol,
+            'snippet', findings.snippet,
+            'source', findings.source,
+            'confidence', findings.confidence,
+            'risk', json_object(
+                'score', findings.risk_score,
+                'band', findings.risk_band,
+                'V', findings.risk_v,
+                'F', findings.risk_f,
+                'U', findings.risk_u,
+                'E', findings.risk_e,
+                'K', findings.risk_k,
+                'X', findings.risk_x,
+                'Y', findings.risk_y,
+                'Z', findings.risk_z,
+                'moscaMargin', findings.risk_mosca_margin,
+                'reason', findings.risk_reason,
+                'classicallyBroken', json('false'),
+                'hndl', case when findings.risk_hndl = 1 then json('true') else json('false') end,
+                'needsReview', case when findings.risk_needs_review = 1 then json('true') else json('false') end
+            ),
+            'triage', json_object('status', 'open', 'note', null)
+        )
         """
         cur.execute(sql, (scan_id,))
-        changed_rows = cur.fetchall()
+        changed_json_strings = [r[0] for r in cur.fetchall()]
 
         cur.execute(f"SELECT risk_band, COUNT(*) FROM findings WHERE scan_id = {ph} GROUP BY risk_band", (scan_id,))
         band_rows = cur.fetchall()
@@ -257,52 +316,280 @@ def rescore_scan_findings(
             action="scan.rescore",
             entity_type="scan",
             entity_id=scan_id,
-            detail={"crqc_years": crqc_years, "rescored": total_rows_rescored, "changed": len(changed_rows)},
+            detail={"crqc_years": crqc_years, "rescored": total_rows_rescored, "changed": len(changed_json_strings)},
         )
         session.commit()
 
         c, h, m, l_cnt = bands["critical"], bands["high"], bands["medium"], bands["low"]
         bands_json = f'{{"critical":{c},"high":{h},"medium":{m},"low":{l_cnt}}}'
-        if not changed_rows:
+        if not changed_json_strings:
             content_bytes = f'{{"bands":{bands_json},"changed":[]}}'.encode()
         else:
-            tmpl = (
-                '{"id":"%s","family":"%s","displayName":"%s","kind":"%s","surface":"%s","function":"%s",'
-                '"keySize":null,"mode":null,"curve":null,'
-                '"location":{"path":"%s","line":%s,"offset":null,"layer":null},'
-                '"symbol":"CRYPTO_SYM","snippet":"crypto_call()","source":"ast","confidence":0.95,'
-                '"risk":{"score":%s,"band":"%s","V":%s,"F":%s,"U":%s,"E":%s,"K":%s,"X":%s,"Y":%s,"Z":%s,'
-                '"moscaMargin":%s,"reason":"%s","classicallyBroken":false,"hndl":%s,"needsReview":%s},'
-                '"triage":{"status":"open","note":null}}'
-            )
-            items = [
-                tmpl % (
-                    r[0],
-                    r[1],
-                    r[2],
-                    r[3],
-                    r[4],
-                    r[5],
-                    r[6].replace("\\", "/").replace('"', '\\"'),
-                    str(r[7]) if r[7] is not None else "null",
-                    str(r[8]),
-                    r[9],
-                    str(r[10]),
-                    str(r[11]),
-                    str(r[12]),
-                    str(r[13]),
-                    str(r[14]),
-                    str(r[15]),
-                    str(r[16]),
-                    str(r[17]),
-                    str(r[18]),
-                    (r[19] or "").replace('"', '\\"'),
-                    "true" if r[20] else "false",
-                    "true" if r[21] else "false",
-                )
-                for r in changed_rows
-            ]
-            joined = ",".join(items)
+            joined = ",".join(changed_json_strings)
             content_bytes = f'{{"bands":{bands_json},"changed":[{joined}]}}'.encode()
 
         return bands, content_bytes
+
+
+# --- Targets ---------------------------------------------------------------------
+
+def create_target(payload: TargetCreate) -> Target:
+    target_id = f"target_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    target = Target(
+        id=target_id,
+        name=payload.name,
+        kind=payload.kind,
+        uri=payload.uri,
+        policyId=payload.policyId,
+        schedule=payload.schedule,
+        enabled=payload.enabled,
+        lastScanId=None,
+        lastScanAt=None,
+        createdAt=now,
+    )
+    with db.session_scope() as session:
+        session.add(db.target_to_record(target))
+        db.log_audit(
+            session,
+            action="target.create",
+            entity_type="target",
+            entity_id=target.id,
+            detail={"name": target.name},
+        )
+        session.commit()
+    return target
+
+
+def get_target(target_id: str) -> Target | None:
+    with db.session_scope() as session:
+        rec = session.get(TargetRecord, target_id)
+        return db.record_to_target(rec) if rec is not None else None
+
+
+def list_targets() -> list[Target]:
+    with db.session_scope() as session:
+        records = session.exec(select(TargetRecord)).all()
+        return [db.record_to_target(r) for r in records]
+
+
+def patch_target(target_id: str, patch: TargetPatch) -> Target | None:
+    with db.session_scope() as session:
+        rec = session.get(TargetRecord, target_id)
+        if rec is None:
+            return None
+        if patch.name is not None:
+            rec.name = patch.name
+        if patch.policyId is not None:
+            rec.policy_id = patch.policyId
+        if patch.schedule is not None:
+            rec.schedule = patch.schedule
+        if patch.enabled is not None:
+            rec.enabled = patch.enabled
+        session.add(rec)
+        db.log_audit(session, action="target.patch", entity_type="target", entity_id=target_id)
+        session.commit()
+        return db.record_to_target(rec)
+
+
+def delete_target(target_id: str) -> bool:
+    with db.session_scope() as session:
+        rec = session.get(TargetRecord, target_id)
+        if rec is None:
+            return False
+        session.delete(rec)
+        db.log_audit(session, action="target.delete", entity_type="target", entity_id=target_id)
+        session.commit()
+        return True
+
+
+def update_target_last_scan(target_id: str, scan_id: str, scan_at: datetime) -> None:
+    with db.session_scope() as session:
+        rec = session.get(TargetRecord, target_id)
+        if rec is not None:
+            rec.last_scan_id = scan_id
+            rec.last_scan_at = scan_at
+            session.add(rec)
+            session.commit()
+
+
+# --- Snapshots -------------------------------------------------------------------
+
+def create_snapshot(target_id: str, scan: Scan, findings: list[Finding]) -> ScanSnapshot:
+    snapshot_id = f"snap_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    stats = scan.stats or ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0)
+    snapshot = ScanSnapshot(
+        id=snapshot_id,
+        targetId=target_id,
+        scanId=scan.id,
+        takenAt=now,
+        bands=scan.bands.model_dump(),
+        totalFindings=len(findings),
+        stats=stats,
+    )
+    with db.session_scope() as session:
+        session.add(db.snapshot_to_record(snapshot))
+        db.log_audit(
+            session,
+            action="snapshot.create",
+            entity_type="snapshot",
+            entity_id=snapshot.id,
+            detail={"targetId": target_id, "scanId": scan.id},
+        )
+        session.commit()
+    return snapshot
+
+
+def get_snapshot(snapshot_id: str) -> ScanSnapshot | None:
+    with db.session_scope() as session:
+        rec = session.get(ScanSnapshotRecord, snapshot_id)
+        return db.record_to_snapshot(rec) if rec is not None else None
+
+
+def list_snapshots(target_id: str) -> list[ScanSnapshot]:
+    with db.session_scope() as session:
+        records = session.exec(
+            select(ScanSnapshotRecord)
+            .where(ScanSnapshotRecord.target_id == target_id)
+            .order_by(col(ScanSnapshotRecord.taken_at).desc())
+        ).all()
+        return [db.record_to_snapshot(r) for r in records]
+
+
+# --- Drift Engine ----------------------------------------------------------------
+
+def _finding_identity(f: Finding) -> tuple[str, str, str | None, str, str, int | None, str | None]:
+    """Stable cryptographic identity: location path, displayName, family, function, symbol, keySize, curve."""
+    return (
+        f.location.path,
+        f.displayName,
+        f.family.value if f.family else None,
+        f.function.value,
+        f.symbol,
+        f.keySize,
+        f.curve,
+    )
+
+
+def calculate_drift(target_id: str, from_snapshot_id: str, to_snapshot_id: str) -> Drift | None:
+    from_snap = get_snapshot(from_snapshot_id)
+    to_snap = get_snapshot(to_snapshot_id)
+    if from_snap is None or to_snap is None:
+        return None
+    if from_snap.targetId != target_id or to_snap.targetId != target_id:
+        return None
+
+    from_findings = list_findings(from_snap.scanId)
+    to_findings = list_findings(to_snap.scanId)
+
+    from_map: dict[tuple[str, str, str | None, str, str, int | None, str | None], Finding] = {
+        _finding_identity(f): f for f in from_findings
+    }
+    to_map: dict[tuple[str, str, str | None, str, str, int | None, str | None], Finding] = {
+        _finding_identity(f): f for f in to_findings
+    }
+
+    added: list[Finding] = []
+    resolved: list[Finding] = []
+    changed: list[DriftChangedItem] = []
+
+    for key, f_to in to_map.items():
+        if key not in from_map:
+            added.append(f_to)
+        else:
+            f_from = from_map[key]
+            band_from = f_from.risk.band if f_from.risk else RiskBand.LOW
+            band_to = f_to.risk.band if f_to.risk else RiskBand.LOW
+            if band_from != band_to:
+                changed.append(DriftChangedItem(finding=f_to, fromBand=band_from, toBand=band_to))
+
+    for key, f_from in from_map.items():
+        if key not in to_map:
+            resolved.append(f_from)
+
+    risk_to = sum(f.risk.score for f in to_findings if f.risk)
+    risk_from = sum(f.risk.score for f in from_findings if f.risk)
+    net_risk_delta = round(risk_to - risk_from, 2)
+
+    summary = DriftSummary(
+        addedCount=len(added),
+        resolvedCount=len(resolved),
+        changedCount=len(changed),
+        netRiskDelta=net_risk_delta,
+    )
+
+    return Drift(
+        targetId=target_id,
+        fromSnapshotId=from_snapshot_id,
+        toSnapshotId=to_snapshot_id,
+        added=added,
+        resolved=resolved,
+        changed=changed,
+        summary=summary,
+    )
+
+
+# --- Alerts ----------------------------------------------------------------------
+
+def create_alert(alert: Alert) -> Alert:
+    with db.session_scope() as session:
+        session.add(db.alert_to_record(alert))
+        db.log_audit(
+            session,
+            action="alert.create",
+            entity_type="alert",
+            entity_id=alert.id,
+            detail={"type": alert.type.value, "severity": alert.severity.value},
+        )
+        session.commit()
+    return alert
+
+
+def list_alerts(acknowledged: bool | None = None) -> list[Alert]:
+    with db.session_scope() as session:
+        query = select(AlertRecord)
+        if acknowledged is not None:
+            query = query.where(AlertRecord.acknowledged == acknowledged)
+        query = query.order_by(col(AlertRecord.created_at).desc())
+        records = session.exec(query).all()
+        return [db.record_to_alert(r) for r in records]
+
+
+def acknowledge_alert(alert_id: str) -> Alert | None:
+    with db.session_scope() as session:
+        rec = session.get(AlertRecord, alert_id)
+        if rec is None:
+            return None
+        rec.acknowledged = True
+        session.add(rec)
+        db.log_audit(session, action="alert.acknowledge", entity_type="alert", entity_id=alert_id)
+        session.commit()
+        return db.record_to_alert(rec)
+
+
+# --- Probes ----------------------------------------------------------------------
+
+def create_probe_result(result: ProbeResult) -> ProbeResult:
+    with db.session_scope() as session:
+        session.add(db.probe_result_to_record(result))
+        db.log_audit(
+            session,
+            action="probe.create",
+            entity_type="probe",
+            entity_id=result.id,
+            detail={"protocol": result.protocol.value, "targetId": result.targetId},
+        )
+        session.commit()
+    return result
+
+
+def list_probe_results(target_id: str | None = None) -> list[ProbeResult]:
+    with db.session_scope() as session:
+        query = select(ProbeResultRecord)
+        if target_id is not None:
+            query = query.where(ProbeResultRecord.target_id == target_id)
+        query = query.order_by(col(ProbeResultRecord.probed_at).desc())
+        records = session.exec(query).all()
+        return [db.record_to_probe_result(r) for r in records]
+

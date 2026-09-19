@@ -14,6 +14,10 @@ dependencies = [
     "sqlmodel>=0.0.42",
     "python-multipart>=0.0.32",
     "tree-sitter-go>=0.25.0",
+    "apscheduler>=3.10.0",
+    "sslyze>=6.3.0",
+    "ssh-audit>=3.3.0",
+    "python-pkcs11>=0.7.0",
 ]
 
 [dependency-groups]
@@ -55,4 +59,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["engine", "api", "scripts", "bench"]
+packages = ["engine", "api", "scripts", "bench", "scheduler", "probes"]
