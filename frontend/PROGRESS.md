@@ -72,3 +72,29 @@
 - Verified `/mosca` route bundle size: 5.0 kB route JS, 112 kB First Load JS (budget <= 250 kB).
 - Test results: `pnpm test:unit` (7/7 passed), `pnpm test:e2e` (6/6 passed).
 
+## 2026-09-19 — Session 3: Phase 0 Pre-Flight Audit & Baseline Verification
+
+### 1. Autonomous Branch & Guardrail Conformance
+- Checked out and verified working branch: `feature/a2-frontend`.
+- Verified repository boundary lockout: zero writes to `backend/**`, `.github/workflows/**`, or `contracts/openapi.yaml`.
+- Purity Guard Checks executed:
+  - Cryptographic Risk Score Purity: `! grep -riE "(snooper|grover|shor).*(score|\*|\+)" frontend/src/` -> 0 violations.
+  - Direct Mock Imports Check: All screens strictly consume data via TanStack Query hooks; zero mock imports in `frontend/src/app/**`.
+  - Offline Air-Gap Enforcement: All fonts and assets bundled locally, zero external CDN requests.
+
+### 2. Pre-Flight Quality Gates (All Passed with Exit Code 0)
+- `pnpm typecheck`: Exit code 0 (0 errors).
+- `pnpm lint`: Exit code 0 (0 ESLint warnings/errors).
+- `pnpm knip`: Exit code 0 (0 unused dependencies, files, or exports).
+- `pnpm vitest run`: Exit code 0 (10 test files passed, 37/37 unit & accessibility tests passed).
+- `pnpm playwright test`: Exit code 0 (24/24 E2E tests passed):
+  - `all-screens.spec.ts`: All 10 screens verified with axe-core a11y in Dark & Light modes, ⌘K command palette, CLS budget < 0.1, multi-viewport snapshots.
+  - `gates-verification.spec.ts`:
+    - GATE 3.1: The One-Flag MSW Switch Test (MSW Off & No Backend) -> PASSED across all 9 target screens.
+    - GATE 3.2: Cross-Screen Semantic Risk Color Consistency (Shor, Broken, Grover, Classical Safe, PQC) -> PASSED.
+    - GATE 3.3: Estate Graph Performance Profile at 5,000 Nodes -> PASSED (61.4 FPS benchmark).
+  - `mosca-matrix.spec.ts`: Flow test ($Z$ horizon re-score with stationary classically broken assets), keyboard-only walkthrough, axe-core a11y, multi-viewport visual QA, CLS measurement -> PASSED.
+  - `finale-integration.spec.ts`: Complete end-to-end integration test (upload -> live stages -> overview -> rescore -> triage -> CBOM -> 2D graph) in both Dark and Light themes -> PASSED.
+- `pnpm build`: Exit code 0 (All 14 static routes prerendered, all bundles within budget).
+
+
