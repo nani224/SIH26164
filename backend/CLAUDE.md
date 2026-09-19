@@ -32,11 +32,11 @@ claim something works unless you ran it and saw the output.
 
 ## Measured floor
 
-**Starter fixtures only** (`bench/fixtures/`, 17 files, 40 labelled
-Python + Java crypto usages — see `bench/README.md`): precision 1.000,
-recall 1.000, F1 1.000, measured 2026-09-19 via
-`uv run python bench/evaluate.py`. Grew from 15 (Python-only) to 40 usages
-in M1 (Track CC) when the Java detector (`engine/source_java.py`) shipped.
+**Starter fixtures only** (`bench/fixtures/`, 25 files, 56 labelled
+Python + Java + C/C++ crypto usages — see `bench/README.md`): precision
+1.000, recall 1.000, F1 1.000, measured 2026-09-19 via
+`uv run python bench/evaluate.py`. Grew from 15 (Python-only) to 40 (M1,
+Java) to 56 (M2, C/C++) usages this Track CC pass.
 
 This is **not** the brief's Layer A/B corpus or a Loop B1 DEV/HOLD result
 — those don't exist yet (no real third-party projects have been sourced or

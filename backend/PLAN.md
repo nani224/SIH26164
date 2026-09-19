@@ -177,9 +177,18 @@ dependency-ordered milestones:
       fixture files, 25 new truth entries (Layer A: 15 -> 40 usages,
       still 1.0/1.0). See ADR 013 and 2026-09-19 PROGRESS.md entry for
       full command output.
-- [ ] **M2** — C/C++ hardening: OpenSSL 3.x `EVP_*_fetch` modern API,
-      mbedTLS `mbedtls_*`, wolfSSL `wc_*`; confirm existing
-      binary/vendored-constant detection still works. Not started.
+- [x] **M2** — C/C++ detection: `engine/source_c.py` +
+      `engine/queries/c_crypto.scm`. OpenSSL 3.x `EVP_CIPHER_fetch`/
+      `EVP_MD_fetch` + `EVP_PKEY_CTX_set_rsa_keygen_bits`/
+      `_set_ec_paramgen_curve_nid` + pre-3.0 zero-arg algorithm getters;
+      mbedTLS (`mbedtls_aes_setkey_*`, `_starts` digests, `rsa_gen_key`,
+      `ecdsa_genkey`, `gcm_setkey`); wolfSSL (`wc_AesSetKey`,
+      `wc_Des3_SetKey`, `wc_MakeRsaKey`, `wc_ecc_make_key`, `wc_*Hash`,
+      `wc_HmacSetKey`). Confirmed existing binary AES S-box detection
+      still works (and added its first-ever regression test — it had
+      none). 8 fixture files (16 usages, incl. one `.cpp`), Layer A:
+      40 -> 56 usages, still 1.0/1.0. See ADR 014 and 2026-09-19
+      PROGRESS.md entry for full command output.
 - [ ] **M3** — Grow HOLD corpus (`bench/real_world/`) to ~150 usages
       across 4 languages (label-before-run, labels committed alone
       first). Not started.

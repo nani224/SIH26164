@@ -8,12 +8,12 @@ def test_bench_starter_fixtures_are_fully_detected() -> None:
 
     Not the brief's Layer A/B corpus (see bench/README.md) -- just the
     small hand-built set that exists today. Grew from 15 (Python-only) to
-    40 (added a Java fixture set, M1 Track CC) usages this pass; still
-    fully detected.
+    40 (Java, M1) to 56 (C/C++, M2) usages across sessions; still fully
+    detected.
     """
     result = evaluate()
     assert result["precision"] == 1.0
     assert result["recall"] == 1.0
     assert result["false_positives"] == []
     assert result["false_negatives"] == []
-    assert result["truth_count"] == 40
+    assert result["truth_count"] == 56

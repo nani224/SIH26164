@@ -31,13 +31,14 @@ from api.models import (
     Surface,
     Triage,
 )
-from engine import source_go, source_java, source_python
+from engine import source_c, source_go, source_java, source_python
 from engine.factors import derive_risk
 from engine.models import Detection, ScanResult
 from engine.recommend import recommend
 
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".mypy_cache", ".ruff_cache"}
-_SOURCE_EXTENSIONS = {".py", ".go", ".java", ".bin", ".elf", ".so"}
+_C_FAMILY_EXTENSIONS = {".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hxx"}
+_SOURCE_EXTENSIONS = {".py", ".go", ".java", ".bin", ".elf", ".so"} | _C_FAMILY_EXTENSIONS
 # Per-file cap: engine/ingest.py bounds the whole archive (5 GB uncompressed,
 # 50k files), but nothing previously bounded a single pathological file --
 # one huge source/binary file could still exhaust memory since read_bytes()
@@ -84,7 +85,10 @@ def _iter_source_files(target: Path) -> list[Path]:
     if target.is_file():
         return [target] if target.suffix in _SOURCE_EXTENSIONS else []
     files: list[Path] = []
-    for ext in ("*.py", "*.go", "*.java", "*.bin", "*.elf", "*.so"):
+    extensions = ("*.py", "*.go", "*.java", "*.bin", "*.elf", "*.so") + tuple(
+        f"*{ext}" for ext in sorted(_C_FAMILY_EXTENSIONS)
+    )
+    for ext in extensions:
         files.extend(target.rglob(ext))
     return [
         p
@@ -149,6 +153,8 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
             detections = source_go.detect_code(source, rel_path)
         elif file_path.suffix == ".java":
             detections = source_java.detect_code(source, rel_path)
+        elif file_path.suffix in _C_FAMILY_EXTENSIONS:
+            detections = source_c.detect_code(source, rel_path)
         elif file_path.suffix in {".bin", ".elf", ".so"}:
             detections = _detect_binary(source, rel_path)
         else:

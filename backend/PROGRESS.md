@@ -1,5 +1,81 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Track CC M2: C/C++ detection engine
+
+New `engine/source_c.py` (`tree-sitter-c==0.24.2`, MIT, confirmed pinnable
+before writing rules; `tree-sitter-cpp` was also test-installed then
+removed -- a real test proved the plain C grammar already parses the
+plain-function-call patterns these libraries use even inside a `.cpp`
+file with `class`/access-specifier syntax it doesn't understand, so a
+second grammar bought nothing). Covers OpenSSL 3.x `EVP_CIPHER_fetch`/
+`EVP_MD_fetch` (algorithm-string parsing) + `EVP_PKEY_CTX_set_rsa_keygen_bits`/
+`_set_ec_paramgen_curve_nid`, the pre-3.0 zero-arg algorithm getters
+(`EVP_aes_256_gcm()`, `EVP_sha256()`, ...) -- a deliberate scope expansion
+beyond the brief's literal wording since real C code still mostly uses
+these, not `*_fetch` -- mbedTLS (`mbedtls_aes_setkey_enc/dec`,
+`mbedtls_{sha256,sha1,md5}_starts`, `mbedtls_rsa_gen_key`,
+`mbedtls_ecdsa_genkey`, `mbedtls_gcm_setkey`), and wolfSSL
+(`wc_AesSetKey`, `wc_Des3_SetKey`, `wc_MakeRsaKey`, `wc_ecc_make_key`,
+`wc_{Sha256,Sha,Md5}Hash`, `wc_HmacSetKey`). See
+`docs/decisions/backend/014-c-cpp-detection-engine.md` for the exact
+mapping and two things caught during development, not after:
+
+1. wolfSSL's `wc_AesSetKey`/`wc_ecc_make_key` pass key size in **bytes**,
+   unlike OpenSSL/mbedTLS's bits -- handled with an explicit x8
+   conversion so `Detection.key_size` means the same thing everywhere.
+2. A real substring-matching bug in the HMAC underlying-hash lookup
+   (`WC_SHA256` was matching the generic `"SHA"` key before reaching
+   `"SHA256"`, misclassifying every SHA-2/3 HMAC as SHA-1) -- caught by
+   direct manual testing *before* fixtures were written, fixed by
+   matching digest names longest-first, and locked down with a named
+   regression test (`test_wolfssl_hmac_underlying_hash_not_confused_by_substring`).
+
+Also closed a real pre-existing gap unrelated to this milestone's own
+code: the binary AES S-box constant detector
+(`engine/scanner.py::_detect_binary`, live since Phase 7) had **zero**
+test coverage anywhere in the suite. Added
+`test_scan_binary_constant_detection_still_works_alongside_source_detectors`
+-- both to satisfy M2's explicit "binary detection still works" exit
+criterion and to close a real coverage hole that had nothing to do with
+C/C++.
+
+7 new crypto fixture files + 1 true-negative file under `bench/fixtures/`
+(16 labelled usages, incl. one `.cpp` file), 13 new unit tests in
+`tests/test_source_c.py`. Real command output:
+
+```
+$ uv run python bench/evaluate.py
+precision=1.0 recall=1.0 f1=1.0
+truth=56 detected=56 tp=56
+```
+(grew from 40 to 56 usages; still 1.0/1.0)
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 68 source files
+$ uv run pytest --cov -q
+147 passed, 4 warnings in 16.99s   (was 131 after M1; +13 test_source_c.py,
+                                     +3 scanner integration tests incl. the
+                                     binary-detection regression test,
+                                     +1 floor-count bump)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/real_world/evaluate.py
+(unchanged: precision=1.0 recall=0.52 truth=25 detected=13 -- the C/C++
+detector doesn't touch the Python/Go real-world corpus, as expected)
+```
+
+Not started this session: M3 (HOLD corpus growth to ~150 usages/4
+languages), M4 (largest false-negative cluster), M5 (CI/CD + real blocked
+PR). Known gap recorded rather than silently shipped: `mbedtls_gcm_setkey`
+only fires when its cipher-id argument's text contains `"AES"` (the
+function is generic over the underlying block cipher, and guessing wrong
+would be a false positive) -- a non-AES GCM usage via this function is a
+deliberate miss, not a bug.
+
 ## 2026-09-19 — Track CC M1: Java detection engine
 
 New `engine/source_java.py` (`tree-sitter-java==0.23.5`, MIT, confirmed

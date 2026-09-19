@@ -71,5 +71,34 @@
     {"family": "", "function": "unknown", "line": 8},
     {"family": "", "function": "unknown", "line": 9}
   ],
-  "JavaNoCrypto.java": []
+  "JavaNoCrypto.java": [],
+  "openssl_fetch.c": [
+    {"family": "AES", "function": "encrypt", "line": 4},
+    {"family": "SHA-2", "function": "digest", "line": 5}
+  ],
+  "openssl_keygen.c": [
+    {"family": "RSA", "function": "keygen", "line": 4},
+    {"family": "ECDSA", "function": "keygen", "line": 5}
+  ],
+  "openssl_legacy_getters.c": [
+    {"family": "AES", "function": "encrypt", "line": 4},
+    {"family": "3DES", "function": "encrypt", "line": 5},
+    {"family": "SHA-1", "function": "digest", "line": 6}
+  ],
+  "mbedtls_usage.c": [
+    {"family": "AES", "function": "encrypt", "line": 9},
+    {"family": "SHA-2", "function": "digest", "line": 10},
+    {"family": "RSA", "function": "keygen", "line": 11},
+    {"family": "ECDSA", "function": "keygen", "line": 12}
+  ],
+  "wolfssl_usage.c": [
+    {"family": "AES", "function": "encrypt", "line": 7},
+    {"family": "RSA", "function": "keygen", "line": 8},
+    {"family": "SHA-2", "function": "digest", "line": 9},
+    {"family": "HMAC", "function": "tag", "line": 10}
+  ],
+  "openssl_cpp_wrapper.cpp": [
+    {"family": "AES", "function": "encrypt", "line": 6}
+  ],
+  "no_crypto.c": []
 }
