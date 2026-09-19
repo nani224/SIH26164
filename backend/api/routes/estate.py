@@ -1,0 +1,103 @@
+"""Estate-wide cryptographic inventory and posture analytics endpoints."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Query
+from sqlmodel import col, select
+
+from api import db
+from api.db_models import AlertRecord, FindingRecord, ScanRecord, ScanSnapshotRecord, TargetRecord
+from api.models import EstateSummary, EstateTrend, EstateTrendPoint
+
+router = APIRouter(tags=["estate"])
+
+
+@router.get("/estate/summary", response_model=EstateSummary)
+def get_estate_summary() -> EstateSummary:
+    """Compute an estate-wide cryptographic posture and inventory summary."""
+    with db.session_scope() as session:
+        total_targets = len(session.exec(select(TargetRecord)).all())
+        total_scans = len(session.exec(select(ScanRecord)).all())
+
+        findings = session.exec(select(FindingRecord)).all()
+        total_findings = len(findings)
+
+        critical_findings = sum(
+            1 for f in findings
+            if f.risk_band == "critical" or (f.risk_score is not None and f.risk_score >= 60.0)
+        )
+
+        active_alerts = len(
+            session.exec(select(AlertRecord).where(AlertRecord.acknowledged == False)).all()  # noqa: E712
+        )
+
+        pqc_findings = sum(
+            1 for f in findings
+            if f.family in ("ML-KEM", "ML-DSA", "SLH-DSA") or (f.risk_score is not None and f.risk_score <= 15.0)
+        )
+        if total_findings == 0:
+            pqc_readiness = 100.0
+        else:
+            pqc_readiness = round(max(0.0, min(100.0, (pqc_findings / total_findings) * 100.0)), 1)
+
+        return EstateSummary(
+            totalTargets=total_targets,
+            totalScans=total_scans,
+            totalFindings=total_findings,
+            criticalFindings=critical_findings,
+            pqcReadinessScore=pqc_readiness,
+            activeAlerts=active_alerts,
+        )
+
+
+@router.get("/estate/trend", response_model=EstateTrend)
+def get_estate_trend(days: int = Query(default=30, ge=1, le=365)) -> EstateTrend:
+    """Historical estate cryptographic risk trend over the requested number of days."""
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(days=days)
+
+    with db.session_scope() as session:
+        snapshots = session.exec(
+            select(ScanSnapshotRecord)
+            .where(ScanSnapshotRecord.taken_at >= cutoff)
+            .order_by(col(ScanSnapshotRecord.taken_at).asc())
+        ).all()
+
+        # Group snapshots by YYYY-MM-DD
+        by_date: dict[str, list[ScanSnapshotRecord]] = {}
+        for s in snapshots:
+            d_str = (s.taken_at.date() if s.taken_at else now.date()).isoformat()
+            by_date.setdefault(d_str, []).append(s)
+
+        # Build day-by-day continuous trend
+        points: list[EstateTrendPoint] = []
+        for offset in range(days):
+            day_dt = (now - timedelta(days=days - 1 - offset)).date()
+            d_str = day_dt.isoformat()
+
+            day_snaps = by_date.get(d_str, [])
+            if day_snaps:
+                total_f = sum(s.total_findings for s in day_snaps) // len(day_snaps)
+                crit = sum(s.bands.get("critical", 0) for s in day_snaps) // len(day_snaps)
+                crit_weighted = sum(
+                    s.bands.get("critical", 0) * 80.0 + s.bands.get("high", 0) * 40.0
+                    for s in day_snaps
+                )
+                avg_score = round(crit_weighted / max(1, total_f), 1)
+            else:
+                total_f = 0
+                crit = 0
+                avg_score = 0.0
+
+            points.append(
+                EstateTrendPoint(
+                    date=d_str,
+                    avgRiskScore=avg_score,
+                    criticalCount=crit,
+                    totalFindings=total_f,
+                )
+            )
+
+        return EstateTrend(days=days, points=points)

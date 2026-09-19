@@ -86,6 +86,7 @@ class FindingRecord(SQLModel, table=True):
 
     triage_status: str = "open"
     triage_note: str | None = None
+    negotiated: bool | None = None
 
 
 class PolicyRecord(SQLModel, table=True):
@@ -127,3 +128,57 @@ class ScanEventRecord(SQLModel, table=True):
     type: str
     payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+class TargetRecord(SQLModel, table=True):
+    __tablename__ = "targets"
+
+    id: str = Field(primary_key=True)
+    name: str
+    kind: str  # repo, path, endpoint
+    uri: str
+    policy_id: str
+    schedule: str
+    enabled: bool = True
+    last_scan_id: str | None = None
+    last_scan_at: datetime | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class ScanSnapshotRecord(SQLModel, table=True):
+    __tablename__ = "scan_snapshots"
+
+    id: str = Field(primary_key=True)
+    target_id: str = Field(index=True)
+    scan_id: str = Field(index=True)
+    taken_at: datetime = Field(default_factory=_utcnow)
+    bands: dict[str, int] = Field(default_factory=dict, sa_column=Column(JSON))
+    total_findings: int = 0
+    stats: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+
+class AlertRecord(SQLModel, table=True):
+    __tablename__ = "alerts"
+
+    id: str = Field(primary_key=True)
+    type: str  # new-critical, cert-expiring, drift, probe-downgrade
+    target_id: str = Field(index=True)
+    finding_id: str | None = None
+    severity: str  # critical, high, medium, low
+    message: str
+    created_at: datetime = Field(default_factory=_utcnow)
+    acknowledged: bool = False
+
+
+class ProbeResultRecord(SQLModel, table=True):
+    __tablename__ = "probe_results"
+
+    id: str = Field(primary_key=True)
+    target_id: str = Field(index=True)
+    host: str
+    port: int
+    protocol: str  # tls, ssh
+    negotiated: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    supported: list[Any] = Field(default_factory=list, sa_column=Column(JSON))
+    probed_at: datetime = Field(default_factory=_utcnow)
+

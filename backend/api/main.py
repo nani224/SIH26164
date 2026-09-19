@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from api import db
 from api.rate_limiter import RateLimitMiddleware
-from api.routes import catalog, findings, health, policies, scans
+from api.routes import alerts, audit, catalog, estate, findings, health, hsm, policies, probes, scans, targets
 
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
 log = structlog.get_logger("ecdat.api")
@@ -27,14 +27,26 @@ log = structlog.get_logger("ecdat.api")
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     db.init_db()
-    log.info("ecdat_api_startup", phase="2")
-    yield
+    try:
+        from scheduler.engine import shutdown_scheduler, start_scheduler
+        start_scheduler()
+    except Exception as exc:
+        log.warning("scheduler_startup_failed", error=str(exc))
+    log.info("ecdat_api_startup", phase="v0.3")
+    try:
+        yield
+    finally:
+        try:
+            from scheduler.engine import shutdown_scheduler
+            shutdown_scheduler()
+        except Exception:
+            pass
 
 
 app = FastAPI(
     title="ECDAT API",
-    version="0.2.0-phase2",
-    description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — Phase 2 persistence.",
+    version="0.3.0",
+    description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — v0.3 Continuous Operation.",
     lifespan=lifespan,
 )
 
@@ -47,7 +59,11 @@ app.add_middleware(
 )
 app.add_middleware(RateLimitMiddleware)
 
-for router in (health.router, scans.router, findings.router, policies.router, catalog.router):
+for router in (
+    health.router, scans.router, findings.router, policies.router,
+    catalog.router, targets.router, probes.router, alerts.router,
+    hsm.router, audit.router, estate.router,
+):
     app.include_router(router, prefix="/api/v1")
 
 

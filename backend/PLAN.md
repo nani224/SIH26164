@@ -236,3 +236,57 @@ dependency-ordered milestones:
 
 Track CC v0.3 mandate (M0-M5) complete.
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.
+
+---
+
+# Track A1 — v0.3 Continuous Operation
+
+## Milestone 1 (M1) — The Contract [DONE]
+- [x] OpenAPI 3.1 contract updated with continuous operation schemas:
+      Target, ScanSnapshot, Drift, Alert, ProbeResult, HsmInventory, EstateSummary, EstateTrend, AuditVerifyResponse
+- [x] Extended `Finding` with `negotiated: boolean | null`
+- [x] Extended `Surface` enum with `hardware-hsm`
+- [x] Defined all continuous operation paths in `contracts/openapi.yaml`
+- [x] Audited `contracts/PROPOSALS.md` (RFC-001..RFC-004)
+- [x] Documented in `contracts/CHANGELOG.md`
+- [x] Validated via `test_openapi_valid.py`
+- [x] Pushed branch `feature/a1-backend`
+
+## Milestone 2 (M2) — Scheduler, Snapshots & Drift Detection [DONE]
+- [x] Add `apscheduler` dependency
+- [x] DB Models in `api/db_models.py` (`TargetRecord`, `ScanSnapshotRecord`, etc.)
+- [x] Pydantic Schemas in `api/models.py`
+- [x] In-process scheduler engine in `backend/scheduler/` (APScheduler)
+- [x] Snapshot capture upon scan completion
+- [x] Stable cryptographic identity drift engine `(location, algorithm/family, parameters)`
+- [x] Target CRUD, scan-now, snapshots, and drift routes (`api/routes/targets.py`)
+- [x] Unit and integration tests (`tests/test_targets_scheduler.py`)
+
+## Milestone 3 (M3) — Probe Test Infrastructure & Adapters [DONE]
+- [x] `docker-compose.test.yml` for local mock target containers
+- [x] In-code destination guard (`localhost`, `127.0.0.1`, test containers only) in `backend/probes/guard.py`
+- [x] `sslyze` TLS probe adapter in `backend/probes/tls.py` (maintains negotiated != supported)
+- [x] `ssh-audit` SSH probe adapter in `backend/probes/ssh.py`
+- [x] Findings reconciliation (`negotiated=true`) in `backend/probes/reconciler.py`
+- [x] Isolated probe adapter tests (`tests/test_probes_adapters.py`)
+
+## Milestone 4 (M4) — Alerts Engine & Certificate Monitor [DONE]
+- [x] Multi-rule alert engine (New Critical, Cert Expiring, Drift Critical, Probe Downgrade) in `backend/api/alerts/rules.py`
+- [x] Alert DB persistence and Slack/Discord webhook dispatcher in `backend/api/alerts/dispatcher.py`
+- [x] Routes: `GET /api/v1/alerts`, `PATCH /api/v1/alerts/{id}/acknowledge` in `backend/api/routes/alerts.py`
+- [x] Integration tests with mock webhook receiver (`tests/test_alerts_engine.py`)
+
+## Milestone 5 (M5) — SoftHSM2 & Local Registry Auditing [DONE]
+- [x] `python-pkcs11` integration with local SoftHSM2 in `backend/probes/hsm.py`
+- [x] Slot, token, and key inventory enumeration (`GET /api/v1/hsm/inventory` in `backend/api/routes/hsm.py`)
+- [x] Local container registry scanner (`localhost:5000`) in `backend/probes/registry.py`
+- [x] Integration tests (`tests/test_hsm_inventory.py`)
+
+## Milestone 6 (M6) — Hardening, Performance & Security Audit [DONE]
+- [x] Route `GET /api/v1/audit/verify` wired to hash chain verification in `backend/api/routes/audit.py`
+- [x] Estate summary & trend endpoints (`GET /api/v1/estate/summary`, `GET /api/v1/estate/trend` in `backend/api/routes/estate.py`)
+- [x] Rescore and findings query performance optimization: SQLite C-level `RETURNING json_object` (< 150ms measured, under 200ms SLA)
+- [x] Security audits: AST air-gap verification clean (`scripts/verify_airgap.py`), zero contract drift (`scripts/contract_diff.py`)
+- [x] Full regression test suite: 144/144 passed
+
+

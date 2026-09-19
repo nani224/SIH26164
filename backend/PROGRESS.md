@@ -1102,3 +1102,209 @@ None. Everything attempted this session succeeded.
 See `PLAN.md` "Next 3 tasks" (start of Phase 1: real `engine/scanner.py` +
 one detection rule with fixture/truth/test; `bench/` harness; Phase 2
 persistence wiring behind the existing contract).
+
+---
+
+## 2026-09-19 — Session (Track A1 v0.3 Continuous Operation — Milestone 1)
+
+### Status: MILESTONE 1 (M1) COMPLETE
+
+- Target Branch: `feature/a1-backend`
+- Commits:
+  - `contract: v0.3 continuous operation schema` (commit `8365b02`) pushed to `origin/feature/a1-backend`
+
+### What was completed
+1. **contracts/openapi.yaml**:
+   - Version updated to `0.3.0`.
+   - Added schemas: `TargetKind`, `Target`, `TargetCreate`, `TargetPatch`, `ScanSnapshot`, `Drift`, `DriftChangedItem`, `DriftSummary`, `Alert`, `ProbeProtocol`, `ProbeRequest`, `ProbeResult`, `HsmKey`, `HsmSlot`, `HsmInventory`, `EstateSummary`, `EstateTrendPoint`, `EstateTrend`, `AuditVerifyResponse`.
+   - Extended `Finding` with `negotiated: boolean | null`.
+   - Extended `Surface` enum with `hardware-hsm`.
+   - Added endpoints:
+     - `GET|POST /api/v1/targets`
+     - `GET|PATCH|DELETE /api/v1/targets/{id}`
+     - `POST /api/v1/targets/{id}/scan-now`
+     - `GET /api/v1/targets/{id}/snapshots`
+     - `GET /api/v1/targets/{id}/drift`
+     - `GET /api/v1/alerts`
+     - `PATCH /api/v1/alerts/{id}/acknowledge`
+     - `POST /api/v1/probes/tls`
+     - `POST /api/v1/probes/ssh`
+     - `GET /api/v1/probes`
+     - `GET /api/v1/hsm/inventory`
+     - `GET /api/v1/estate/summary`
+     - `GET /api/v1/estate/trend`
+     - `GET /api/v1/audit/verify`
+2. **contracts/PROPOSALS.md**:
+   - Audited open RFCs: RFC-001 (ACCEPTED), RFC-002 (ACCEPTED), RFC-003 (DECLINED per air-gap constraint), RFC-004 (ACCEPTED).
+3. **contracts/CHANGELOG.md**:
+   - Added `## 0.3.0-continuous-operation — 2026-09-19`.
+4. **Validation**:
+   - `uv run pytest tests/test_openapi_valid.py` -> 1 passed (OpenAPI 3.1 valid).
+   - Git push to `origin feature/a1-backend` succeeded.
+
+### Next 3 tasks
+1. Add dependencies to `backend/pyproject.toml` (`apscheduler`, `sslyze`, `ssh-audit`, `python-pkcs11`) [DONE].
+2. Milestone 2: Implement SQLModel models in `backend/api/db_models.py` and Pydantic schemas in `backend/api/models.py` [DONE].
+3. Milestone 2: Implement scheduler engine in `backend/scheduler/` and Targets / Snapshots / Drift endpoints in `backend/api/routes/targets.py` [DONE].
+
+---
+
+## 2026-09-19 — Session (Track A1 v0.3 Continuous Operation — Milestone 2)
+
+### Status: MILESTONE 2 (M2) COMPLETE
+
+### What was completed
+1. **Dependencies & Packaging**:
+   - Added `apscheduler>=3.10.0`, `sslyze>=6.3.0`, `ssh-audit>=3.3.0`, `python-pkcs11>=0.7.0` to `backend/pyproject.toml`.
+   - Registered packages `scheduler` and `probes` in hatch build targets.
+   - Synchronized dependencies cleanly with `uv sync`.
+2. **Database Models & API Schemas**:
+   - Added `TargetRecord`, `ScanSnapshotRecord`, `AlertRecord`, `ProbeResultRecord` to `backend/api/db_models.py`.
+   - Added `negotiated` field to `FindingRecord`.
+   - Added `Target`, `TargetCreate`, `TargetPatch`, `ScanSnapshot`, `Drift`, `DriftChangedItem`, `DriftSummary`, `Alert`, `ProbeResult`, `ProbeRequest`, `HsmInventory`, `EstateSummary`, `EstateTrend`, `AuditVerifyResponse` to `backend/api/models.py`.
+   - Added bidirectional record converters in `backend/api/db.py`.
+3. **In-Process Scheduler (`backend/scheduler/engine.py`)**:
+   - Zero-broker in-process `APScheduler` engine supporting standard cron (`0 0 * * *`), shorthands (`@daily`, `@hourly`), and interval triggers (`every N seconds/minutes`).
+   - Integrated with FastAPI lifespan: starts background thread on boot, shuts down on exit.
+   - Orchestrates `execute_target_scan`: runs AST detection on target path, persists scan result, automatically generates and stores `ScanSnapshot`, updates target tracking timestamps.
+4. **Target Management & Drift Endpoints (`backend/api/routes/targets.py`)**:
+   - `GET /api/v1/targets` and `POST /api/v1/targets` (201 Created).
+   - `GET /api/v1/targets/{id}`, `PATCH /api/v1/targets/{id}`, `DELETE /api/v1/targets/{id}`.
+   - `POST /api/v1/targets/{id}/scan-now`: runs immediate target scan and returns created `Scan`.
+   - `GET /api/v1/targets/{id}/snapshots`: retrieves historical snapshots.
+   - `GET /api/v1/targets/{id}/drift?from=&to=`: computes stable cryptographic identity differences partitioned into `added`, `resolved`, and `changed` (risk band transitions).
+5. **Validation**:
+   - `uv run pytest tests/test_targets_scheduler.py` -> 4 passed in 1.99s.
+   - `uv run ruff check .` -> All checks passed!
+   - `uv run mypy --strict .` -> Success: no issues found in 69 source files.
+
+### Next 3 tasks
+1. Milestone 3: Create `docker-compose.test.yml` with isolated local test containers (weak TLS 1.0, modern TLS 1.3, legacy SSH) [DONE].
+2. Milestone 3: Implement in-code destination guardrail (`localhost`, `127.0.0.1`, local test containers only) in `backend/probes/guard.py` [DONE].
+3. Milestone 3: Implement `sslyze` TLS adapter, `ssh-audit` SSH adapter, findings reconciler (`negotiated=true`), and routes [DONE].
+
+---
+
+## 2026-09-19 — Session (Track A1 v0.3 Continuous Operation — Milestone 3)
+
+### Status: MILESTONE 3 (M3) COMPLETE
+
+### What was completed
+1. **Probe Test Harness (`docker-compose.test.yml`)**:
+   - Configured `test-target-legacy-tls` (TLS 1.0/1.1, RC4/3DES/CBC, port 8443).
+   - Configured `test-target-modern-tls` (TLS 1.3 + ML-KEM hybrid, port 8444).
+   - Configured `test-target-legacy-ssh` (diffie-hellman-group1-sha1, ssh-rsa, port 2222).
+2. **In-Code Destination Guard (`backend/probes/guard.py`)**:
+   - Strictly enforces air-gap boundaries prior to any network connection.
+   - Restricts probe destinations exclusively to `localhost`, `127.0.0.1`, `::1`, and approved container names (`test-target-legacy-tls`, `test-target-modern-tls`, `test-target-legacy-ssh`).
+   - Raises `SecurityException` on any unauthorized destination (e.g. `google.com`, `8.8.8.8`).
+3. **Live Adapters & Reconciler**:
+   - `backend/probes/tls.py`: Connects via TLS socket and executes sslyze scanner to enumerate supported cipher suites. Strictly maintains semantic distinction `negotiated != supported`.
+   - `backend/probes/ssh.py`: Uses `ssh-audit` to inspect server banner and extract negotiated primitives (kex, cipher, mac, host key) vs. supported algorithm catalogs. Protected against unhandled `sys.exit` with `target_list`.
+   - `backend/probes/reconciler.py`: Correlates negotiated parameters against target finding symbols/names, updating `finding.negotiated = True`.
+4. **Probes API Routes (`backend/api/routes/probes.py`)**:
+   - `POST /api/v1/probes/tls`: Audits TLS endpoint, triggers reconciler, stores result. Rejects external endpoints with 400 Air-Gap error.
+   - `POST /api/v1/probes/ssh`: Audits SSH endpoint, triggers reconciler, stores result. Rejects external endpoints with 400 Air-Gap error.
+   - `GET /api/v1/probes`: Lists historical probe results with optional `targetId` filtering.
+5. **SQLite High-Performance Tuning**:
+   - Added `PRAGMA journal_mode = WAL`, `PRAGMA synchronous = NORMAL`, `PRAGMA cache_size = -64000`, `PRAGMA temp_store = MEMORY` on engine connect.
+   - Rescoring 10,000 findings dropped from 206ms to 83.68ms (< 200ms brief budget).
+6. **Validation**:
+   - `tests/test_probes_adapters.py` -> 7 passed in 5.56s.
+   - `tests/test_targets_scheduler.py` -> 4 passed in 1.65s.
+   - `tests/test_rescore_perf.py` -> 1 passed (83.68ms).
+   - `ruff check .` -> All checks passed!
+   - `mypy --strict .` -> Success: no issues found in 75 source files.
+
+### Next 3 tasks
+1. Milestone 4: Implement Alerts Engine (`api/alerts/rules.py` for new-critical, cert-expiring, drift, probe-downgrade) [DONE].
+2. Milestone 4: Implement Webhook Dispatcher (`api/alerts/dispatcher.py` to `ALERT_WEBHOOK_URL`) [DONE].
+3. Milestone 4: Implement Alerts API Routes (`GET /api/v1/alerts`, `PATCH /api/v1/alerts/{id}/acknowledge`) and test suite [DONE].
+
+---
+
+## 2026-09-19 — Session (Track A1 v0.3 Continuous Operation — Milestone 4)
+
+### Status: MILESTONE 4 (M4) COMPLETE
+
+### What was completed
+1. **Alert Rules Engine (`backend/api/alerts/rules.py`)**:
+   - `check_new_critical_findings`: Detects findings with `RiskBand.CRITICAL` or `score >= 60.0` on scan execution.
+   - `check_cert_expiring`: Evaluates parsed expiration timestamps against `< 30 days` horizon (assigning High or Critical severity).
+   - `check_drift_alerts`: Evaluates added critical primitives or overall net risk score regressions (`netRiskDelta > 0`).
+   - `check_probe_downgrade`: Audits negotiated cipher, protocol, and key exchange against insecure algorithm patterns (e.g. SSLv3, TLS 1.0, RC4, 3DES, DES, CBC, Diffie-Hellman Group 1).
+2. **Notification Dispatcher (`backend/api/alerts/dispatcher.py`)**:
+   - Persists all alerts to SQLite `alerts` table via `store.create_alert`.
+   - Dispatches structured Slack/Discord webhook notifications when `ALERT_WEBHOOK_URL` is set, with connection timeout and non-blocking failure tolerance.
+3. **Alerts API Routes (`backend/api/routes/alerts.py`)**:
+   - `GET /api/v1/alerts`: Returns historical/active alerts with optional `acknowledged` boolean filter.
+   - `PATCH /api/v1/alerts/{id}/acknowledge`: Updates acknowledgment status idempotently. Returns 404 for unknown alert IDs.
+4. **Integration Hooks**:
+   - Hooked `evaluate_scan_alerts` into `scheduler/engine.py:execute_target_scan`.
+   - Hooked `check_drift_alerts` into `targets.py:get_target_drift`.
+   - Hooked `check_probe_downgrade` and `check_cert_expiring` into `probes.py`.
+5. **Validation**:
+   - `tests/test_alerts_engine.py` -> 6 passed in 0.28s.
+   - `ruff check .` -> All checks passed!
+   - `mypy --strict .` -> Success: no issues found in 80 source files.
+
+### Next 3 tasks
+1. Milestone 5: Implement SoftHSM2 key & slot enumeration adapter (`backend/probes/hsm.py` using `python-pkcs11`) [DONE].
+2. Milestone 5: Implement Local Registry Scanner (`backend/probes/registry.py` for localhost:5000 images) [DONE].
+3. Milestone 5: Implement HSM Inventory Route (`GET /api/v1/hsm/inventory`) and test suite [DONE].
+
+---
+
+## 2026-09-19 — Session (Track A1 v0.3 Continuous Operation — Milestone 5)
+
+### Status: MILESTONE 5 (M5) COMPLETE
+
+### What was completed
+1. **SoftHSM2 PKCS#11 Probe Adapter (`backend/probes/hsm.py`)**:
+   - Resolves library paths (`softhsm2.dll`, `libsofthsm2.so`, or `SOFTHSM2_LIB`).
+   - Graceful fallback: returns empty inventory `HsmInventory(slots=[])` if library is absent or uninitialized on the host.
+   - Slot and token inspection: iterates slots, opens token sessions, extracts public/private keys, maps key types (RSA, EC, DSA) and bit sizes (`MODULUS_BITS`).
+2. **Local Registry Scanner (`backend/probes/registry.py`)**:
+   - Air-gap constraint enforcement: strictly restricts registry targets to localhost (`localhost`, `127.0.0.1`, `::1`); rejects external registries (`docker.io`, `quay.io`, `ghcr.io`) via `SecurityException`.
+   - Manifest retrieval and layer inspection: inspects container layer tarballs for embedded certificates, private keys, and SSH credentials.
+   - Emits findings with `surface="image"`.
+3. **HSM Inventory Route (`backend/api/routes/hsm.py`)**:
+   - `GET /api/v1/hsm/inventory`: Returns `HsmInventory`. Mounted in `api/main.py`.
+4. **Validation**:
+   - `tests/test_hsm_inventory.py` -> 5 passed in 0.28s.
+   - `ruff check .` -> All checks passed!
+   - `mypy --strict .` -> Success: no issues found in 84 source files.
+
+### Next 3 tasks
+1. Milestone 6: Implement Audit Verification Endpoint (`GET /api/v1/audit/verify` in `api/routes/audit.py`) [DONE].
+2. Milestone 6: Implement Estate Analytics Endpoints (`GET /api/v1/estate/summary`, `GET /api/v1/estate/trend` in `api/routes/estate.py`) [DONE].
+3. Milestone 6: Contract Diff Verification (`scripts/contract_diff.py`) & full suite validation [DONE].
+
+---
+
+## 2026-09-19 — Session (Track A1 v0.3 Continuous Operation — Milestone 6)
+
+### Status: MILESTONE 6 (M6) COMPLETE — ALL TRACK A1 MILESTONES COMPLETE
+
+### What was completed
+1. **Cryptographic Audit Integrity Route (`backend/api/routes/audit.py`)**:
+   - Implemented `GET /api/v1/audit/verify` returning `AuditVerifyResponse`.
+   - Directly executes `verify_audit_log_integrity(session)` over the SHA-256 genesis-anchored hash chain.
+   - Detects log tampering, insertions, omissions, or sequence discrepancies, returning `valid: bool`, `totalRecords: int`, and failure details.
+2. **Estate Analytics Endpoints (`backend/api/routes/estate.py`)**:
+   - `GET /api/v1/estate/summary`: Aggregates active monitored targets, completed scans, total findings, risk band distribution, and unacknowledged alerts across the monitored estate.
+   - `GET /api/v1/estate/trend`: Aggregates historical timeline points (`EstateTrendPoint`) computing average risk score, finding counts, and band distribution over time.
+3. **High-Performance Rescore Engine Optimization (`backend/api/db.py`, `backend/api/store.py`)**:
+   - Implemented SQLite native C JSON construction via `RETURNING json_object(...)` in the vectorized CTE update.
+   - Direct Starlette `Response(media_type="application/json")` byte stream passing.
+   - Benchmark verification: 10,000 seeded findings rescore round-trip latency measured at **149.26ms**, comfortably exceeding the strict < 200ms SLA budget.
+4. **Air-Gap AST Guardrail Verification (`scripts/verify_airgap.py`, `tests/test_airgap.py`)**:
+   - Strict AST validation verifying zero banned network/telemetry modules inside core `api/` and `engine/`.
+   - Webhook network transport safely decoupled into `backend/probes/webhook.py` per architectural boundaries.
+5. **Contract Diff & Quality Gates**:
+   - `python scripts/contract_diff.py` -> 0 contract drift against OpenAPI 3.1 specification.
+   - `uv run ruff check .` -> All checks passed (0 errors).
+   - `uv run mypy --strict .` -> Success (0 issues in 88 source files).
+   - `uv run pytest` -> 144 passed, 0 failed in 30.04s across all test suites.
+
+
