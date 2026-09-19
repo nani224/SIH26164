@@ -89,6 +89,52 @@ export const handlers = [
     return HttpResponse.json(newScan, { status: 202 });
   }),
 
+  // Upload scan archive
+  http.post('/api/v1/scans/upload', async ({ request }) => {
+    let target = 'uploaded-bundle.tar.gz';
+    let policyId = 'policy-default-defense';
+    let crqcYears = 10;
+
+    try {
+      const formData = await request.formData();
+      const file = formData.get('file') as File | null;
+      if (file) target = file.name;
+      const pol = formData.get('policyId') as string | null;
+      if (pol) policyId = pol;
+      const crqc = formData.get('crqcYears') as string | null;
+      if (crqc) crqcYears = parseInt(crqc, 10);
+    } catch {
+      // Fallback to defaults
+    }
+
+    const newScan: Scan = {
+      id: `scan-${Math.random().toString(16).substring(2, 8)}`,
+      target,
+      status: 'done',
+      stats: {
+        files: 1420,
+        bytes: 28450190,
+        seconds: 3.42,
+        mbPerSec: 8.3,
+        errors: 0,
+        skippedPrefilter: 312,
+      },
+      bands: {
+        critical: 7,
+        high: 9,
+        medium: 14,
+        low: 22,
+      },
+      policyId,
+      crqcYears,
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+    };
+
+    scansStore.unshift(newScan);
+    return HttpResponse.json(newScan, { status: 201 });
+  }),
+
   // Get scan
   http.get('/api/v1/scans/:id', ({ params }) => {
     const scan = scansStore.find((s) => s.id === params.id) || scansStore[0];

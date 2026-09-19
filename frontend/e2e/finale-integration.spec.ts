@@ -5,11 +5,18 @@ const themes = ['dark', 'light'] as const;
 
 for (const theme of themes) {
   test.describe(`ECDAT Grand Finale E2E — Theme: ${theme.toUpperCase()}`, () => {
+    test.use({ serviceWorkers: 'block' });
+
     test.beforeEach(async ({ page }) => {
       await page.emulateMedia({ colorScheme: theme });
       await page.addInitScript((mode) => {
         document.documentElement.className = mode;
+        (window as any).__DISABLE_MSW__ = true;
       }, theme);
+      await page.route('**/api/v1/**', async (route) => {
+        const targetUrl = route.request().url().replace('http://localhost:3000', 'http://localhost:8000');
+        await route.continue({ url: targetUrl });
+      });
     });
 
     test(`Complete User Flow in ${theme} mode: upload -> stages -> overview -> rescore -> triage -> cbom -> graph 2D`, async ({

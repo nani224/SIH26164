@@ -214,7 +214,7 @@ export default function InventoryPage() {
       </div>
 
       {isLoading ? (
-        <div className="p-12 text-center border border-[var(--border-subtle)] rounded-lg bg-[var(--surface-card)]">
+        <div className="p-12 text-center border border-[var(--border-subtle)] rounded-lg bg-[var(--surface-card)] animate-pulse">
           <RefreshCw className="w-5 h-5 animate-spin text-[var(--crypto-pqc)] mx-auto mb-2" />
           <span className="text-xs text-[var(--text-muted)]">LOADING DISCOVERED ASSET INVENTORY...</span>
         </div>
