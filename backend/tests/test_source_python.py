@@ -86,3 +86,48 @@ def test_bare_attribute_reference_detected() -> None:
     assert len(detections) == 2
     assert detections[0].family == Family.SHA_2
     assert detections[1].family == Family.MD5
+
+
+def test_key_sign_verify_resolved_via_parameter_type_annotation() -> None:
+    # M4 (Track CC): a `key.sign(...)`/`key.verify(...)` call where `key`'s
+    # concrete cryptography-library type is named in the enclosing
+    # function's own parameter annotation -- a real, static fact, not a
+    # guess. Closes the largest false-negative cluster found in the
+    # real-world HOLD corpus (pyjwt's OO Algorithm classes).
+    src = (
+        b"def sign(self, msg: bytes, key: RSAPrivateKey) -> bytes:\n"
+        b"    return key.sign(msg, padding.PKCS1v15(), hashes.SHA256())\n"
+        b"def verify(self, msg: bytes, key: RSAPublicKey, sig: bytes) -> bool:\n"
+        b"    return key.verify(sig, msg, padding.PKCS1v15(), hashes.SHA256())\n"
+        b"def ec_sign(self, msg: bytes, key: EllipticCurvePrivateKey) -> bytes:\n"
+        b"    return key.sign(msg, ec.ECDSA(hashes.SHA256()))\n"
+        b"def ed_sign(self, msg: bytes, key: Ed25519PrivateKey | Ed448PrivateKey) -> bytes:\n"
+        b"    return key.sign(msg)\n"
+    )
+    detections = detect("t.py", src)
+    assert len(detections) == 4
+    assert (detections[0].family, detections[0].function) == (Family.RSA, CryptoFunction.SIGN)
+    assert (detections[1].family, detections[1].function) == (Family.RSA, CryptoFunction.VERIFY)
+    assert (detections[2].family, detections[2].function) == (Family.ECDSA, CryptoFunction.SIGN)
+    assert (detections[3].family, detections[3].function) == (Family.ED25519, CryptoFunction.SIGN)
+
+
+def test_key_sign_verify_unresolvable_type_alias_is_not_flagged() -> None:
+    # A project-specific type alias (e.g. pyjwt's own
+    # `AllowedECKeys = Union[EllipticCurvePrivateKey, EllipticCurvePublicKey]`)
+    # is a real, honest miss -- the detector must not guess, and must not
+    # be hardcoded to recognize one specific project's alias name.
+    src = b"def verify(self, msg: bytes, key: AllowedECKeys, sig: bytes) -> bool:\n    return key.verify(sig, msg)\n"
+    assert detect("t.py", src) == []
+
+
+def test_sign_verify_on_untyped_or_unrelated_parameter_is_not_flagged() -> None:
+    # No type annotation at all, or an annotation that isn't a recognized
+    # cryptography-library key class -- must not fire (no guessing).
+    src = (
+        b"def f(self, key, msg: bytes) -> bytes:\n"
+        b"    return key.sign(msg)\n"
+        b"def g(self, doc: PdfDocument) -> bytes:\n"
+        b"    return doc.sign()\n"
+    )
+    assert detect("t.py", src) == []

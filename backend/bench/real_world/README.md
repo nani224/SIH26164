@@ -45,25 +45,29 @@ into this repo as a copied file. (A later Track CC mandate reversed this
 as "over-cautious" and said paramiko is usable via fetch-to-/tmp-only,
 never committed -- not yet acted on.)
 
-## Result (2026-09-19, M3 Track CC, 9 files / 32 usages / 4 languages)
+## Result (2026-09-19, M4 Track CC, 9 files / 32 usages / 4 languages)
 
 ```
 $ uv run python bench/real_world/evaluate.py
-precision=1.0 recall=0.625 f1=0.7692
-truth=32 detected=20 tp=20
+precision=1.0 recall=0.8125 f1=0.8966
+truth=32 detected=26 tp=26
 ```
 
-**20/32, zero false positives.** Precision briefly regressed to 0.8889
-during this same session when the 2 new OpenSSL usages exposed a real bug
-(`EVP_CIPHER_fetch` firing as a standalone ENCRYPT regardless of how the
-fetched handle was actually used) -- caught by this exact HOLD run, fixed
-same-session (see `docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md`),
-re-measured, precision restored to 1.0 and recall *improved* as a side
-effect (the fix also found the 4 real OpenSSL operations the old
-heuristic was missing). This is the value of a real HOLD run: it caught a
-precision-floor violation before it ever reached CI, not after.
+**26/32, zero false positives.** Two things happened to get here, same
+session: (1) growing the corpus to include 2 new OpenSSL usages exposed a
+real precision bug (`EVP_CIPHER_fetch` firing as a standalone ENCRYPT
+regardless of how the fetched handle was actually used) that briefly
+dropped precision to 0.8889, below the 0.95 floor -- caught by this exact
+HOLD run, fixed same-session (`docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md`),
+restoring precision to 1.0 and *improving* recall as a side effect (the
+fix also found 4 real OpenSSL operations the old heuristic was missing).
+(2) M4 then closed the corpus's single largest false-negative cluster --
+pyjwt's `key.sign()`/`key.verify()` calls, 8 misses -- by resolving
+`key`'s family from a real static fact (the enclosing function's own
+parameter type annotation) rather than a guess; 6 of the 8 closed with
+zero new false positives (`docs/decisions/backend/016-python-key-method-type-annotation.md`).
 
-Every false negative is one of the gaps documented below -- see
+Every remaining false negative is one of the gaps documented below -- see
 `backend/PROGRESS.md`'s 2026-09-19 entries for the full false-negative
 list. This number is a floor (`tests/test_bench_real_world.py`), not a
 target -- don't chase it back up by weakening the corpus or the labels;
@@ -71,27 +75,37 @@ closing the gaps below for real is what would honestly move it.
 
 ## What this did *not* find (real gaps, noted honestly, not silently fixed)
 
-1. **Bare attribute references aren't detected**, only calls. PyJWT does
-   `SHA256: ClassVar[HashlibHash] = hashlib.sha256` (assigning the
-   function object, never calling it) -- three such lines in
-   `pyjwt_algorithms.py` (320-322), plus Go's `hashFunc: sha256.New,` and
-   `s.BlockFunc(aes.NewCipher)` in `gorilla_securecookie.go` (139, 148,
-   same pattern in Go: passing a function value, not calling it). Our
-   queries only match direct call nodes, so this registry-style pattern
-   is a false negative in both languages. `FindingSource.AST_REFERENCE`
-   already exists in the schema for exactly this case but nothing
-   populates it yet.
-2. **No intra-file type inference**, so `key.sign(...)`, `key.verify(...)`
-   in `pyjwt_algorithms.py` (RSA/ECDSA/Ed25519, lines 683/688/761/777/
-   914/926/994/1018) where `key`'s concrete type isn't known from the
-   call site alone are missed entirely. Same root cause in Go:
-   `cipher.NewCTR(block, iv)` (`gorilla_securecookie.go`:402,420) takes a
-   generic `cipher.Block` interface, not a literal `aes.X(...)` call, so
-   there's nothing at that call site naming AES specifically even though
-   it's AES in this program (the `New()` constructor defaults to
-   `aes.NewCipher`). This is explicitly listed as future work in the
-   brief's own Phase 7 ("intra-file type inference for key.sign/verify/
-   exchange").
+1. **Bare attribute references in Go aren't detected**, only calls.
+   `hashFunc: sha256.New,` and `s.BlockFunc(aes.NewCipher)` in
+   `gorilla_securecookie.go` (139, 148) pass a function *value*, never
+   call it -- Go's query only matches direct call nodes, so this
+   registry-style pattern is a false negative there. **This is already
+   fixed on the Python side**: `pyjwt_algorithms.py`'s equivalent pattern
+   (`SHA256: ClassVar[HashlibHash] = hashlib.sha256`, lines 320-322) *is*
+   correctly detected (`source_python.py`'s `attr.node` query capture,
+   landed in an earlier session) -- this file previously claimed
+   otherwise; that was stale and is corrected here per the project's
+   "re-derive, don't quote" bookkeeping rule. Go has no equivalent
+   capture yet -- a real, still-open, language-specific gap.
+2. **Intra-file type inference for `key.sign(...)`/`key.verify(...)`
+   in `pyjwt_algorithms.py` is now mostly resolved** (M4, ADR 016): 6 of
+   8 occurrences (RSA/ECDSA/Ed25519 sign, RSA verify x2) are detected by
+   reading `key`'s type straight off the enclosing function's own
+   parameter annotation (a real static fact, not inference in the
+   dataflow sense). The 2 that remain unresolved, deliberately: line 777
+   (`ECAlgorithm.verify`) types `key` as `AllowedECKeys`, a pyjwt-internal
+   type alias the detector doesn't chase (would mean reading pyjwt's own
+   source to learn a project-specific name, i.e. tuning on this exact
+   HOLD file); line 1018 (`OKPAlgorithm.verify`) calls `.verify()` on a
+   *local variable* (`public_key = key.public_key() if ... else key`),
+   not a typed parameter, which needs real local dataflow tracking inside
+   the function body -- a materially bigger feature, not attempted.
+   Same root cause still applies to Go's `cipher.NewCTR(block, iv)`
+   (`gorilla_securecookie.go`:402,420), which takes a generic
+   `cipher.Block` interface with the concrete constructor
+   (`aes.NewCipher`, via `BlockFunc`) several calls removed -- not
+   addressed by the Python-specific type-annotation mechanism above,
+   still open in Go.
 3. `hmac.compare_digest(...)` (Python) / `subtle.ConstantTimeCompare(...)`
    (Go, `gorilla_securecookie.go`:384) are correctly *not* flagged --
    timing-safe comparison utilities, not keygen/encrypt/digest primitives,

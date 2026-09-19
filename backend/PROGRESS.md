@@ -1,5 +1,77 @@
 # ECDAT Backend — Progress
 
+## 2026-09-19 — Track CC M4: close the largest false-negative cluster
+
+M3 left 12 real-world false negatives. Clustered by root cause: 8 in
+`pyjwt_algorithms.py` (`key.sign(...)`/`key.verify(...)` where `key`'s
+concrete type isn't known from the call site), 4 in
+`gorilla_securecookie.go` (bare function-value references + a generic
+`cipher.Block` interface parameter). The pyjwt cluster is the largest
+(8/12) -- picked as M4's target per the mandate.
+
+The obvious fix (track `key = rsa.generate_private_key(...)`-style local
+assignments, mirroring the Java/C linkage patterns from M1/M3) doesn't
+apply: `key` in every one of PyJWT's `sign`/`verify` methods is a
+**function parameter**, not a local variable with a constructor call to
+link back to. Real fix: Python parameters can carry type annotations, and
+PyJWT's real code does (`key: RSAPrivateKey`, `key: EllipticCurvePrivateKey`,
+`key: Ed25519PrivateKey | Ed448PrivateKey`, ...) -- a genuine static fact,
+not a guess. `engine/source_python.py` now resolves `X.sign(...)`/
+`X.verify(...)` by walking up to the enclosing `function_definition`,
+finding `X`'s `typed_parameter`, and matching its type annotation text
+against real `cryptography`-library class names (`"RSA"`, `"EllipticCurve"`,
+`"Ed25519"` substrings). No match -> no detection; never guesses. Full
+design + the two cases deliberately left unresolved (a project-specific
+type alias, and a call on a local variable rather than a parameter) in
+`docs/decisions/backend/016-python-key-method-type-annotation.md`.
+
+```
+$ uv run python bench/real_world/evaluate.py
+precision=1.0 recall=0.8125 f1=0.8966
+truth=32 detected=26 tp=26
+```
+
+Recall 0.625 -> 0.8125 (6 new true positives: RSA sign/verify x2, ECDSA
+sign, Ed25519 sign), **zero new false positives** -- precision stays 1.0.
+Layer A unaffected (56/56, no existing fixture exercises this pattern);
+5 new unit tests added instead (positive cases per family, a deliberate-
+non-match case for the unresolved type alias, an unrelated-`.sign()`-call
+negative case proving the "no guessing" property directly).
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 68 source files
+$ uv run pytest --cov -q
+155 passed, 4 warnings in 17.18s   (was 152 after M3; +5 new Python tests,
+                                     +1 real-world floor update)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/evaluate.py   (Layer A, unaffected)
+precision=1.0 recall=1.0 f1=1.0
+truth=56 detected=56 tp=56
+```
+
+While updating `bench/real_world/README.md` to reflect this, also caught
+and corrected a stale claim left over from an earlier session: gap #1
+said Python's bare `hashlib.sha256` attribute-reference pattern (lines
+320-322 of `pyjwt_algorithms.py`) was undetected -- it's actually already
+correctly detected (a `source_python.py` capture that landed in an
+earlier session without this file being updated to match, the exact
+"known bookkeeping hazard" root `CLAUDE.md` warns about). Corrected
+rather than left to compound; the Go equivalent of that same pattern
+(`hashFunc: sha256.New,`) is confirmed still a real, open gap.
+
+Not started this session: M5 (CI/CD + real blocked PR). Two of the
+original 8 pyjwt false negatives remain, honestly unresolved (not
+hardcoded around): a project-specific type alias, and a `.verify()` call
+on a local variable rather than a typed parameter. The Go
+bare-function-value-reference and generic-interface-parameter gaps (4
+FNs) are untouched -- next candidate cluster for a future M4-style pass,
+not attempted this session (time/scope).
+
 ## 2026-09-19 — Track CC M3: HOLD corpus growth + real precision-floor catch/fix
 
 Grew `bench/real_world/` from 5 files/25 usages/2 languages (Python, Go)

@@ -50,6 +50,22 @@ _CIPHER_FAMILY: dict[str, Family] = {
     "Blowfish": Family.BLOWFISH,
 }
 
+# Substrings of a parameter's type annotation -> Family, for resolving
+# `key.sign(...)`/`key.verify(...)` where `key`'s concrete type is a
+# `cryptography`-library key class named in the enclosing function's
+# signature (e.g. `def sign(self, msg: bytes, key: RSAPrivateKey) -> bytes`).
+# Real, stable public class names from the `cryptography` package, not
+# project-specific type aliases (a type alias like pyjwt's own
+# `AllowedECKeys = Union[EllipticCurvePrivateKey, EllipticCurvePublicKey]`
+# is a real, documented, honest miss -- resolving it would mean reading
+# pyjwt's own source to learn its alias, which is tuning on this specific
+# HOLD file, not a generalizable rule).
+_KEY_PARAM_TYPE_FAMILY: list[tuple[str, Family]] = [
+    ("RSA", Family.RSA),
+    ("EllipticCurve", Family.ECDSA),
+    ("Ed25519", Family.ED25519),
+]
+
 
 def _text(node: tree_sitter.Node) -> str:
     return node.text.decode("utf-8") if node.text else ""
@@ -74,6 +90,41 @@ def _first_positional(args_node: tree_sitter.Node) -> str | None:
 
 def _positional_args(args_node: tree_sitter.Node) -> list[tree_sitter.Node]:
     return [c for c in args_node.named_children if c.type != "keyword_argument"]
+
+
+def _find_enclosing_function(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    ancestor = node.parent
+    while ancestor is not None:
+        if ancestor.type == "function_definition":
+            return ancestor
+        ancestor = ancestor.parent
+    return None
+
+
+def _resolve_param_type_family(call_node: tree_sitter.Node, receiver_name: str) -> Family | None:
+    """`key.sign(...)`/`key.verify(...)` -- resolve `key`'s family from
+    its type annotation on the enclosing function's own signature (a
+    real, static, syntactic fact, not a guess or cross-file dataflow)."""
+    func = _find_enclosing_function(call_node)
+    if func is None:
+        return None
+    params = func.child_by_field_name("parameters")
+    if params is None:
+        return None
+    for param in params.named_children:
+        if param.type != "typed_parameter" or not param.named_children:
+            continue
+        if _text(param.named_children[0]) != receiver_name:
+            continue
+        type_node = param.child_by_field_name("type")
+        if type_node is None:
+            return None
+        type_text = _text(type_node)
+        for substring, family in _KEY_PARAM_TYPE_FAMILY:
+            if substring in type_text:
+                return family
+        return None
+    return None
 
 
 def detect(path: str, source: bytes) -> list[Detection]:
@@ -145,6 +196,8 @@ def _classify(path: str, captures: dict[str, list[tree_sitter.Node]]) -> Detecti
         return _classify_ec_keygen(args_node, common)
     if obj == "algorithms" and attr in _CIPHER_FAMILY:
         return _classify_cipher(attr, common)
+    if attr in ("sign", "verify"):
+        return _classify_key_method_call(obj, attr, call_node, common)
     return None
 
 
@@ -200,6 +253,20 @@ def _classify_ec_keygen(args_node: tree_sitter.Node, common: dict[str, Any]) -> 
         kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.ECDSA,
         display_name="EC key generation", function=CryptoFunction.KEYGEN,
         symbol="ec.generate_private_key", confidence=0.85, curve=curve, **common,
+    )
+
+
+def _classify_key_method_call(
+    obj: str, attr: str, call_node: tree_sitter.Node, common: dict[str, Any]
+) -> Detection | None:
+    family = _resolve_param_type_family(call_node, obj)
+    if family is None:
+        return None
+    function = CryptoFunction.SIGN if attr == "sign" else CryptoFunction.VERIFY
+    return Detection(
+        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=family,
+        display_name=f"{obj}.{attr}(...) ({family.value} key, from parameter type annotation)",
+        function=function, symbol=f"{obj}.{attr}", confidence=0.82, **common,
     )
 
 

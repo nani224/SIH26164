@@ -200,9 +200,17 @@ dependency-ordered milestones:
       (up from 0.52). Still far short of the 150-usage target -- see
       2026-09-19 PROGRESS.md entry and `bench/real_world/README.md` for
       full numbers and remaining gaps.
-- [ ] **M4** — Cluster M3's false negatives by root cause, fix the
-      largest cluster, re-measure, confirm precision stays >=0.95. Not
-      started.
+- [x] **M4** — Clustered M3's 12 false negatives by root cause (8 in
+      pyjwt's `key.sign()`/`key.verify()`, 4 in Go's bare function-value
+      references + generic `cipher.Block` interface). Fixed the largest
+      (pyjwt, 8): resolved `key`'s family from the enclosing function's
+      own parameter type annotation (`key: RSAPrivateKey`, a real static
+      fact, not dataflow) -- 6/8 closed, 2 deliberately left unresolved
+      (project-specific type alias; call on a local var, not a
+      parameter). Recall 0.625 -> 0.8125, precision held at 1.0, Layer A
+      unaffected (56/56). See ADR 016 and 2026-09-19 PROGRESS.md entry.
+      Go's 4-FN cluster untouched -- next candidate, not attempted this
+      pass.
 - [ ] **M5** — CI/CD: reusable GitHub Action, PR-comment findings table,
       `.ecdat-policy.yml` policy-as-code, precision-floor enforcement, a
       real deliberately-vulnerable demo repo with a real blocked PR. Not
