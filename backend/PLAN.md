@@ -265,10 +265,27 @@ established this session, flagged rather than silently substituted.
       well short of 150; a wolfSSL C candidate was searched for and not
       found, documented honestly rather than skipped silently. 176 tests
       green. See ADR 019 and 2026-09-20 PROGRESS.md entry.
-- [ ] **M8** — CI hardening: prove the precision-floor gate fails red
-      when breached (deliberately, then revert), and either get a real
-      external-repo proof of the reusable Action or document the exact
-      blocked-on-human-repo-creation instruction. Not started.
+- [x] **M8** —
+      **M8b (done)**: proved the precision-floor gate fails red for real.
+      On a throwaway branch (`track-cc-m8b-precision-gate-proof`, off
+      `origin/main`), deliberately made every unrecognized Python
+      attribute call fire as a bogus MD5 finding. Confirmed locally
+      (Layer A precision 0.8615, real-world 0.1722, both FAIL) and then
+      for real on GitHub's own infrastructure: opened PR #12, the
+      `backend-ci` job ran and concluded `failure` (5 pytest failures,
+      including both precision-floor regression tests catching the drop
+      before the dedicated `bench/check_precision_floor.py` step even
+      ran). Reverted the very next commit, confirmed precision back to
+      1.0/1.0 locally, pushed, closed PR #12 without merging (branch
+      delete was denied -- outside session's GitHub scope -- but the
+      branch is inert and the PR is closed).
+      **M8a (BLOCKED - needs human repo creation)**: external-repo proof
+      of the cross-repo reusable-workflow form needs a human to create
+      one empty repo -- this session's GitHub App access cannot create
+      repositories via the API (confirmed architectural 403 earlier this
+      engagement). Exact instruction + `uses:` snippet documented in
+      docs/decisions/backend/020-m8a-external-repo-proof-blocked.md
+      rather than left vague.
 - [ ] **M9** — `backend/bench/README.md` handoff doc: every benchmark,
       every corpus, the blind-labelling protocol, current numbers dated,
       documented FN clusters. Not started.

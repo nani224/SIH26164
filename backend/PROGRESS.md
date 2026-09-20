@@ -1,5 +1,87 @@
 # ECDAT Backend — Progress
 
+## 2026-09-20 — Track CC M8: precision-gate proven to fail red; external-repo proof BLOCKED (documented)
+
+M8b: prove the CI precision-floor gate actually fails the build when
+breached, not just that it exists as a script. Created a throwaway branch
+off `origin/main`, `track-cc-m8b-precision-gate-proof`, and deliberately
+broke `engine/source_python.py`'s classifier to flag every unrecognized
+attribute call as a bogus MD5 digest finding. Confirmed locally first:
+
+```
+$ uv run python bench/check_precision_floor.py
+Layer A (bench/fixtures): precision=0.8615 (floor 0.95) -- FAIL
+  false positive: ('ec_keygen.py', 'MD5', 'digest', 3)
+  ... (9 total)
+real_world (HOLD): precision=0.1722 (floor 0.95) -- FAIL
+  ... (117 total)
+
+PRECISION FLOOR (0.95) VIOLATED -- see root CLAUDE.md's Track CC rules.
+```
+
+Pushed the branch and opened a real PR (#12, `[DO NOT MERGE] Track CC
+M8b: proof the precision-floor gate fails red`) to trigger GitHub's own
+`backend-ci` workflow. Real result on GitHub's infrastructure:
+
+```
+backend-ci / backend: completed, conclusion=failure
+5 failed, 161 passed, 4 warnings in 31.67s
+FAILED tests/test_bench_evaluate.py::test_bench_starter_fixtures_are_fully_detected - assert 0.8615 == 1.0
+FAILED tests/test_bench_real_world.py::test_real_world_sample_detected_correctly - assert 0.1722 == 1.0
+FAILED tests/test_source_python.py::test_ec_keygen_captures_curve_and_does_not_double_count - assert 2 == 1
+FAILED tests/test_source_python.py::test_unrelated_calls_are_not_flagged - assert [...] == []
+FAILED tests/test_source_python.py::test_key_sign_verify_resolved_via_parameter_type_annotation - assert 10 == 4
+Process completed with exit code 1
+```
+
+(Ran against `origin/main`'s current test suite -- 166 tests, pre-M6/M7 --
+since `claude/inspiring-hamilton-p6ig7n` hasn't merged to `main` yet; the
+pytest step failed before the workflow could reach the dedicated
+`bench/check_precision_floor.py` step, so this run demonstrates the
+existing regression-floor unit tests catching the break, and the local
+run above independently demonstrates the dedicated script catching it
+too -- both layers proven, not just one.) Reverted the very next commit
+(`13e1275`), confirmed precision back to 1.0/1.0 locally, pushed, and
+closed PR #12 without merging. Deleting the remote branch was denied (403
+-- outside this session's GitHub scope) but the closed PR and reverted
+history make the branch inert; left as harmless residue rather than
+retried with a wider-scope workaround.
+
+M8a: external-repo proof of the cross-repo `uses: nani224/SIH26164/...@main`
+reusable-workflow form (as opposed to the same-repo `uses: ./...` form
+already proven via `demo/vulnerable-app/` and PRs #8-#10). This session's
+GitHub App access cannot create a new repository via the API -- confirmed
+architectural (403, independent of the app's configured repo access)
+earlier this same engagement. Per the mandate's own instruction for this
+exact case, documented the exact one-time human action and the literal
+`uses:` snippet needed (copied verbatim from
+`.github/workflows/ecdat-scan-reusable.yml`'s own header comment, so the
+two can never drift) in
+`docs/decisions/backend/020-m8a-external-repo-proof-blocked.md`, and
+marked it `[BLOCKED - needs human repo creation]` in `PLAN.md` rather than
+left vague or silently skipped.
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 74 source files
+$ uv run pytest --cov -q
+176 passed, 4 warnings in ...s   (unchanged from M7 -- M8 touched no
+                                    engine/test code on this branch,
+                                    only a throwaway branch + 2 ADRs)
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/check_precision_floor.py
+Layer A (bench/fixtures): precision=1.0 (floor 0.95) -- PASS
+real_world (HOLD): precision=0.9583 (floor 0.95) -- PASS
+```
+
+Not started this session: M9 (bench/README.md handoff doc), the
+merge-window responsibility (a1-backend -> cc-detection -> a2-frontend --
+`feature/a2-frontend`'s branch contents still need checking before any
+merge, per the mandate's own flag).
+
 ## 2026-09-20 — Track CC M7: real-world corpus grown 32 -> 56 usages (9 -> 14 files)
 
 Follow-on mandate section 2 (M6-M9), M7: grow `bench/real_world/` toward
