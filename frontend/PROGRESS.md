@@ -293,5 +293,38 @@ the authoritative number and update the README/PROGRESS.md with it.
     - Desktop (1440×900): `public/screenshots/viewports/screen-11-estate-1440.png`
     - Laptop (1280×720): `public/screenshots/viewports/screen-11-estate-1280.png`
     - Mobile (390×844): `public/screenshots/viewports/screen-11-estate-390.png`
-  - Performance: CLS < 0.1 verified across all viewports.
 - `pnpm build`: Exit code 0 (All 15 routes prerendered statically).
+
+## 2026-09-20 — Track A2 Milestone 2: Screen 12 (Estate Cryptographic Trend)
+
+### 1. Delivery Summary
+- Implemented **Screen 12: Estate Cryptographic Trend** (`/trend`) providing high-density historical posture and risk trajectory over time.
+- Consumes `GET /api/v1/estate/trend?days={days}` (with presets for 7D, 30D, and 90D).
+- Trajectory bento metrics:
+  - Risk Score Velocity (net delta in average risk score over selected time window).
+  - Critical Assets Delta (number of critical findings remediated vs new).
+  - Total Findings Delta (inventory discovery velocity).
+  - PQC Horizon Projection (linear extrapolation of zero-critical target date based on current burn rate).
+- Interactive SVG / D3-grade Time Series Visualization:
+  - Dual-axis visual representation: Average Risk Score area/line plot (Lattice Teal) + Critical Findings trend (Ember Red).
+  - Horizontal gridlines, Y-axis risk score calibration (0-100), and dynamic X-axis date labels.
+  - Interactive hover overlay with vertical guideline, detailed inspection tooltip displaying date, average risk score, critical counts, and total findings.
+- Daily Cryptographic Telemetry Log Table:
+  - Chronological snapshot records with daily risk score delta (+/-), status indicators (`Remediated`, `Migrating`).
+- Fully accessible with WCAG AA compliance in both Dark and Light themes (`text-[var(--surface-base)]` on action buttons).
+
+### 2. Verification Gates (100% Passed)
+- `pnpm typecheck`: Exit code 0 (0 errors).
+- `pnpm lint`: Exit code 0 (0 warnings/errors).
+- `pnpm knip`: Exit code 0 (0 unused exports/dependencies).
+- `pnpm vitest run src/app/trend/trend.test.tsx`: Exit code 0 (5/5 unit tests passed).
+- `pnpm playwright test e2e/trend.spec.ts`: Exit code 0 (2/2 E2E tests passed):
+  - Real-browser axe-core a11y in Dark & Light modes: 0 critical, 0 serious violations.
+  - Interactive flow: time-window switching (7D, 30D, 90D).
+  - Multi-viewport screenshots captured:
+    - Desktop (1440×900): `public/screenshots/viewports/screen-12-trend-1440.png`
+    - Laptop (1280×720): `public/screenshots/viewports/screen-12-trend-1280.png`
+    - Mobile (390×844): `public/screenshots/viewports/screen-12-trend-390.png`
+  - Performance: CLS < 0.1 verified across all viewports.
+- `pnpm build`: Exit code 0 (All 16 routes prerendered statically).
+
