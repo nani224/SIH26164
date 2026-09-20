@@ -13,7 +13,7 @@ test.describe('Screen 11: Continuous Estate Console E2E Verification', () => {
     await expect(page.getByRole('heading', { name: /Cryptographic Estate Console/i })).toBeVisible();
     await expect(page.getByText(/Total Targets/i)).toBeVisible();
     await expect(page.getByText(/Total Scans/i)).toBeVisible();
-    await expect(page.getByText(/Critical Findings/i)).toBeVisible();
+    await expect(page.getByText('Critical Findings', { exact: true })).toBeVisible();
     await expect(page.getByText(/PQC Readiness/i)).toBeVisible();
     await expect(page.getByText(/Active Alerts/i)).toBeVisible();
 

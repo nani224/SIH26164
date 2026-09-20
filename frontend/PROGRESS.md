@@ -430,4 +430,60 @@ the authoritative number and update the README/PROGRESS.md with it.
     - Mobile (390×844): `public/screenshots/viewports/screen-04-hsm-inventory-390.png`
 - `pnpm build`: Exit code 0 (All 18 routes prerendered statically).
 
+## 2026-09-20 — Track A2 Milestone 6: 7-Minute Guided Demo Mode & Full Regression Suite
 
+### 1. Delivery Summary
+- **7-Minute Guided Demo Mode (`DemoTour.tsx`)**:
+  - Implemented an interactive, accessible, floating tour controller providing an end-to-end guided walkthrough across all 14 ECDAT screens.
+  - 14 Structured Steps:
+    1. Screen 11: Continuous Estate Console (`/estate`)
+    2. Screen 12: Estate Cryptographic Trend (`/trend`)
+    3. Screen 13: Cryptographic Drift Analysis (`/drift`)
+    4. Screen 14: Security Alerts & Protocol Probes (`/alerts`)
+    5. Screen 1: Scan Launcher & Deterministic Ingestion (`/launcher`)
+    6. Screen 2: Cryptographic Overview Console (`/overview`)
+    7. Screen 3: Mosca Quantum Risk Matrix (`/mosca`)
+    8. Screen 4: Virtualized Asset Inventory & SoftHSM2 (`/inventory`)
+    9. Screen 5: Finding Drawer Deep-Dive (`/inventory?findingId=f-004`)
+    10. Screen 6: 3D Estate Graph & Spatial Topology (`/graph`)
+    11. Screen 7: Surface & Family Threat Heatmap (`/heatmap`)
+    12. Screen 8: Certificate Expiration & X.509 Timeline (`/certificates`)
+    13. Screen 9: Remediation & PQC Migration Plan (`/plan`)
+    14. Screen 10: Cryptographic Policy Rules (`/policies`)
+  - Features:
+    - Speaker notes and executive briefing context on each step.
+    - 30-second per-step countdown timer with auto-advance and pause/resume controls.
+    - Quick-jump step selector dropdown for non-linear demonstrations.
+    - Keyboard navigation support (`ArrowRight` for next, `ArrowLeft` for prev, `Escape` to dismiss).
+    - Global launch button in `Header.tsx` ("Start 7-Minute Guided Demo Tour").
+- **Integrated Unit & Component Tests**:
+  - Implemented `frontend/src/components/DemoTour.test.tsx` covering mount/unmount, step navigation, keyboard shortcuts, and quick-jump selector (5/5 passed).
+
+### 2. Full Regression & Quality Gates (100% Passed)
+- **Vitest Unit Test Suite**:
+  - 15 test files passed (100%).
+  - 68 tests passed, 0 failures (100%).
+- **Playwright E2E & Real-Browser Accessibility Suite**:
+  - 10 test specs passed (100%).
+  - 35 E2E tests passed, 0 failures (100%):
+    - `alerts.spec.ts`: 2/2 passed.
+    - `all-screens.spec.ts`: 14/14 passed.
+    - `demo-walkthrough.spec.ts`: 1/1 passed (Full 14-screen tour, FindingDrawer deep-link, Axe a11y Dark/Light).
+    - `drift.spec.ts`: 2/2 passed.
+    - `estate.spec.ts`: 2/2 passed.
+    - `finale-integration.spec.ts`: 2/2 passed (Dark & Light end-to-end flows with real backend).
+    - `gates-verification.spec.ts`: 3/3 passed (MSW Switch, Color Consistency, Estate Graph 60.4 FPS).
+    - `hsm-audit-ci.spec.ts`: 2/2 passed.
+    - `mosca-matrix.spec.ts`: 7/7 passed.
+    - `trend.spec.ts`: 2/2 passed.
+- **Real-Browser Axe Accessibility**:
+  - Audited across all 14 screens in both Dark and Light modes.
+  - Zero critical, zero serious WCAG AA violations.
+- **Code Quality & Type Safety**:
+  - `pnpm typecheck`: Exit code 0 (0 errors).
+  - `pnpm lint`: Exit code 0 (0 warnings/errors).
+  - `pnpm knip`: Exit code 0 (0 unused exports/dependencies).
+  - `pnpm build`: Exit code 0 (All 18 routes statically prerendered within performance budgets).
+
+---
+**Track A2 Status**: 100% COMPLETE across all 6 milestones (M1 $\to$ M2 $\to$ M3 $\to$ M4 $\to$ M5 $\to$ M6). Zero regressions, zero unhandled errors, full air-gap compliance.

@@ -6,6 +6,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { FindingDrawer } from '../components/FindingDrawer';
 import { CommandPalette } from '../components/CommandPalette';
 import { CommandPaletteButton } from '../components/CommandPaletteButton';
+import { DemoTour } from '../components/DemoTour';
 import Link from 'next/link';
 
 const ibmPlexSansCondensed = localFont({
@@ -195,6 +196,7 @@ export default function RootLayout({
 
               {/* Right controls */}
               <div className="flex items-center gap-2">
+                <DemoTour />
                 <CommandPaletteButton />
                 <ThemeToggle />
               </div>
