@@ -1,4 +1,20 @@
-import type { Finding, Scan, Policy, PqcCatalogItem, RemediationPlanItem, GraphNode, GraphEdge } from '../types/crypto';
+import type {
+  Finding,
+  Scan,
+  Policy,
+  PqcCatalogItem,
+  RemediationPlanItem,
+  GraphNode,
+  GraphEdge,
+  Target,
+  EstateSummary,
+  EstateTrend,
+  Drift,
+  Alert,
+  ProbeResult,
+  HsmInventory,
+  AuditVerifyResponse,
+} from '../types/crypto';
 
 export const mockScans: Scan[] = [
   {
@@ -857,3 +873,234 @@ export const mockPlan: RemediationPlanItem[] = [
     target: 'AES-256-GCM',
   },
 ];
+
+// Continuous Operation Mock Data (v0.3.0)
+
+export const mockTargets: Target[] = [
+  {
+    id: 'target-001',
+    name: 'Core Payment Gateway',
+    kind: 'repo',
+    uri: 'https://github.com/org/payment-gateway.git',
+    policyId: 'policy-default-defense',
+    schedule: '@hourly',
+    enabled: true,
+    lastScanId: 'scan-7f8e1a',
+    lastScanAt: '2026-09-20T07:15:00Z',
+    createdAt: '2026-09-01T10:00:00Z',
+  },
+  {
+    id: 'target-002',
+    name: 'Gateway Firmware Binary',
+    kind: 'path',
+    uri: '/srv/firmware/gateway-v2.1.bin',
+    policyId: 'policy-default-defense',
+    schedule: '@daily',
+    enabled: true,
+    lastScanId: 'scan-2b9c4d',
+    lastScanAt: '2026-09-19T15:10:00Z',
+    createdAt: '2026-09-05T12:00:00Z',
+  },
+  {
+    id: 'target-003',
+    name: 'Production Ingress TLS',
+    kind: 'endpoint',
+    uri: 'api.payments.internal:443',
+    policyId: 'policy-default-defense',
+    schedule: '0 */6 * * *',
+    enabled: true,
+    lastScanId: 'scan-3c4d5e',
+    lastScanAt: '2026-09-20T06:00:00Z',
+    createdAt: '2026-09-10T08:30:00Z',
+  },
+  {
+    id: 'target-004',
+    name: 'HSM Partition Alpha',
+    kind: 'endpoint',
+    uri: 'hsm01.vault.internal:1111',
+    policyId: 'policy-strict-pqc',
+    schedule: '@daily',
+    enabled: true,
+    lastScanId: 'scan-4d5e6f',
+    lastScanAt: '2026-09-19T02:00:00Z',
+    createdAt: '2026-09-12T14:20:00Z',
+  },
+  {
+    id: 'target-005',
+    name: 'Legacy Auth Broker',
+    kind: 'repo',
+    uri: 'https://github.com/org/legacy-auth-broker.git',
+    policyId: 'policy-default-defense',
+    schedule: '@daily',
+    enabled: false,
+    lastScanId: null,
+    lastScanAt: null,
+    createdAt: '2026-09-15T09:00:00Z',
+  },
+];
+
+export const mockEstateSummary: EstateSummary = {
+  totalTargets: 5,
+  totalScans: 48,
+  totalFindings: 184,
+  criticalFindings: 14,
+  pqcReadinessScore: 68.5,
+  activeAlerts: 3,
+};
+
+export const mockEstateTrend: EstateTrend = {
+  days: 30,
+  points: [
+    { date: '2026-08-22', avgRiskScore: 78.4, criticalCount: 28, totalFindings: 240 },
+    { date: '2026-08-25', avgRiskScore: 76.1, criticalCount: 26, totalFindings: 235 },
+    { date: '2026-08-28', avgRiskScore: 75.0, criticalCount: 25, totalFindings: 230 },
+    { date: '2026-08-31', avgRiskScore: 73.2, criticalCount: 23, totalFindings: 224 },
+    { date: '2026-09-03', avgRiskScore: 70.8, criticalCount: 21, totalFindings: 215 },
+    { date: '2026-09-06', avgRiskScore: 68.5, criticalCount: 19, totalFindings: 208 },
+    { date: '2026-09-09', avgRiskScore: 66.0, criticalCount: 18, totalFindings: 202 },
+    { date: '2026-09-12', avgRiskScore: 63.4, criticalCount: 16, totalFindings: 196 },
+    { date: '2026-09-15', avgRiskScore: 60.1, criticalCount: 15, totalFindings: 190 },
+    { date: '2026-09-18', avgRiskScore: 57.5, criticalCount: 14, totalFindings: 185 },
+    { date: '2026-09-20', avgRiskScore: 55.2, criticalCount: 14, totalFindings: 184 },
+  ],
+};
+
+export const mockDrifts: Record<string, Drift> = {
+  'target-001': {
+    targetId: 'target-001',
+    fromSnapshotId: 'snap-001',
+    toSnapshotId: 'snap-002',
+    added: [mockFindings[0]],
+    resolved: [mockFindings[1]],
+    changed: [
+      {
+        finding: mockFindings[2],
+        fromBand: 'high',
+        toBand: 'critical',
+      },
+    ],
+    summary: {
+      addedCount: 1,
+      resolvedCount: 1,
+      changedCount: 1,
+      netRiskDelta: -12.4,
+    },
+  },
+};
+
+export const mockAlerts: Alert[] = [
+  {
+    id: 'alt-001',
+    type: 'new-critical',
+    targetId: 'target-001',
+    findingId: 'f-001',
+    severity: 'critical',
+    message: 'New classical Shor-vulnerable RSA-2048 key detected in configs/sshd_config',
+    createdAt: '2026-09-20T07:15:20Z',
+    acknowledged: false,
+  },
+  {
+    id: 'alt-002',
+    type: 'cert-expiring',
+    targetId: 'target-003',
+    findingId: null,
+    severity: 'high',
+    message: 'Ingress certificate expiring in 14 days without ML-KEM hybrid extension',
+    createdAt: '2026-09-20T06:00:10Z',
+    acknowledged: false,
+  },
+  {
+    id: 'alt-003',
+    type: 'probe-downgrade',
+    targetId: 'target-003',
+    findingId: null,
+    severity: 'critical',
+    message: 'Active probe detected cipher suite downgrade to TLS_RSA_WITH_AES_128_CBC_SHA',
+    createdAt: '2026-09-19T22:45:00Z',
+    acknowledged: false,
+  },
+  {
+    id: 'alt-004',
+    type: 'drift',
+    targetId: 'target-001',
+    findingId: 'f-003',
+    severity: 'medium',
+    message: 'Drift detected: 1 new algorithm added, 1 algorithm migrated to PQC',
+    createdAt: '2026-09-18T11:20:00Z',
+    acknowledged: true,
+  },
+];
+
+export const mockProbes: ProbeResult[] = [
+  {
+    id: 'probe-001',
+    targetId: 'target-003',
+    host: 'api.payments.internal',
+    port: 443,
+    protocol: 'tls',
+    negotiated: {
+      version: 'TLSv1.3',
+      cipher: 'TLS_AES_256_GCM_SHA384',
+      keyExchange: 'X25519',
+      quantumSafe: false,
+    },
+    supported: [
+      { cipher: 'TLS_AES_256_GCM_SHA384', kex: 'X25519MLKEM768', quantumSafe: true },
+      { cipher: 'TLS_AES_256_GCM_SHA384', kex: 'X25519', quantumSafe: false },
+      { cipher: 'TLS_CHACHA20_POLY1305_SHA256', kex: 'X25519', quantumSafe: false },
+      { cipher: 'TLS_AES_128_GCM_SHA256', kex: 'secp256r1', quantumSafe: false },
+    ],
+    probedAt: '2026-09-20T06:00:00Z',
+  },
+  {
+    id: 'probe-002',
+    targetId: 'target-003',
+    host: 'api.payments.internal',
+    port: 22,
+    protocol: 'ssh',
+    negotiated: {
+      version: 'SSH-2.0-OpenSSH_9.6p1',
+      kex: 'sntrup761x25519-sha512@openssh.com',
+      cipher: 'chacha20-poly1305@openssh.com',
+      quantumSafe: true,
+    },
+    supported: [
+      { kex: 'sntrup761x25519-sha512@openssh.com', quantumSafe: true },
+      { kex: 'curve25519-sha256', quantumSafe: false },
+      { kex: 'diffie-hellman-group-exchange-sha256', quantumSafe: false },
+    ],
+    probedAt: '2026-09-20T06:05:00Z',
+  },
+];
+
+export const mockHsmInventory: HsmInventory = {
+  slots: [
+    {
+      slot: 0,
+      label: 'SoftHSM v2 Slot 0 - Root Vault',
+      keys: [
+        { type: 'RSA', size: 4096, label: 'Root CA Signing Key (Shor-vulnerable)' },
+        { type: 'ECDSA', size: 256, label: 'Service Identity Key P-256' },
+        { type: 'AES', size: 256, label: 'Master DB Key Encryption Key (KEK)' },
+        { type: 'ML-KEM', size: 768, label: 'PQC Transport KEM Key (ML-KEM-768)' },
+      ],
+    },
+    {
+      slot: 1,
+      label: 'SoftHSM v2 Slot 1 - Payment Tokenizer',
+      keys: [
+        { type: 'AES', size: 256, label: 'PAN Encryption Key AES-256-XTS' },
+        { type: 'ML-DSA', size: 65, label: 'Audit Log Signature Key (ML-DSA-65)' },
+        { type: 'DES3', size: 168, label: 'Legacy EMV Debit Key (Classically Broken)' },
+      ],
+    },
+  ],
+};
+
+export const mockAuditVerify: AuditVerifyResponse = {
+  status: 'valid',
+  recordCount: 1248,
+  headHash: '7f9a8b1c2d3e4f5061728394a5b6c7d8e9f0123456789abcdef0123456789abc',
+  details: 'Cryptographic SHA-256 hash chain intact across 1248 log entries. Zero tampering detected.',
+};
+

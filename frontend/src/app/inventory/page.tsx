@@ -214,7 +214,7 @@ export default function InventoryPage() {
       </div>
 
       {isLoading ? (
-        <div className="p-12 text-center border border-[var(--border-subtle)] rounded-lg bg-[var(--surface-card)]">
+        <div className="p-12 text-center border border-[var(--border-subtle)] rounded-lg bg-[var(--surface-card)] animate-pulse">
           <RefreshCw className="w-5 h-5 animate-spin text-[var(--crypto-pqc)] mx-auto mb-2" />
           <span className="text-xs text-[var(--text-muted)]">LOADING DISCOVERED ASSET INVENTORY...</span>
         </div>
@@ -289,6 +289,17 @@ export default function InventoryPage() {
                           label={f.family ?? undefined}
                           size="sm"
                         />
+                        {f.negotiated !== undefined && f.negotiated !== null && (
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider border ${
+                              f.negotiated
+                                ? 'bg-[var(--crypto-pqc-bg)] text-[var(--crypto-pqc)] border-[var(--crypto-pqc-border)]'
+                                : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+                            }`}
+                          >
+                            {f.negotiated ? 'NEGOTIATED' : 'SUPPORTED'}
+                          </span>
+                        )}
                         {isProposed && (
                           <span
                             title="[Proposed: Hardware security module & cloud discovery pending backend implementation]"
