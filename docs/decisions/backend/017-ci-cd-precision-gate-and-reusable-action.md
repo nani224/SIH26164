@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (in progress — see Consequences for what remains)
+Accepted — real blocked PR demonstrated: https://github.com/nani224/SIH26164/pull/9
 
 ## Context
 
@@ -65,24 +65,46 @@ repo with a PR that actually gets blocked by this Action.
 
 - `backend-ci.yml` now fails if this repo's own detection precision ever
   regresses below 0.95 on either corpus -- a real gate, not a rule
-  someone has to remember to check by hand.
-- The reusable Action and policy file are real, tested (locally, against
-  a real hand-built vulnerable sample) infrastructure -- but **not yet
-  proven against a real external repository and a real GitHub PR**,
-  which is what the brief's "create a deliberately-vulnerable demo repo
-  and open a REAL PR that gets REALLY BLOCKED" step is for. Creating a
-  new external repository and opening a real PR under the user's GitHub
-  identity is a visible, hard-to-reverse action outside this session's
-  current repository scope (`nani224/SIH26164` only) -- flagged to the
-  user rather than done unilaterally or silently skipped. If authorized
-  and a target repository is provided, the remaining work is
-  straightforward given everything above: add a workflow file calling
-  `ecdat-scan-reusable.yml` to that repo, commit a file introducing an
-  RSA-1024 key generation (or similar critical-band pattern), open a PR,
-  and confirm the check fails for real.
+  someone has to remember to check by hand. Proven for real on GitHub's
+  own runner (not just locally) in PR #8: https://github.com/nani224/SIH26164/pull/8
+  (backend-ci `success`, including the new precision-floor step) -- the
+  first time this session's entire M0-M5 work was validated by GitHub's
+  Actions infrastructure rather than only local `uv run` commands.
+- **The real-blocked-PR demonstration is done**:
+  https://github.com/nani224/SIH26164/pull/9 introduces
+  `demo/vulnerable-app/legacy_auth.py` (a 1024-bit RSA keygen) and is
+  genuinely blocked -- the `ecdat-demo / scan` check reports `failure`
+  (exit 1), the PR's `mergeable_state` is `unstable`, and
+  `post_pr_comment.py` posted a real findings-table comment
+  (https://github.com/nani224/SIH26164/pull/9#issuecomment-5746916900)
+  via `GITHUB_TOKEN`, all on GitHub's actual infrastructure -- not a
+  local simulation. Not a separate external repository, as the brief
+  originally envisioned: repo creation via the GitHub App integration is
+  403-blocked (`Resource not accessible by integration` -- GitHub Apps
+  generally cannot create repositories via the API at all, independent of
+  which permissions are granted; confirmed by retrying after the user
+  checked the app's permission page), and the user, once informed,
+  redirected this to a same-repo demo instead (`demo/vulnerable-app/` +
+  `.github/workflows/demo-vulnerable-check.yml`, calling the *same*
+  reusable workflow an external repo would call via
+  `nani224/SIH26164/.github/workflows/ecdat-scan-reusable.yml@main`,
+  just referenced locally as `./.github/workflows/ecdat-scan-reusable.yml`
+  since this workflow lives in the same repo it's demonstrating).
+- **Real bug caught and fixed by this exact demonstration, not before
+  it**: the first run of `demo-vulnerable-check.yml` (on PR #8, then
+  again on PR #9) failed with `startup_failure` --
+  `"The nested job 'scan' is requesting 'pull-requests: write', but is
+  only allowed 'pull-requests: none'"` -- because the calling workflow
+  didn't declare `permissions:`, so it defaulted to read-only and
+  couldn't grant what `ecdat-scan-reusable.yml`'s job requests. Fixed by
+  adding explicit `permissions: {contents: read, pull-requests: write}`
+  to the calling job. This is exactly the value of actually running the
+  thing on real infrastructure instead of stopping at "the YAML parses
+  and the underlying script works locally" -- a composite-Action
+  permission-propagation bug like this has no local equivalent to catch
+  it against.
 - `.github/actions/ecdat-scan/action.yml`'s cross-repo checkout step
-  (`repository: nani224/SIH26164`) has not been exercised inside an
-  actual GitHub Actions runner -- verified for YAML syntax validity only
-  (`yaml.safe_load`), not for actually running end-to-end on GitHub's
-  infrastructure. The underlying script it calls (`ci_scan.py`) *has*
-  been verified end-to-end locally.
+  (`repository: nani224/SIH26164`) is now proven on real GitHub Actions
+  infrastructure (PR #9's run: real checkout of this repo's `backend/`,
+  real `uv sync`, real scan, real exit code, real PR comment) -- no
+  longer YAML-syntax-validated only.

@@ -211,15 +211,28 @@ dependency-ordered milestones:
       unaffected (56/56). See ADR 016 and 2026-09-19 PROGRESS.md entry.
       Go's 4-FN cluster untouched -- next candidate, not attempted this
       pass.
-- [~] **M5** (partial) — Built and locally-verified: `.ecdat-policy.yml`
-      policy-as-code, `backend/bench/check_precision_floor.py` wired into
-      `backend-ci.yml` as a real CI gate, `backend/bench/ci_scan.py`
-      (verified end-to-end against a real RSA-1024 sample: correctly
-      blocks, exit 1), `backend/bench/post_pr_comment.py` (GITHUB_TOKEN,
-      no third-party action), `.github/actions/ecdat-scan/action.yml` +
+- [x] **M5** — `.ecdat-policy.yml` policy-as-code,
+      `backend/bench/check_precision_floor.py` wired into `backend-ci.yml`
+      as a real CI gate, `backend/bench/ci_scan.py`,
+      `backend/bench/post_pr_comment.py` (GITHUB_TOKEN, no third-party
+      action), `.github/actions/ecdat-scan/action.yml` +
       `.github/workflows/ecdat-scan-reusable.yml`. 11 new tests, full
-      gates green. **Not done**: the real deliberately-vulnerable demo
-      repo + real blocked PR -- needs a new external GitHub repository,
-      flagged to the user for authorization rather than created
-      unilaterally (see ADR 017 and 2026-09-19 PROGRESS.md entry).
+      gates green -- proven for real on GitHub's own Actions
+      infrastructure via PR #8 (backend-ci `success`, first time this
+      session's work ran on real CI, not just local `uv run`). Real
+      blocked-PR demonstration: PR #9
+      (https://github.com/nani224/SIH26164/pull/9) introduces a
+      1024-bit RSA keygen and is genuinely blocked (`ecdat-demo / scan`:
+      `failure`, `mergeable_state`: `unstable`, real findings-comment
+      posted via GITHUB_TOKEN) -- same-repo demo (`demo/vulnerable-app/`)
+      rather than a separate external repo, since GitHub App
+      integrations can't create repositories via the API (403,
+      confirmed architectural, not a missing permission); the user
+      redirected to this approach once informed. A real
+      permission-propagation bug (`startup_failure`: nested job
+      requesting `pull-requests: write` but only allowed `none`) was
+      caught and fixed by this exact demonstration -- see ADR 017 and
+      2026-09-20 PROGRESS.md entry for full detail.
+
+Track CC v0.3 mandate (M0-M5) complete.
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.

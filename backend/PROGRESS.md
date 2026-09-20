@@ -1,5 +1,61 @@
 # ECDAT Backend — Progress
 
+## 2026-09-20 — Track CC M5 complete: real blocked PR on GitHub's actual infrastructure
+
+Finished what the previous entry left open. First, opened a real PR
+(#8, https://github.com/nani224/SIH26164/pull/8) for all of this
+session's M0-M5 work, since none of it had ever run on GitHub's actual
+Actions infrastructure before -- only local `uv run` commands. Real
+result: `backend-ci` `success`, including the new precision-floor step,
+on GitHub's own runner. Merged.
+
+Then the demo repo: repository creation via the GitHub App integration
+is 403-blocked (`Resource not accessible by integration`) -- confirmed
+this is a GitHub App architecture limit, not a missing permission, by
+retrying after the user checked the app's installation permissions page
+(no "Administration" scope offered at all). The user redirected this to
+a same-repo demo instead: `demo/vulnerable-app/` +
+`.github/workflows/demo-vulnerable-check.yml`, calling the exact same
+`ecdat-scan-reusable.yml` an external repo would call (just via a local
+path reference instead of the cross-repo `nani224/SIH26164/...@main`
+form, since this workflow lives in the repo it demonstrates).
+
+Opened PR #9 (https://github.com/nani224/SIH26164/pull/9), introducing
+`demo/vulnerable-app/legacy_auth.py` -- a 1024-bit RSA keygen. **First
+run: `startup_failure`** -- `"The nested job 'scan' is requesting
+'pull-requests: write', but is only allowed 'pull-requests: none'"`. A
+real bug, caught only by actually running this on GitHub's
+infrastructure (no local equivalent exists for a composite-Action
+permission-propagation failure): the calling workflow didn't declare
+`permissions:`, defaulting to read-only. Fixed
+(`permissions: {contents: read, pull-requests: write}` on the calling
+job), pushed, re-ran. Real result:
+
+```
+## ECDAT scan: 2 finding(s), worst band critical
+| critical | 90.0 | RSA | keygen | legacy_auth.py:14 | ML-KEM-768 |
+| low | 12.2 | RSA | sign | legacy_auth.py:21 | ML-DSA-65 |
+BLOCKED: 1 finding(s) at or above the gate band (critical).
+##[error]Process completed with exit code 1.
+Posted findings comment to nani224/SIH26164#9.
+```
+
+Check `ecdat-demo / scan`: **failure**. PR #9's `mergeable_state`:
+**unstable**. A real findings-table comment posted by `github-actions[bot]`
+via `GITHUB_TOKEN`: https://github.com/nani224/SIH26164/pull/9#issuecomment-5746916900.
+PR #9 left open (not merged) as the demonstration artifact -- it's
+deliberately vulnerable and isn't meant to land.
+
+Ported the same one-line permissions fix to `main` via a small separate
+branch (`fix/demo-check-permissions`) so the demo infrastructure is
+correct there too, not just on the demo PR's own branch.
+
+Full writeup, including the exact reasoning for why a same-repo demo
+replaced the originally-planned separate external repo, in
+`docs/decisions/backend/017-ci-cd-precision-gate-and-reusable-action.md`.
+
+Track CC v0.3 mandate (M0-M5) is now complete.
+
 ## 2026-09-19 — Track CC M5 (in progress): CI/CD precision gate + reusable Action
 
 Built the in-repo, fully-verifiable half of M5:
