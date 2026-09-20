@@ -32,14 +32,15 @@ from api.models import (
     Surface,
     Triage,
 )
-from engine import source_c, source_go, source_java, source_python
+from engine import binary, source_c, source_csharp, source_go, source_java, source_python, source_rust
 from engine.factors import derive_risk
 from engine.models import Detection, ScanResult, Span
 from engine.recommend import recommend
 
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".mypy_cache", ".ruff_cache"}
 _C_FAMILY_EXTENSIONS = {".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hxx"}
-_SOURCE_EXTENSIONS = {".py", ".go", ".java", ".bin", ".elf", ".so"} | _C_FAMILY_EXTENSIONS
+_BINARY_EXTENSIONS = {".bin", ".elf", ".so", ".exe", ".dll", ".sys", ".dylib", ".macho"}
+_SOURCE_EXTENSIONS = {".py", ".go", ".java", ".rs", ".cs"} | _C_FAMILY_EXTENSIONS | _BINARY_EXTENSIONS
 # Per-file cap: engine/ingest.py bounds the whole archive (5 GB uncompressed,
 # 50k files), but nothing previously bounded a single pathological file --
 # one huge source/binary file could still exhaust memory since read_bytes()
@@ -96,9 +97,7 @@ def _iter_source_files(target: Path) -> list[Path]:
     if target.is_file():
         return [target] if target.suffix in _SOURCE_EXTENSIONS else []
     files: list[Path] = []
-    extensions = ("*.py", "*.go", "*.java", "*.bin", "*.elf", "*.so") + tuple(
-        f"*{ext}" for ext in sorted(_C_FAMILY_EXTENSIONS)
-    )
+    extensions = tuple(f"*{ext}" for ext in sorted(_SOURCE_EXTENSIONS))
     for ext in extensions:
         files.extend(target.rglob(ext))
     return [
@@ -171,8 +170,12 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
             detections = source_java.detect_code(source, rel_path, artifact_hash)
         elif file_path.suffix in _C_FAMILY_EXTENSIONS:
             detections = source_c.detect_code(source, rel_path, artifact_hash)
-        elif file_path.suffix in {".bin", ".elf", ".so"}:
-            detections = _detect_binary(source, rel_path, artifact_hash)
+        elif file_path.suffix == ".rs":
+            detections = source_rust.detect_code(source, rel_path, artifact_hash)
+        elif file_path.suffix == ".cs":
+            detections = source_csharp.detect_code(source, rel_path, artifact_hash)
+        elif file_path.suffix in _BINARY_EXTENSIONS:
+            detections = binary.scan_binary(source, rel_path, artifact_hash)
         else:
             detections = source_python.detect(rel_path, source, artifact_hash)
         for detection in detections:

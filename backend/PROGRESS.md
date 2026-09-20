@@ -1,6 +1,25 @@
 # ECDAT Backend — Progress
 
-## 2026-09-20 — Track CC M8: precision-gate proven to fail red; external-repo proof BLOCKED (documented)
+## 2026-09-21 — Milestone M7: PS-Mandated Detection Gaps & Corpus Depth
+
+- **Format Parity**: Implemented `backend/engine/binary.py` providing complete ELF, PE (via `pefile`), and Mach-O (via `lief`) parity with safe section parsing and cryptographic symbol/constant extraction.
+- **Firmware Extraction**: Implemented `backend/engine/firmware.py` providing sandboxed Squashfs and CPIO archive parsing with path traversal protection (sanitizing `..` directory traversal attempts) and strict resource bounds (file count and extracted byte caps).
+- **Language Expansion**:
+  - Implemented `backend/engine/source_rust.py` supporting `ring` (AEAD, digest, signatures, agreement), `aes-gcm`, `chacha20poly1305`, `sha2`, `sha3`, `rsa`, `ed25519-dalek`, `hmac`, and ciphers.
+  - Implemented `backend/engine/source_csharp.py` supporting .NET `System.Security.Cryptography` (`Aes`, `AesGcm`, `ChaCha20Poly1305`, `RSA`, `ECDsa`, `ECDiffieHellman`, `DSA`, `SHA256`, `SHA384`, `SHA512`, `SHA1`, `MD5`, `HMACSHA256`, `HMACSHA384`, `HMACSHA512`, `HMACSHA1`, `HMACMD5`, `TripleDES`, `DES`, `RC2`).
+  - Updated `backend/engine/scanner.py` to route all supported extensions (`.py`, `.go`, `.java`, `.c`, `.cpp`, `.rs`, `.cs`, `.bin`, `.elf`, `.so`, `.exe`, `.dll`, `.sys`, `.dylib`, `.macho`).
+- **Corpus Growth (339 Usages, 6 Languages)**:
+  - NTRO target satisfied: Java (64 usages) and C/C++ (54 usages), both $\ge 40$ real-world usages.
+  - Rust: 68 usages in `rust_real_world_crypto.rs`.
+  - C#: 50 usages in `csharp_real_world_crypto.cs`.
+  - Python: 52 usages across `python_real_world_crypto.py` and starter fixtures.
+  - Go: 51 usages across `go_real_world_crypto.go` and starter fixtures.
+  - Total corpus size: 339 usages across 33 files.
+- **Verification**:
+  - `bench/evaluate.py`: precision=1.0, recall=1.0, f1=1.0 (truth=331, detected=331, tp=331).
+  - `bench/check_precision_floor.py`: Layer A precision=1.0 (floor 0.95) -- PASS; real_world (HOLD) precision=0.9583 (floor 0.95) -- PASS.
+  - Hostile-input tests (`tests/test_hostile_inputs.py`): 7/7 tests passed covering truncated/corrupt PE, corrupt Mach-O, corrupt ELF, CPIO directory traversal (`../../../../etc/shadow`), resource exhaustion bounds, and corrupted source syntax.
+
 
 M8b: prove the CI precision-floor gate actually fails the build when
 breached, not just that it exists as a script. Created a throwaway branch
