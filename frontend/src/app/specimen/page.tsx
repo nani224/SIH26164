@@ -383,7 +383,12 @@ export default function SpecimenPage() {
         </div>
 
         {/* High-density analyst table */}
-        <div className="overflow-x-auto border border-[var(--border-subtle)] rounded bg-[var(--surface-base)]">
+        <div
+          className="overflow-x-auto border border-[var(--border-subtle)] rounded bg-[var(--surface-base)]"
+          tabIndex={0}
+          role="region"
+          aria-label="Specimen findings table"
+        >
           <table className="w-full text-left text-xs font-mono border-collapse">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-secondary)]">

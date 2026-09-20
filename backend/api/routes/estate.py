@@ -81,11 +81,20 @@ def get_estate_trend(days: int = Query(default=30, ge=1, le=365)) -> EstateTrend
             if day_snaps:
                 total_f = sum(s.total_findings for s in day_snaps) // len(day_snaps)
                 crit = sum(s.bands.get("critical", 0) for s in day_snaps) // len(day_snaps)
-                crit_weighted = sum(
-                    s.bands.get("critical", 0) * 80.0 + s.bands.get("high", 0) * 40.0
+                # Per-snapshot weighted score (critical/high bands, findings-weighted),
+                # averaged across the day's snapshots. Found via the G3 functional-proof
+                # pass: the previous version divided one day's SUM of per-snapshot
+                # crit_weighted values by a single day-average total_f, producing scores
+                # far outside the formula's intended 0-100 range (e.g. 400.0 for a day
+                # with 5 snapshots) whenever more than one snapshot landed on the same
+                # day -- exactly the real-scheduler scenario this endpoint exists for.
+                # The existing unit test only checked the response shape, not the value,
+                # so this never surfaced until a real multi-scan day was exercised.
+                per_snapshot_scores = [
+                    (s.bands.get("critical", 0) * 80.0 + s.bands.get("high", 0) * 40.0) / max(1, s.total_findings)
                     for s in day_snaps
-                )
-                avg_score = round(crit_weighted / max(1, total_f), 1)
+                ]
+                avg_score = round(sum(per_snapshot_scores) / len(day_snaps), 1)
             else:
                 total_f = 0
                 crit = 0

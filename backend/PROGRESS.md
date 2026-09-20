@@ -1554,4 +1554,148 @@ persistence wiring behind the existing contract).
    - `uv run mypy --strict .` -> Success (0 issues in 88 source files).
    - `uv run pytest` -> 144 passed, 0 failed in 30.04s across all test suites.
 
+---
+
+## 2026-09-20 — Session (Track A1 Functional Proof Pass, then Finale G1-G5)
+
+### Status: v0.3.0-sih-finale FINALE PASS COMPLETE
+
+### Track A1 P1-P7: real functional proofs against a live server
+All 7 proofs (scheduler fires unprompted, drift is real, negotiated !=
+supported, alert+webhook, HSM returns real keys, audit verify catches
+tampering, rescore timing explained) run with real request/response
+evidence, not unit tests. Found 1 real bug: drift finding-identity
+collision missing `location.line` -- two distinct findings on different
+lines of the same file were treated as the same finding, which would
+silently drop a real new weak algorithm from a drift `added[]` diff.
+Fixed in `backend/api/store.py` (`88afa13`), merged to `main` (`02135b9`)
+before the finale pass began.
+
+### Finale G1 — pre-flight gates
+Every backend/bench/frontend/contract gate re-run clean on
+`release/v0.3.0` (branched from `main` at `72f6650`). Frontend generated
+types confirmed matching contract 0.3.0 exactly (regenerated and diffed).
+
+### Finale G2 — real stack up
+`api` (uvicorn, real SQLite), `web` (`next start`, `NEXT_PUBLIC_ENABLE_MSW=false`
+-- confirmed this must be set at BUILD time, not runtime, since Next.js
+inlines `NEXT_PUBLIC_*` vars), a weak-TLS demo container, a local
+container registry, and host-installed SoftHSM2 (2 keys) all brought up
+and health-confirmed. Sandbox-specific workarounds (image re-tagging via
+`mirror.gcr.io`, host-generated TLS cert to avoid the sandbox's
+container-CA-trust gap) documented in
+`docs/decisions/backend/021-g2-real-stack-verification.md` -- not baked
+into `docker-compose.yml`/`Dockerfile`, which stay correct for a normal
+deployment host.
+
+### Finale G3 — 14-step real continuous-operation scenario
+Ran in full depth once end to end (all 14 steps, real evidence for each),
+finding and fixing 1 real bug: `/estate/trend`'s day-aggregation divided
+one day's *summed* per-snapshot weighted score by a single day-average
+finding count, producing scores up to 400.0 (intended scale 0-100) when
+multiple scheduled scans landed on the same day. Fixed in
+`backend/api/routes/estate.py` (`79d2345`) to average each snapshot's own
+weighted score; verified live: 400.0 -> 62.9 on the same underlying rows
+after a server restart. Regression test added
+(`test_estate_trend_multiple_snapshots_same_day_stays_in_range`). A
+lighter second pass re-ran the dynamic/timing-sensitive core
+(scheduler->drift->alert) against a fresh target to check for flakiness;
+the static/UI-level steps (probes, Mosca, triage, HSM, audit, CBOM,
+hostile upload) were not literally re-run a second time but had already
+been proven once with real evidence.
+
+### Finale G4 — cross-cutting (air-gap, accuracy, performance, a11y, security)
+Real evidence, 3 more real bugs found and fixed, 1 real exception
+documented:
+
+- **Air-gap** (`b136314`): `scripts/verify_airgap.py` never covered
+  `probes/` or `scheduler/` -- the entire v0.3 continuous-operation
+  surface -- so nothing had mechanically checked either directory's
+  network behavior. Extended with `NETWORK_CAPABLE_MODULES` and a
+  `probes.guard`-or-documented-exception rule; both new rules proven
+  with real deliberately-introduced violations (temp `import httpx` in
+  `engine/scanner.py` caught; temp-removing the `webhook.py` allowlist
+  entry caught), then reverted.
+- **Accuracy**: `bench/evaluate.py` -> `precision=1.0 recall=1.0 f1=1.0`
+  (64 usages). `bench/real_world/evaluate.py` ->
+  `precision=0.9583 recall=0.8214 f1=0.8846` (tp=46, detected=48,
+  truth=56), with a real per-language breakdown computed for the first
+  time (C 1.0/1.0, Java 1.0/1.0, Python 1.0/0.80, Go 0.9048/0.7917).
+  CI precision-gate fail-red/pass-green already proven with real evidence
+  in PR #12 during the Track CC M5/M8 milestones -- not re-proven this
+  pass, cited instead.
+- **Performance** (`94172aa`): seeded a real 10,000-finding scan against
+  a throwaway uvicorn instance and measured `GET /scans/{id}/findings`
+  over 60 real HTTP requests: **p50 710.49ms, p95 773.25ms** -- far over
+  the 150ms budget. Root cause: `store.list_findings()` always
+  materialized every finding for the scan into a full Pydantic object
+  before pagination ran, regardless of the requested page size. Fixed
+  with `store.count_findings()`/`store.list_findings_page()`'s SQL-level
+  `LIMIT`/`OFFSET` fast path for the common unfiltered case. Re-measured:
+  **p50 8.34ms, p95 10.97ms**. Rescore-10k and estate-graph-FPS numbers
+  carried forward from already-settled earlier diagnostics (Track A1 P7;
+  the 2026-09-19 FPS software-rasterizer finding), not re-litigated.
+- **Accessibility** (`9b5e9f8`): a real axe-core Playwright scan (own
+  script injecting the repo's vendored `axe-core@4.13.0`, not the
+  mock-backed `@axe-core/playwright` suite) across all 15 real routes x
+  both themes = 30 combinations, MSW off, against the live backend.
+  29/30 clean; `/specimen` (the only route with zero axe coverage in the
+  whole repo) failed `scrollable-region-focusable` (serious) in both
+  themes. Fixed with `tabIndex`/`role`/`aria-label` on the scroll
+  container; added `e2e/specimen.spec.ts` to close the coverage gap
+  permanently. Re-scanned after the fix and after an unrelated `postcss`
+  dependency bump: **30/30 clean, 0 violations**, both times.
+- **Security** (`ecbaaf8`): `gitleaks --log-opts="--all"` (full history,
+  75 commits) -> 8 hits, all manually verified false positives (type
+  annotations, an algorithm constant, fabricated test/mock key material
+  with literal `"..."`/`"SECRET"` placeholders). `trivy fs` (CA bundle
+  mounted into the container to work around the sandbox's
+  container-CA-trust gap) found 5 real HIGH CVEs: `postcss` (2, pinned
+  internally by Next.js) fixed via a `pnpm.overrides`; `cryptography` (3)
+  confirmed unfixable today -- `sslyze` 6.3.1 (latest on PyPI) hard-pins
+  `cryptography<47`, and `46.0.7` is already the newest release
+  satisfying that bound, with every fix landing at `>=47` -- documented
+  as an accepted, upstream-blocked exception with an exposure assessment
+  in `docs/decisions/backend/022-cryptography-cve-blocked-by-sslyze.md`.
+  `trivy image` on the demo's third-party base images: `nginx:alpine`
+  clean, `registry:2` 27 HIGH/CRITICAL (upstream's Go binary, not an
+  ECDAT-built artifact). Rate-limiter bypass env flags
+  (`ECDAT_RATE_LIMIT_DISABLED`, `ECDAT_RATE_LIMIT_TRUST_TEST_HEADER`)
+  confirmed absent from both compose files.
+
+### Finale G5 — release
+`README.md` fully rewritten with only real, dated (2026-09-20) numbers
+from this pass's own G1-G4 loops (no earlier-phase numbers carried
+forward uncredited). New `docs/DEMO_SCRIPT.md` (7-minute jury
+walkthrough) and `CHANGELOG.md` (v0.3.0, grouped by track). `Makefile`'s
+`make demo` rewired to actually bring up the real Docker stack per G2's
+own exit criteria (previously only seeded a local SQLite file despite
+`docker-compose.yml` already having the services); old behavior preserved
+as `make demo-seed`. `docs/decisions/backend/021-g2-real-stack-verification.md`
+written for real (docker-compose.yml already referenced this exact
+filename in a comment; the file had never actually been created).
+
+### Full gate output (2026-09-20, final)
+```
+uv run ruff check .                    -> All checks passed!
+uv run mypy --strict .                 -> Success: no issues found in 98 source files
+uv run pytest --cov                    -> 207 passed, 4 warnings (93% coverage)
+uv run python scripts/contract_diff.py -> No contract drift.
+pnpm typecheck / pnpm lint             -> 0 errors
+pnpm test:unit                         -> 58 passed (14 files)
+pnpm knip                              -> 0 issues
+pnpm build                             -> 15 routes + /_not-found, exit 0
+pnpm test:e2e (MSW off, real backend)  -> 29/33 passed (4 explained, see README)
+```
+
+### What remains (honest, not silently dropped)
+- External-repo CI proof still blocked on a one-time human action (ADR 020).
+- Real-world HOLD corpus (56 usages) short of the brief's 150-usage target.
+- No custom `api`/`web` container image built or vulnerability-scanned in
+  this sandbox (documented Docker build limitation, ADR 021).
+- 3 pre-existing Playwright tests coupled to MSW-fixture-only literal
+  strings fail against the real backend -- a test-authoring gap.
+- `cryptography` HIGH CVEs unfixable today without an unverified `sslyze`
+  compatibility gamble (ADR 022).
+
 

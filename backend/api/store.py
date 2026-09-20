@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 
 from api import db, stub_data
 from api.db_models import (
@@ -142,6 +142,37 @@ def list_findings(scan_id: str) -> list[Finding]:
         return [db.record_to_finding(r) for r in records]
 
 
+def count_findings(scan_id: str) -> int:
+    """Real SQL COUNT, no row materialization -- used by list_findings_page's
+    fast path so the FindingPage.total field doesn't require pulling every row."""
+    with db.session_scope() as session:
+        result = session.exec(
+            select(func.count()).select_from(FindingRecord).where(FindingRecord.scan_id == scan_id)
+        ).one()
+        return int(result)
+
+
+def list_findings_page(scan_id: str, *, offset: int, limit: int) -> list[Finding]:
+    """SQL-level LIMIT/OFFSET fast path for the (band/family/surface/source/
+    minConfidence/needsReview/q/sort)-free case -- found via the G4 perf pass:
+    list_findings() always materializes every finding for the scan into a full
+    Pydantic Finding (nested risk/location submodels) before any filtering or
+    pagination happens, which measured at ~700-780ms p50/p95 for a 10k-finding
+    scan's default GET /findings call against a real running server -- far over
+    the mandate's 150ms budget. This path only ever constructs up to `limit`
+    Finding objects, ordered by id for stable pagination (matches the DB's
+    natural insertion order, same as the unsorted fallback path already did)."""
+    with db.session_scope() as session:
+        records = session.exec(
+            select(FindingRecord)
+            .where(FindingRecord.scan_id == scan_id)
+            .order_by(col(FindingRecord.id))
+            .offset(offset)
+            .limit(limit)
+        ).all()
+        return [db.record_to_finding(r) for r in records]
+
+
 def get_finding(finding_id: str) -> Finding | None:
     with db.session_scope() as session:
         rec = session.get(FindingRecord, finding_id)
@@ -202,14 +233,24 @@ def rescore_scan_findings(
         is_sqlite = session.bind.dialect.name == "sqlite" if session.bind else True
         ph = "?" if is_sqlite else "%s"
 
-        # Check scan exists
-        cur.execute(f"SELECT id FROM scans WHERE id = {ph}", (scan_id,))
+        # Check scan exists. `ph` is always the literal "?" or "%s" placeholder
+        # token chosen by dialect above, never derived from input; `scan_id`
+        # itself is bound as a real query parameter below, not interpolated
+        # -- this is parameterized SQL, not string-built SQL. (Reviewed G4,
+        # Track A1/finale: bandit B608 flags the f-string shape without
+        # seeing that only the placeholder token is interpolated.)
+        cur.execute(f"SELECT id FROM scans WHERE id = {ph}", (scan_id,))  # nosec B608
         if not cur.fetchone():
             return None, b""
 
         # Invariant: Classically broken algorithms have U=1.0 invariant and never change with Z.
         # Filtering (risk_classically_broken = 0 OR risk_classically_broken IS NULL) eliminates 40% of rows
         # from CTE calculation and index search, cutting query time in half.
+        # `new_z`/`two_z` are interpolated directly (not bound) but are guaranteed
+        # `float` by the cast at the top of this function -- a float literal can't
+        # carry SQL syntax, so this isn't an injection vector despite the f-string
+        # shape bandit's B608 rule flags. `ph`/`scan_id` below are the placeholder
+        # token and a real bound parameter, same as the query above.
         sql = f"""
         WITH urgency AS (
             SELECT
@@ -297,7 +338,9 @@ def rescore_scan_findings(
         cur.execute(sql, (scan_id,))
         changed_json_strings = [r[0] for r in cur.fetchall()]
 
-        cur.execute(f"SELECT risk_band, COUNT(*) FROM findings WHERE scan_id = {ph} GROUP BY risk_band", (scan_id,))
+        cur.execute(
+            f"SELECT risk_band, COUNT(*) FROM findings WHERE scan_id = {ph} GROUP BY risk_band", (scan_id,)  # nosec B608
+        )
         band_rows = cur.fetchall()
         bands: dict[str, int] = {"critical": 0, "high": 0, "medium": 0, "low": 0}
         for b, c in band_rows:
@@ -307,7 +350,7 @@ def rescore_scan_findings(
         scan_up_sql = f"""UPDATE scans
                           SET bands = {ph},
                               crqc_years = COALESCE({ph}, crqc_years)
-                          WHERE id = {ph}"""
+                          WHERE id = {ph}"""  # nosec B608 -- placeholder token only, all 3 values bound below
         cur.execute(scan_up_sql, (json.dumps(bands), crqc_years, scan_id))
 
         total_rows_rescored = sum(bands.values())
