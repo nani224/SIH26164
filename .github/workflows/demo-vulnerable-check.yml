@@ -19,6 +19,9 @@ on:
 
 jobs:
   ecdat-demo:
+    permissions:
+      contents: read
+      pull-requests: write
     uses: ./.github/workflows/ecdat-scan-reusable.yml
     with:
       scan-path: demo/vulnerable-app
