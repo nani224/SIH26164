@@ -134,6 +134,36 @@ def test_java_keyagreement_ecdh() -> None:
     assert detections[0].function == CryptoFunction.KEYDERIVE
 
 
+def test_java_secretkeyfactory_pbkdf2() -> None:
+    # M7: found while sourcing a real HOLD candidate (Spring Security's
+    # Pbkdf2PasswordEncoder) that uses SecretKeyFactory for key derivation.
+    code = b"""
+    public class P {
+      void run() throws Exception {
+        SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+      }
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 1
+    assert detections[0].family == Family.HMAC
+    assert detections[0].function == CryptoFunction.KEYDERIVE
+    assert detections[0].underlying_hash_family == Family.SHA_2
+
+
+def test_java_secretkeyfactory_non_pbkdf2_unmapped() -> None:
+    # Legacy PBEWith... names intentionally unmapped -- no Family maps
+    # cleanly onto a password-based-encryption transform, so don't guess.
+    code = b"""
+    public class P {
+      void run() throws Exception {
+        SecretKeyFactory f = SecretKeyFactory.getInstance("PBEWithMD5AndDES");
+      }
+    }
+    """
+    assert detect_code(code) == []
+
+
 def test_java_secretkeyspec_key_material() -> None:
     code = b"""
     public class K {

@@ -101,6 +101,10 @@
     {"family": "AES", "function": "encrypt", "line": 6}
   ],
   "no_crypto.c": [],
+  "JavaSecretKeyFactory.java": [
+    {"family": "HMAC", "function": "keyderive", "line": 5},
+    {"family": "HMAC", "function": "keyderive", "line": 6}
+  ],
   "go_sign_verify.go": [
     {"family": "RSA", "function": "sign", "line": 10},
     {"family": "RSA", "function": "verify", "line": 11},

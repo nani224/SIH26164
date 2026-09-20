@@ -10,6 +10,11 @@ of direct BouncyCastle lightweight-API class usages (`new SHA256Digest()`,
 the JCA transformation-string path since the provider arg doesn't change
 the shape of the `getInstance` call.
 
+M7 (Track CC): also `javax.crypto.SecretKeyFactory.getInstance("PBKDF2With...")`
+-- found while sourcing a real HOLD candidate (Spring Security's
+Pbkdf2PasswordEncoder). Reported as Family.HMAC/KEYDERIVE since PBKDF2 is
+itself an HMAC-based KDF, not a distinct Family enum value.
+
 Two things the query alone can't express, handled here in Python:
   - Transformation-string parsing (`"AES/GCM/NoPadding"`, `"SHA256withRSA"`,
     `"HmacSHA256"`) -- same string, three different JCA classes, three
@@ -44,6 +49,7 @@ _QUERY = tree_sitter.Query(_LANGUAGE, _QUERY_PATH.read_text())
 _GET_INSTANCE_CLASSES = {
     "Cipher", "KeyPairGenerator", "KeyGenerator", "MessageDigest",
     "Signature", "KeyAgreement", "Mac", "SSLContext", "KeyStore",
+    "SecretKeyFactory",
 }
 # For these classes, a later `var.initialize(...)`/`var.init(...)` call on
 # the assigned variable carries key size / curve info worth linking back.
@@ -305,6 +311,18 @@ def _classify_get_instance(
             kind=FindingKind.PROTOCOL, surface=Surface.SOURCE, family=None,
             display_name=f"SSLContext.getInstance(\"{transformation}\") TLS context",
             function=CryptoFunction.UNKNOWN, symbol=symbol, confidence=0.85, **common,
+        )
+
+    if class_name == "SecretKeyFactory":
+        if not transformation.startswith("PBKDF2"):
+            return None  # PBEWith... legacy names intentionally unmapped -- see ADR
+        underlying = _DIGEST_FAMILY.get(transformation.split("WithHmac", 1)[1]) \
+            if "WithHmac" in transformation else None
+        return Detection(
+            kind=FindingKind.PROTOCOL, surface=Surface.SOURCE, family=Family.HMAC,
+            display_name=f"SecretKeyFactory.getInstance(\"{transformation}\") PBKDF2 key derivation",
+            function=CryptoFunction.KEYDERIVE, symbol=symbol, confidence=0.88,
+            underlying_hash_family=underlying, **common,
         )
 
     if class_name == "KeyStore":
