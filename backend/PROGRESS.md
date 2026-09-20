@@ -1,5 +1,100 @@
 # ECDAT Backend — Progress
 
+## 2026-09-20 — Track CC M7: real-world corpus grown 32 -> 56 usages (9 -> 14 files)
+
+Follow-on mandate section 2 (M6-M9), M7: grow `bench/real_world/` toward
+150 usages, breadth of idiom over volume, strict label-before-run order.
+
+Sourced 5 new real, unseen, permissively-licensed files: `x_crypto_autocert.go`
+and `x_crypto_ssh_keys.go` (golang.org/x/crypto, BSD-3-Clause),
+`django_hashers.py` and `django_crypto.py` (Django, BSD-3-Clause),
+`spring_security_Pbkdf2PasswordEncoder.java` (Spring Security, Apache-2.0).
+A wolfSSL-API C candidate was searched for (to balance C's 2-file/OpenSSL+
+mbedTLS-only state) and not found in the time available -- wolfSSL's own
+example repos are GPL-licensed like the library, not vendorable. Documented
+honestly in the README rather than silently skipped.
+
+Reading the new files during sourcing (before any labelling) surfaced two
+real, generalizable API gaps, extended in their own commits before the
+motivating files were labelled or scored -- not tuning on HOLD:
+- `engine/source_go.py`: `crypto/dsa` `Sign`/`Verify` (found via
+  `x_crypto_ssh_keys.go`'s legacy ssh-dss support).
+- `engine/source_java.py`: `SecretKeyFactory` PBKDF2 transformation-string
+  parsing -> `Family.HMAC`/`KEYDERIVE` (found via
+  `spring_security_Pbkdf2PasswordEncoder.java`). Layer A: 62 -> 64 usages
+  from this alone, verified via `bench/evaluate.py` before the real-world
+  run.
+
+Dispatched 5 `corpus-labeler` subagents in parallel (one per file, no
+detector access), verified their line-number claims by hand against the
+actual files before trusting them, committed labels in their own commit
+(`ac031b7`, separate from both detector-capability commits), then ran
+`bench/real_world/evaluate.py` exactly once:
+
+```
+$ uv run python bench/real_world/evaluate.py
+precision=0.9583 recall=0.8214 f1=0.8846
+truth=56 detected=48 tp=46
+  false positive: ('x_crypto_ssh_keys.go', 'AES', 'encrypt', 1509)
+  false positive: ('x_crypto_ssh_keys.go', 'AES', 'encrypt', 1561)
+  false negative: ('django_crypto.py', 'HMAC', 'keyderive', 93)
+  false negative: ('django_hashers.py', 'HMAC', 'keyderive', 333)
+  false negative: ('django_hashers.py', 'SHA-2', 'digest', 514)
+  false negative: ('gorilla_securecookie.go', 'AES', 'decrypt', 420)
+  false negative: ('gorilla_securecookie.go', 'AES', 'encrypt', 402)
+  false negative: ('pyjwt_algorithms.py', 'ECDSA', 'verify', 777)
+  false negative: ('pyjwt_algorithms.py', 'Ed25519', 'verify', 1018)
+  false negative: ('x_crypto_ssh_keys.go', 'AES', 'decrypt', 1516)
+  false negative: ('x_crypto_ssh_keys.go', 'AES', 'decrypt', 1522)
+  false negative: ('x_crypto_ssh_keys.go', 'AES', 'encrypt', 1567)
+```
+
+Precision fell from 1.0 to 0.9583 -- still above the 0.95 floor (confirmed
+via `bench/check_precision_floor.py`, PASS on both corpora), but the
+closest to it this project has been. Root-caused both false positives:
+real `aes.NewCipher(key)` calls the detector correctly finds, but which
+this file's blind labeller chose to attribute to a downstream call
+instead of the constructor (inconsistent with, e.g., already-accepted
+`gorilla_securecookie.go`:148 labelling). Per "never tune on HOLD," did
+**not** edit the labels after seeing this to make the number look
+better -- documented the real cause and a forward-looking labelling
+convention instead. Full writeup: `docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md`.
+
+Recall fell from 0.875 to 0.8214 -- purely because the corpus grew faster
+than detector coverage (all 28 previously-found usages are still found);
+10 total misses, of which 6 are new: 3 more instances of the pre-existing
+Go generic-`cipher.Stream`/`BlockMode` dataflow gap, and 3 newly-discovered
+gap categories (no Python PBKDF2 API coverage at all, one attribute-bound
+hash-resolution case). Full detail in `bench/real_world/README.md`'s
+numbered gap list (now 10 entries).
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 74 source files
+$ uv run pytest --cov -q
+176 passed, 4 warnings in 16.50s   (was 170 before this pass: +1 DSA test,
+                                     +2 SecretKeyFactory tests, +1 Layer A
+                                     floor update, +1 real-world floor
+                                     update, +1 stale-floor fix carried
+                                     over from the Go sign/verify commit)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/evaluate.py   (Layer A)
+precision=1.0 recall=1.0 f1=1.0
+truth=64 detected=64 tp=64
+$ uv run python bench/check_precision_floor.py
+Layer A (bench/fixtures): precision=1.0 (floor 0.95) -- PASS
+real_world (HOLD): precision=0.9583 (floor 0.95) -- PASS
+```
+
+Not started this session: M8 (CI hardening + external-repo proof), M9
+(bench/README.md handoff doc). Still well short of the mandate's 150-usage
+target (56/150) -- honestly reported, not rounded up; see README's
+"What's still missing" section for the full accounting.
+
 ## 2026-09-20 — Track CC M6: Go bare-function-reference cluster closed
 
 Follow-on mandate after M0-M5 completion: 3 gaps remained, picked in

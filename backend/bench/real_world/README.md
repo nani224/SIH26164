@@ -7,14 +7,18 @@ reading the source *before* running the detector on it, per Loop B1's rule
 
 **This is still not the brief's full Loop B1 DEV/HOLD split** (that needs
 >=150 labelled usages across 3 unseen projects, one Java, one Go, one C).
-As of 2026-09-19 (M3, Track CC) this is **9 real files, 4 languages
-(Python, Go, Java, C), 32 labelled usages** -- grown from a 25-usage/2-
-language state by fetching 4 more real, unseen, Apache-2.0 files (one
-each from jjwt, OkHttp, OpenSSL's own demos, and mbedTLS's own programs)
-and blind-labelling them via a fresh `corpus-labeler` subagent per file
-(no access to this repo's detector output). Still well short of the
-brief's 150-usage target, and honestly reported as such rather than
-rounded up -- see "What's still missing" below.
+As of 2026-09-20 (M7, Track CC) this is **14 real files, 4 languages
+(Python, Go, Java, C), 56 labelled usages** -- grown from a 32-usage/9-file
+state by fetching 5 more real, unseen, permissively-licensed files (two
+from golang.org/x/crypto, two from Django, one from Spring Security) and
+blind-labelling them via a fresh `corpus-labeler` subagent per file (no
+access to this repo's detector output). A sixth candidate (a permissively-
+licensed project calling wolfSSL's C API) was searched for and not found
+in the time available this session -- wolfSSL's own example repositories
+are GPL-licensed like the library itself and not vendorable under the
+licence gate; C stays represented by OpenSSL + mbedTLS only. Still well
+short of the brief's 150-usage target, and honestly reported as such
+rather than rounded up -- see "What's still missing" below.
 
 This file was found stale once already (it said "two files, Python only,
 4/4" after a later commit added a third Go file and pushed the real score
@@ -34,6 +38,11 @@ something to re-derive with `bench/real_world/evaluate.py`, not quote.
 | `jjwt_JcaTemplate.java` | [jwtk/jjwt `JcaTemplate.java`](https://github.com/jwtk/jjwt/blob/master/impl/src/main/java/io/jsonwebtoken/impl/security/JcaTemplate.java), unmodified. A real, heavily-used file with **zero** labelled usages (see gap #6 below) -- kept in the corpus deliberately, not swapped out, because that zero is itself the finding. | Apache-2.0 |
 | `openssl_demo_aesgcm.c` | [openssl/openssl `demos/cipher/aesgcm.c`](https://github.com/openssl/openssl/blob/master/demos/cipher/aesgcm.c), unmodified | Apache-2.0 |
 | `mbedtls_gen_key.c` | [Mbed-TLS/mbedtls `programs/pkey/gen_key.c`](https://github.com/Mbed-TLS/mbedtls/blob/master/programs/pkey/gen_key.c), unmodified | Apache-2.0 OR GPL-2.0-or-later (dual-licensed; treated as Apache-2.0) |
+| `x_crypto_autocert.go` | [golang.org/x/crypto `acme/autocert/autocert.go`](https://cs.opensource.google/go/x/crypto/+/master:acme/autocert/autocert.go), unmodified. Automatic ACME/Let's Encrypt certificate manager. | BSD-3-Clause |
+| `x_crypto_ssh_keys.go` | [golang.org/x/crypto `ssh/keys.go`](https://cs.opensource.google/go/x/crypto/+/master:ssh/keys.go), unmodified. SSH key wire-format parsing, signing, and verification -- the largest file in this corpus (1933 lines) and the source of two real detector gaps found this pass (see below). | BSD-3-Clause |
+| `django_hashers.py` | [django/django `django/contrib/auth/hashers.py`](https://github.com/django/django/blob/main/django/contrib/auth/hashers.py), unmodified | BSD-3-Clause |
+| `django_crypto.py` | [django/django `django/utils/crypto.py`](https://github.com/django/django/blob/main/django/utils/crypto.py), unmodified | BSD-3-Clause |
+| `spring_security_Pbkdf2PasswordEncoder.java` | [spring-projects/spring-security `crypto/password/Pbkdf2PasswordEncoder.java`](https://github.com/spring-projects/spring-security/blob/main/crypto/src/main/java/org/springframework/security/crypto/password/Pbkdf2PasswordEncoder.java), unmodified. Labels to **zero** confidently-determinable usages (see gap #8 below) -- kept deliberately, same rationale as `jjwt_JcaTemplate.java`. | Apache-2.0 |
 
 All licences here are on the licence gate's "OK to vendor" list
 (`backend/CLAUDE.md`). **Note for whoever adds more files**: paramiko
@@ -45,22 +54,29 @@ into this repo as a copied file. (A later Track CC mandate reversed this
 as "over-cautious" and said paramiko is usable via fetch-to-/tmp-only,
 never committed -- not yet acted on.)
 
-## Result (2026-09-20, M6 Track CC, 9 files / 32 usages / 4 languages)
+## Result (2026-09-20, M7 Track CC, 14 files / 56 usages / 4 languages)
 
 ```
 $ uv run python bench/real_world/evaluate.py
-precision=1.0 recall=0.875 f1=0.9333
-truth=32 detected=28 tp=28
+precision=0.9583 recall=0.8214 f1=0.8846
+truth=56 detected=48 tp=46
 ```
 
-**28/32, zero false positives.** M3 fixed a real precision bug found by
-growing this corpus (OpenSSL `EVP_CIPHER_fetch`, see ADR 015); M4 closed
-pyjwt's `key.sign()`/`key.verify()` cluster (6/8, ADR 016); M6 closed
-Go's bare-function-reference cluster (`hashFunc: sha256.New,` and
-`s.BlockFunc(aes.NewCipher)` in `gorilla_securecookie.go`, both now
-detected at their real lines, see ADR 018) -- a direct port of the
-equivalent fix already living on the Python side. Zero new false
-positives at each step; precision has stayed at 1.0 since the M3 fix.
+**46/56 true positives, 2 false positives, 10 false negatives.** Growing
+the corpus from 32 to 56 usages this pass found two Go capability gaps
+(closed before running the detector on the motivating files, per the
+"extend for a real newly-found pattern before you label it" rule -- see
+`docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md`) and
+three genuinely new false-negative gaps (below), plus more instances of
+one already-known gap category. Precision dropped from 1.0 to 0.9583 --
+**still above the 0.95 floor** (confirmed via
+`bench/check_precision_floor.py`, PASS on both corpora) but closer to it
+than at any point before. The 2 false positives are not classification
+errors -- see gap #8 below for the real (and narrow) cause, a
+label-attribution convention question rather than a detector defect. Per
+"never tune on HOLD," neither the labels nor the detector were touched
+after this run to make the number look better; it is recorded exactly as
+measured.
 
 Every remaining false negative is one of the gaps documented below -- see
 `backend/PROGRESS.md`'s dated entries for the full false-negative list.
@@ -100,7 +116,14 @@ the gaps below for real is what would honestly move it.
    `cipher.Block` interface with the concrete constructor
    (`aes.NewCipher`, via `BlockFunc`) several calls removed -- not
    addressed by the Python-specific type-annotation mechanism above,
-   still open in Go.
+   still open in Go. M7 added three more instances of the exact same
+   category in `x_crypto_ssh_keys.go` (`ctr.XORKeyStream`:1516,
+   `cbc.CryptBlocks`:1522, `stream.XORKeyStream`:1567) -- the concrete
+   cipher (`aes.NewCipher`) is constructed several lines earlier and
+   passed through a generic `cipher.Stream`/`cipher.BlockMode`-typed
+   variable, same shape as `gorilla_securecookie.go`'s gap. Not a new gap
+   type, just more real-world evidence it's worth fixing -- 5 known
+   instances across 2 files now.
 3. `hmac.compare_digest(...)` (Python) / `subtle.ConstantTimeCompare(...)`
    (Go, `gorilla_securecookie.go`:384) are correctly *not* flagged --
    timing-safe comparison utilities, not keygen/encrypt/digest primitives,
@@ -148,6 +171,50 @@ the gaps below for real is what would honestly move it.
    `mbedtls_ecdsa_genkey`) -- a real, separate gap, but one this
    particular call site can't be used to measure either way.
 
+8. **Two "false positives" that are a label-attribution question, not a
+   detector defect.** `x_crypto_ssh_keys.go`:1509,1561 are real
+   `aes.NewCipher(key)` calls -- the detector correctly finds them,
+   exactly as it already does for `gorilla_securecookie.go`:148's
+   `s.BlockFunc(aes.NewCipher)` bare reference (both are labelled AES/
+   encrypt there). The blind labeler for `x_crypto_ssh_keys.go`
+   deliberately chose, before any detector run, to attribute the AES
+   usage to the downstream `XORKeyStream`/`CryptBlocks` call instead
+   (see gap #2's three new entries) reasoning that "the encrypt/decrypt
+   semantics live there," not at the constructor -- a defensible
+   labelling call, but inconsistent with this corpus's own established
+   convention of attributing Go block-cipher usage to the `aes.NewCipher`
+   call/reference itself. Per "never tune on HOLD," the labels were
+   **not** retroactively edited to add the constructor lines once this
+   was discovered by running the detector -- that would be exactly the
+   inspect-the-miss-then-relabel pattern the rule exists to prevent.
+   Recorded here as a real methodology finding for the next corpus pass:
+   **the convention for future files should state explicitly that
+   `aes.NewCipher`/equivalent constructor calls are the canonical
+   attribution point**, and label accordingly *before* running the
+   detector, so this doesn't recur. See ADR 019.
+9. **Python has no PBKDF2 API surface coverage at all.** `django_crypto.py`:93
+   (`hashlib.pbkdf2_hmac(...)`) and `django_hashers.py`:333 (Django's own
+   `pbkdf2()` wrapper, which itself calls `hashlib.pbkdf2_hmac`) are both
+   real HMAC-based key-derivation calls with no detection rule at all --
+   unlike Java, which gained `SecretKeyFactory`/PBKDF2 coverage this same
+   session (see ADR 019). Found by reading source during this session's
+   candidate-sourcing phase, *before* these two files were labelled or
+   scored, so extending the Python detector for it now would have been
+   legitimate "extend before you label" -- not done this pass because it
+   was noticed only while assembling this report, after the one
+   permitted detector run had already happened; left as an honest,
+   documented gap for the next pass rather than fixed reactively.
+10. **Attribute-based hash resolution.** `django_hashers.py`:514
+    (`self.digest(password).digest()`) calls a hash function bound to an
+    instance attribute (itself set via a bare `hashlib.sha256`/`sha256`
+    class-attribute reference elsewhere in the same class, e.g. line 498)
+    -- resolving it needs attribute-to-class-body dataflow, a different
+    (and more general) mechanism than the existing parameter-type-
+    annotation resolution used for `key.sign()`/`key.verify()` (ADR 016).
+    Not attempted; the class-attribute *declaration* itself (line 498)
+    is separately detected as a bare reference, so this is specifically
+    about the later *call site* that reads it back through `self`.
+
 Per Loop B1's cap-of-6-iterations process, the next iteration (not done
 this pass -- explicitly deferred) would pick gap #1 (the largest, cheapest
 cluster, and now confirmed to affect both Python and Go) and implement a
@@ -155,23 +222,27 @@ query + test for both languages.
 
 ## What's still missing to meet the brief's actual target
 
-- **>=150 usages, not 32.** Growing this further means repeating this
+- **>=150 usages, not 56.** Growing this further means repeating this
   same process (find a real, unseen, permissively-licensed file with
   genuine crypto usage -- not a library's own class/algorithm
   *definitions*, which don't contain "usages" in the sense these queries
   detect -- read and label it before running the detector, commit the
   label, then run) across more real files, in all 4 languages. This
-  session (and the one before it) prioritized correctness of the
+  session (and the ones before it) prioritized correctness of the
   methodology (real files, real licences, labelled blind, precision
   floor enforced even when it meant a mid-session detector redesign) over
-  hitting a number.
-- **Java and C are now both represented** (1 file each this pass, `okhttp_Util.java`
-  + `jjwt_JcaTemplate.java` for Java, `openssl_demo_aesgcm.c` +
-  `mbedtls_gen_key.c` for C) -- both were literally zero-coverage before
-  M1/M2 shipped their respective detectors this Track CC pass. Still far
-  short of a real per-language sample size; one or two files per language
-  demonstrates the detector *works* on real code, not that it's
-  well-measured across each language's idiom space.
+  hitting a number. M7 grew usages 75% (32->56) but is still well short
+  of 150; a wolfSSL-API C candidate was searched for and not found this
+  pass (see the provenance note above) -- C stays at 2 files.
+- **Java, Go, and C are all still thin.** Java has 3 files (`okhttp_Util.java`,
+  `jjwt_JcaTemplate.java`, `spring_security_Pbkdf2PasswordEncoder.java`),
+  Go has 4 (`go_crypto_sample.go`, `gorilla_securecookie.go`, plus the two
+  new x/crypto files), C has 2 (unchanged this pass, see above). Python is
+  the best-represented language now at 5 files (`itsdangerous_signer.py`,
+  `cryptography_rsa_recipe.py`, `pyjwt_algorithms.py`, plus the two new
+  Django files). Two-to-five files per language demonstrates the detector
+  *works* on real code across a wider idiom space than before, not that
+  it's well-measured against any one language's full API surface.
 - **A genuine train/tune-blind HOLD split** (a DEV set the detector may
   be iterated against, and a separate HOLD set touched only once, at the
   end) doesn't exist yet -- every file here has only ever been run once

@@ -250,8 +250,21 @@ established this session, flagged rather than silently substituted.
       argument double-counting). Recall 0.8125 -> 0.875 (28/32), zero
       new false positives, Layer A unchanged (56/56), 170 tests green.
       See ADR 018 and 2026-09-20 PROGRESS.md entry.
-- [ ] **M7** — Grow HOLD corpus toward 150 usages (currently 32), label-
-      before-run discipline unchanged. Not started.
+- [x] **M7** — Grow HOLD corpus toward 150 usages: 32 -> 56 usages, 9 -> 14
+      files (Python 5, Go 4, Java 3, C 2). 5 new real files sourced and
+      blind-labelled (5 parallel corpus-labeler subagents), label-before-
+      run discipline held throughout. 2 real detector capability gaps
+      found and closed before labelling their motivating files (Go
+      crypto/dsa sign/verify, Java SecretKeyFactory/PBKDF2 -- Layer A
+      62->64). Precision 1.0 -> 0.9583 (still above the 0.95 floor);
+      recall 0.875 -> 0.8214 (corpus outgrew coverage, not a regression --
+      all 28 previously-found usages still found). 2 "false positives"
+      root-caused to a labelling-convention mismatch, not a code defect,
+      and the labels were deliberately NOT edited after the run to fix
+      them (see ADR 019) -- numbers recorded exactly as measured. Still
+      well short of 150; a wolfSSL C candidate was searched for and not
+      found, documented honestly rather than skipped silently. 176 tests
+      green. See ADR 019 and 2026-09-20 PROGRESS.md entry.
 - [ ] **M8** — CI hardening: prove the precision-floor gate fails red
       when breached (deliberately, then revert), and either get a real
       external-repo proof of the reusable Action or document the exact
