@@ -459,10 +459,19 @@ def list_snapshots(target_id: str) -> list[ScanSnapshot]:
 
 # --- Drift Engine ----------------------------------------------------------------
 
-def _finding_identity(f: Finding) -> tuple[str, str, str | None, str, str, int | None, str | None]:
-    """Stable cryptographic identity: location path, displayName, family, function, symbol, keySize, curve."""
+def _finding_identity(f: Finding) -> tuple[str, int | None, str, str | None, str, str, int | None, str | None]:
+    """Stable cryptographic identity: location path+line, displayName, family, function,
+    symbol, keySize, curve. Must include the line number -- two structurally-identical
+    findings in the same file (e.g. the same weak keygen call repeated at different
+    locations) are still two distinct findings, and drift needs to tell them apart to
+    correctly report a newly-added one in `added[]` rather than silently treating it as
+    an existing, unchanged finding (found via a real functional proof pass, Track A1 P4:
+    a second identical-shaped RSA-1024 finding at a different line collided with the
+    first one's identity tuple, so `added[]` stayed empty even though `netRiskDelta`
+    correctly reflected the real +90 score increase)."""
     return (
         f.location.path,
+        f.location.line,
         f.displayName,
         f.family.value if f.family else None,
         f.function.value,
@@ -483,10 +492,10 @@ def calculate_drift(target_id: str, from_snapshot_id: str, to_snapshot_id: str) 
     from_findings = list_findings(from_snap.scanId)
     to_findings = list_findings(to_snap.scanId)
 
-    from_map: dict[tuple[str, str, str | None, str, str, int | None, str | None], Finding] = {
+    from_map: dict[tuple[str, int | None, str, str | None, str, str, int | None, str | None], Finding] = {
         _finding_identity(f): f for f in from_findings
     }
-    to_map: dict[tuple[str, str, str | None, str, str, int | None, str | None], Finding] = {
+    to_map: dict[tuple[str, int | None, str, str | None, str, str, int | None, str | None], Finding] = {
         _finding_identity(f): f for f in to_findings
     }
 
