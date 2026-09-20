@@ -31,13 +31,24 @@ def get_residue_cluster(id: str) -> ResidueCluster:
 @router.patch("/residue/{id}", response_model=ResidueCluster)
 def patch_residue_cluster(id: str, patch: ResidueClusterPatch) -> ResidueCluster:
     """Transition state of a residue cluster (open -> promoted | excluded | accepted)."""
+    existing = store.get_residue_cluster(id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="residue cluster not found")
+
     # Validation per Track A1 M3 rules:
-    # Excluding REQUIRES a justification and an owner (reject without them).
+    # 1. Excluding REQUIRES a justification and an owner (reject without them).
     if patch.state == ResidueClusterState.EXCLUDED:
         if not patch.justification or not patch.justification.strip():
             raise HTTPException(status_code=400, detail="Exclusion requires a non-empty justification")
         if not patch.owner or not patch.owner.strip():
             raise HTTPException(status_code=400, detail="Exclusion requires a non-empty owner")
+
+    # 2. Promoted state is terminal once a detection rule is created
+    if existing.state == ResidueClusterState.PROMOTED and patch.state != ResidueClusterState.PROMOTED:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid transition: cannot transition a cluster once promoted to a rule",
+        )
 
     cluster = store.patch_residue_cluster(id, patch)
     if cluster is None:

@@ -207,3 +207,37 @@ def check_probe_downgrade(target_id: str, probe_result: ProbeResult) -> Alert | 
         return dispatch_alert(alert)
 
     return None
+
+
+def check_residue_rise(
+    target_id: str,
+    from_residue_mass: float | None,
+    to_residue_mass: float | None,
+    threshold: float = 10.0,
+) -> Alert | None:
+    """Trigger alert if residue mass rises by more than the configured threshold between snapshots.
+
+    That means new unexplained cryptographic evidence mass appeared in the estate.
+    """
+    if from_residue_mass is None or to_residue_mass is None:
+        return None
+
+    delta = to_residue_mass - from_residue_mass
+    if delta > threshold:
+        alert = Alert(
+            id=f"alt_{uuid4().hex[:12]}",
+            type=AlertType.RESIDUE_RISE,
+            targetId=target_id,
+            findingId=None,
+            severity=RiskBand.HIGH if delta < 50.0 else RiskBand.CRITICAL,
+            message=(
+                f"Residue crypto mass increased significantly by +{delta:.1f} "
+                f"(from {from_residue_mass:.1f} to {to_residue_mass:.1f}), exceeding threshold {threshold:.1f}. "
+                "New unexplained cryptographic suspicion appeared."
+            ),
+            createdAt=datetime.now(UTC),
+            acknowledged=False,
+        )
+        return dispatch_alert(alert)
+    return None
+
