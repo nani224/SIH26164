@@ -70,13 +70,27 @@ def probe_tls(
 
             peer_cert = tls_sock.getpeercert() or {}
             not_after = peer_cert.get("notAfter")
+            cert_subject = str(peer_cert.get("subject", ""))
+            cert_issuer = str(peer_cert.get("issuer", ""))
+
+            if not not_after:
+                try:
+                    der_cert = tls_sock.getpeercert(binary_form=True)
+                    if der_cert:
+                        from cryptography import x509
+                        parsed = x509.load_der_x509_certificate(der_cert)
+                        not_after = parsed.not_valid_after_utc.isoformat()
+                        cert_subject = parsed.subject.rfc4514_string()
+                        cert_issuer = parsed.issuer.rfc4514_string()
+                except Exception:
+                    pass
 
             negotiated = {
                 "protocol": version,
                 "cipher": cipher_name,
                 "secretBits": secret_bits,
-                "certSubject": str(peer_cert.get("subject", "")),
-                "certIssuer": str(peer_cert.get("issuer", "")),
+                "certSubject": cert_subject,
+                "certIssuer": cert_issuer,
                 "certNotAfter": not_after,
             }
             # Initial supported entry from the active handshake

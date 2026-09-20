@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Common default paths for SoftHSM2 shared library
 DEFAULT_SOFTHSM_PATHS = (
     os.environ.get("SOFTHSM2_LIB"),
+    r"C:\SoftHSM2\lib\softhsm2-x64.dll",
     r"C:\SoftHSM2\lib\softhsm2.dll",
     r"C:\Program Files\SoftHSM2\lib\softhsm2.dll",
     "/usr/lib/softhsm/libsofthsm2.so",
@@ -41,6 +42,9 @@ def get_hsm_inventory(lib_path: str | None = None, pin: str | None = None) -> Hs
     Returns:
         HsmInventory containing discovered slots and keys.
     """
+    if not os.environ.get("SOFTHSM2_CONF") and os.path.isfile(r"C:\SoftHSM2\etc\softhsm2.conf"):
+        os.environ["SOFTHSM2_CONF"] = r"C:\SoftHSM2\etc\softhsm2.conf"
+
     resolved_path = lib_path or _resolve_softhsm_lib()
     user_pin = pin or os.environ.get("SOFTHSM2_PIN", "1234")
 
