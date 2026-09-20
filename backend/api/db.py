@@ -24,10 +24,14 @@ from sqlmodel import Session, SQLModel, col, create_engine, select, text
 from api import stub_data
 from api.db_models import (
     AlertRecord,
+    ArtifactCoverageRecord,
+    AssetCriticalityRecord,
     AuditLogRecord,
+    CoverageCertificateRecord,
     FindingRecord,
     PolicyRecord,
     ProbeResultRecord,
+    ResidueClusterRecord,
     ScanRecord,
     ScanSnapshotRecord,
     TargetRecord,
@@ -35,15 +39,24 @@ from api.db_models import (
 from api.models import (
     Alert,
     AlertType,
+    ArtifactCoverage,
+    AssetCriticality,
+    AssetFacing,
     BandCounts,
     Context,
     ContextWithGlob,
+    CoverageCertificate,
+    Criticality,
+    CriticalitySource,
     Finding,
     Location,
     Policy,
     ProbeProtocol,
     ProbeResult,
     Recommendation,
+    ResidueCluster,
+    ResidueClusterState,
+    ResidueOccurrence,
     Risk,
     RiskBand,
     Scan,
@@ -390,6 +403,127 @@ def record_to_probe_result(rec: ProbeResultRecord) -> ProbeResult:
         negotiated=rec.negotiated,
         supported=rec.supported,
         probedAt=_as_utc(rec.probed_at) or rec.probed_at,
+    )
+
+
+def record_to_coverage_certificate(rec: CoverageCertificateRecord) -> CoverageCertificate:
+    return CoverageCertificate(
+        scanId=rec.scan_id,
+        artifactCount=rec.artifact_count,
+        totalMass=rec.total_mass,
+        attributedMass=rec.attributed_mass,
+        excludedMass=rec.excluded_mass,
+        residueMass=rec.residue_mass,
+        coverageRatio=rec.coverage_ratio,
+        residueClusterCount=rec.residue_cluster_count,
+        computedAt=_as_utc(rec.computed_at) or rec.computed_at,
+    )
+
+
+def coverage_certificate_to_record(cert: CoverageCertificate | dict[str, Any]) -> CoverageCertificateRecord:
+    if isinstance(cert, dict):
+        cert = CoverageCertificate.model_validate(cert)
+    return CoverageCertificateRecord(
+        scan_id=cert.scanId,
+        artifact_count=cert.artifactCount,
+        total_mass=cert.totalMass,
+        attributed_mass=cert.attributedMass,
+        excluded_mass=cert.excludedMass,
+        residue_mass=cert.residueMass,
+        coverage_ratio=cert.coverageRatio,
+        residue_cluster_count=cert.residueClusterCount,
+        computed_at=cert.computedAt,
+    )
+
+
+def record_to_artifact_coverage(rec: ArtifactCoverageRecord) -> ArtifactCoverage:
+    return ArtifactCoverage(
+        artifactHash=rec.artifact_hash,
+        path=rec.path,
+        totalMass=rec.total_mass,
+        attributed=rec.attributed,
+        excluded=rec.excluded,
+        residue=rec.residue,
+        coverageRatio=rec.coverage_ratio,
+    )
+
+
+def artifact_coverage_to_record(cov: ArtifactCoverage, scan_id: str) -> ArtifactCoverageRecord:
+    return ArtifactCoverageRecord(
+        id=f"{scan_id}:{cov.artifactHash}",
+        scan_id=scan_id,
+        artifact_hash=cov.artifactHash,
+        path=cov.path,
+        total_mass=cov.totalMass,
+        attributed=cov.attributed,
+        excluded=cov.excluded,
+        residue=cov.residue,
+        coverage_ratio=cov.coverageRatio,
+    )
+
+
+def record_to_residue_cluster(rec: ResidueClusterRecord) -> ResidueCluster:
+    occurrences = [
+        ResidueOccurrence(
+            artifactHash=occ.get("artifactHash", ""),
+            path=occ.get("path", ""),
+            range=occ.get("range", [0, 0]),
+        )
+        for occ in (rec.occurrences or [])
+    ]
+    return ResidueCluster(
+        id=rec.id,
+        contentHash=rec.content_hash,
+        signalTypes=rec.signal_types or [],
+        magnitude=rec.magnitude,
+        occurrences=occurrences,
+        state=ResidueClusterState(rec.state),
+        justification=rec.justification,
+        owner=rec.owner,
+        firstSeen=_as_utc(rec.first_seen) or rec.first_seen,
+        lastSeen=_as_utc(rec.last_seen) or rec.last_seen,
+    )
+
+
+def residue_cluster_to_record(cluster: ResidueCluster, target_id: str | None = None) -> ResidueClusterRecord:
+    return ResidueClusterRecord(
+        id=cluster.id,
+        content_hash=cluster.contentHash,
+        signal_types=cluster.signalTypes,
+        magnitude=cluster.magnitude,
+        occurrences=[occ.model_dump() for occ in cluster.occurrences],
+        state=cluster.state.value if hasattr(cluster.state, "value") else str(cluster.state),
+        justification=cluster.justification,
+        owner=cluster.owner,
+        target_id=target_id,
+        first_seen=cluster.firstSeen,
+        last_seen=cluster.lastSeen,
+    )
+
+
+def record_to_asset_criticality(rec: AssetCriticalityRecord) -> AssetCriticality:
+    return AssetCriticality(
+        targetId=rec.target_id,
+        pathPattern=rec.path_pattern,
+        criticality=Criticality(rec.criticality),
+        businessOwner=rec.business_owner,
+        dataClassification=rec.data_classification,
+        facing=AssetFacing(rec.facing),
+        source=CriticalitySource(rec.source),
+    )
+
+
+def asset_criticality_to_record(crit: AssetCriticality) -> AssetCriticalityRecord:
+    rec_id = f"{crit.targetId}:{crit.pathPattern}"
+    return AssetCriticalityRecord(
+        id=rec_id,
+        target_id=crit.targetId,
+        path_pattern=crit.pathPattern,
+        criticality=crit.criticality.value if hasattr(crit.criticality, "value") else str(crit.criticality),
+        business_owner=crit.businessOwner,
+        data_classification=crit.dataClassification,
+        facing=crit.facing.value if hasattr(crit.facing, "value") else str(crit.facing),
+        source=crit.source.value if hasattr(crit.source, "value") else str(crit.source),
     )
 
 

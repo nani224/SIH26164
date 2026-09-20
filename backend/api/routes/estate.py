@@ -9,7 +9,7 @@ from sqlmodel import col, select
 
 from api import db
 from api.db_models import AlertRecord, FindingRecord, ScanRecord, ScanSnapshotRecord, TargetRecord
-from api.models import EstateSummary, EstateTrend, EstateTrendPoint
+from api.models import EstateCoverage, EstateSummary, EstateTrend, EstateTrendPoint
 
 router = APIRouter(tags=["estate"])
 
@@ -110,3 +110,11 @@ def get_estate_trend(days: int = Query(default=30, ge=1, le=365)) -> EstateTrend
             )
 
         return EstateTrend(days=days, points=points)
+
+
+@router.get("/estate/coverage", response_model=EstateCoverage)
+def get_estate_coverage() -> EstateCoverage:
+    """Get aggregated crypto coverage and debt trends across the estate."""
+    from api import store
+    return store.get_estate_coverage()
+

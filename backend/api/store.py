@@ -16,9 +16,13 @@ from sqlmodel import col, func, select
 from api import db, stub_data
 from api.db_models import (
     AlertRecord,
+    ArtifactCoverageRecord,
+    AssetCriticalityRecord,
+    CoverageCertificateRecord,
     FindingRecord,
     PolicyRecord,
     ProbeResultRecord,
+    ResidueClusterRecord,
     ScanEventRecord,
     ScanRecord,
     ScanSnapshotRecord,
@@ -27,12 +31,19 @@ from api.db_models import (
 from api.filtering import band_counts
 from api.models import (
     Alert,
+    ArtifactCoverage,
+    AssetCriticality,
+    CoverageCertificate,
     Drift,
     DriftChangedItem,
     DriftSummary,
+    EstateCoverage,
     Finding,
     Policy,
     ProbeResult,
+    ResidueCluster,
+    ResidueClusterPatch,
+    ResidueClusterState,
     RiskBand,
     Scan,
     ScanCreate,
@@ -40,6 +51,7 @@ from api.models import (
     ScanStats,
     ScanStatus,
     Target,
+    TargetCoverageSummary,
     TargetCreate,
     TargetPatch,
 )
@@ -644,4 +656,239 @@ def list_probe_results(target_id: str | None = None) -> list[ProbeResult]:
         query = query.order_by(col(ProbeResultRecord.probed_at).desc())
         records = session.exec(query).all()
         return [db.record_to_probe_result(r) for r in records]
+
+
+# --- Coverage & Debt Ledger (Track A1) -------------------------------------------
+
+def get_coverage_certificate(scan_id: str) -> CoverageCertificate | None:
+    with db.session_scope() as session:
+        rec = session.get(CoverageCertificateRecord, scan_id)
+        return db.record_to_coverage_certificate(rec) if rec is not None else None
+
+
+def get_artifact_coverages(scan_id: str) -> list[ArtifactCoverage]:
+    with db.session_scope() as session:
+        records = session.exec(
+            select(ArtifactCoverageRecord).where(ArtifactCoverageRecord.scan_id == scan_id)
+        ).all()
+        return [db.record_to_artifact_coverage(r) for r in records]
+
+
+def save_coverage(
+    scan_id: str,
+    cert: CoverageCertificate,
+    artifacts: list[ArtifactCoverage],
+    clusters: list[ResidueCluster],
+    target_id: str | None = None,
+) -> None:
+    with db.session_scope() as session:
+        # Upsert certificate
+        existing_cert = session.get(CoverageCertificateRecord, scan_id)
+        if existing_cert:
+            session.delete(existing_cert)
+        session.add(db.coverage_certificate_to_record(cert))
+
+        # Replace artifact coverages for scan
+        old_artifacts = session.exec(
+            select(ArtifactCoverageRecord).where(ArtifactCoverageRecord.scan_id == scan_id)
+        ).all()
+        for old in old_artifacts:
+            session.delete(old)
+        for art in artifacts:
+            session.add(db.artifact_coverage_to_record(art, scan_id=scan_id))
+
+        # Upsert residue clusters indexed by content_hash across time & targets
+        now = datetime.now(UTC)
+        for cluster in clusters:
+            existing_cluster = session.exec(
+                select(ResidueClusterRecord).where(
+                    (ResidueClusterRecord.id == cluster.id)
+                    | (ResidueClusterRecord.content_hash == cluster.contentHash)
+                )
+            ).first()
+
+            if existing_cluster is not None:
+                # Merge occurrences and update last_seen
+                occ_map = {
+                    (o.get("artifactHash"), o.get("path"), tuple(o.get("range", []))): o
+                    for o in (existing_cluster.occurrences or [])
+                }
+                for new_occ in cluster.occurrences:
+                    key = (new_occ.artifactHash, new_occ.path, tuple(new_occ.range))
+                    occ_map[key] = new_occ.model_dump()
+                existing_cluster.occurrences = list(occ_map.values())
+                existing_cluster.last_seen = now
+                if target_id and not existing_cluster.target_id:
+                    existing_cluster.target_id = target_id
+                session.add(existing_cluster)
+            else:
+                session.add(db.residue_cluster_to_record(cluster, target_id=target_id))
+
+        db.log_audit(
+            session,
+            action="coverage.record",
+            entity_type="coverage_certificate",
+            entity_id=scan_id,
+            detail={
+                "coverageRatio": cert.coverageRatio,
+                "totalMass": cert.totalMass,
+                "residueMass": cert.residueMass,
+            },
+        )
+        session.commit()
+
+
+def list_residue_clusters(
+    state: ResidueClusterState | None = None,
+    target_id: str | None = None,
+) -> list[ResidueCluster]:
+    with db.session_scope() as session:
+        query = select(ResidueClusterRecord)
+        if state is not None:
+            state_str = state.value if hasattr(state, "value") else str(state)
+            query = query.where(ResidueClusterRecord.state == state_str)
+        if target_id is not None:
+            query = query.where(ResidueClusterRecord.target_id == target_id)
+        query = query.order_by(col(ResidueClusterRecord.last_seen).desc())
+        records = session.exec(query).all()
+        return [db.record_to_residue_cluster(r) for r in records]
+
+
+def get_residue_cluster(cluster_id: str) -> ResidueCluster | None:
+    with db.session_scope() as session:
+        rec = session.get(ResidueClusterRecord, cluster_id)
+        if rec is None:
+            rec = session.exec(
+                select(ResidueClusterRecord).where(ResidueClusterRecord.content_hash == cluster_id)
+            ).first()
+        return db.record_to_residue_cluster(rec) if rec is not None else None
+
+
+def patch_residue_cluster(cluster_id: str, patch: ResidueClusterPatch) -> ResidueCluster | None:
+    with db.session_scope() as session:
+        rec = session.get(ResidueClusterRecord, cluster_id)
+        if rec is None:
+            rec = session.exec(
+                select(ResidueClusterRecord).where(ResidueClusterRecord.content_hash == cluster_id)
+            ).first()
+        if rec is None:
+            return None
+
+        old_state = rec.state
+        new_state = patch.state.value if hasattr(patch.state, "value") else str(patch.state)
+        rec.state = new_state
+        if patch.justification is not None:
+            rec.justification = patch.justification
+        if patch.owner is not None:
+            rec.owner = patch.owner
+        rec.last_seen = datetime.now(UTC)
+
+        session.add(rec)
+        db.log_audit(
+            session,
+            action="residue.transition",
+            entity_type="residue_cluster",
+            entity_id=rec.id,
+            detail={"from": old_state, "to": new_state, "owner": rec.owner, "justification": rec.justification},
+        )
+        session.commit()
+        return db.record_to_residue_cluster(rec)
+
+
+def list_asset_criticalities(target_id: str | None = None) -> list[AssetCriticality]:
+    with db.session_scope() as session:
+        query = select(AssetCriticalityRecord)
+        if target_id is not None:
+            query = query.where(AssetCriticalityRecord.target_id == target_id)
+        records = session.exec(query).all()
+        return [db.record_to_asset_criticality(r) for r in records]
+
+
+def set_asset_criticality(crit: AssetCriticality) -> AssetCriticality:
+    with db.session_scope() as session:
+        rec_id = f"{crit.targetId}:{crit.pathPattern}"
+        existing = session.get(AssetCriticalityRecord, rec_id)
+        if existing:
+            session.delete(existing)
+        session.add(db.asset_criticality_to_record(crit))
+        db.log_audit(
+            session,
+            action="criticality.set",
+            entity_type="asset_criticality",
+            entity_id=rec_id,
+            detail={
+                "targetId": crit.targetId,
+                "criticality": crit.criticality.value if hasattr(crit.criticality, "value") else str(crit.criticality),
+                "businessOwner": crit.businessOwner,
+            },
+        )
+        session.commit()
+    return crit
+
+
+def get_estate_coverage() -> EstateCoverage:
+    with db.session_scope() as session:
+        targets = session.exec(select(TargetRecord)).all()
+        target_summaries: list[TargetCoverageSummary] = []
+
+        total_mass_sum = 0.0
+        attributed_mass_sum = 0.0
+        excluded_mass_sum = 0.0
+        residue_mass_sum = 0.0
+
+        for t in targets:
+            # Find latest scan certificate for this target
+            last_scan_id = t.last_scan_id
+            cert: CoverageCertificateRecord | None = None
+            if last_scan_id:
+                cert = session.get(CoverageCertificateRecord, last_scan_id)
+            if cert is None:
+                # Find any certificate from scans matching target
+                scans = session.exec(select(ScanRecord).where(ScanRecord.target == t.uri)).all()
+                for s in scans:
+                    c = session.get(CoverageCertificateRecord, s.id)
+                    if c is not None:
+                        cert = c
+                        break
+
+            if cert:
+                t_cov = cert.coverage_ratio
+                t_res = cert.residue_mass
+                t_tot = cert.total_mass
+                total_mass_sum += cert.total_mass
+                attributed_mass_sum += cert.attributed_mass
+                excluded_mass_sum += cert.excluded_mass
+                residue_mass_sum += cert.residue_mass
+            else:
+                t_cov = 1.0
+                t_res = 0.0
+                t_tot = 100.0
+                total_mass_sum += 100.0
+                attributed_mass_sum += 100.0
+
+            target_summaries.append(
+                TargetCoverageSummary(
+                    targetId=t.id,
+                    targetName=t.name,
+                    coverageRatio=round(t_cov, 4),
+                    residueMass=round(t_res, 2),
+                    totalMass=round(t_tot, 2),
+                )
+            )
+
+        overall_ratio = (
+            round(attributed_mass_sum / total_mass_sum, 4) if total_mass_sum > 0 else 1.0
+        )
+        total_clusters = len(session.exec(select(ResidueClusterRecord)).all())
+
+        return EstateCoverage(
+            overallCoverageRatio=overall_ratio,
+            totalMass=round(total_mass_sum, 2),
+            attributedMass=round(attributed_mass_sum, 2),
+            excludedMass=round(excluded_mass_sum, 2),
+            residueMass=round(residue_mass_sum, 2),
+            totalClusters=total_clusters,
+            targets=target_summaries,
+        )
+
 

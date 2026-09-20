@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ECDAT API
-  version: "0.3.0"
+  version: "1.0.0"
   description: >
     Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) API contract.
     Phase 0: this contract is implemented by an in-memory stub (see
@@ -694,6 +694,213 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditVerifyResponse"
 
+  /api/v1/scans/{scan_id}/coverage:
+    get:
+      operationId: getScanCoverage
+      summary: Get crypto mass conservation coverage certificate for a scan
+      tags: [coverage]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoverageCertificate"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/scans/{scan_id}/coverage/artifacts:
+    get:
+      operationId: getScanArtifactCoverage
+      summary: Get per-artifact crypto mass conservation coverage for a scan
+      tags: [coverage]
+      parameters:
+        - $ref: "#/components/parameters/ScanId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtifactCoverage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/residue:
+    get:
+      operationId: listResidueClusters
+      summary: List crypto debt residue clusters across scans and targets
+      tags: [debt]
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ResidueClusterState"
+        - name: targetId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResidueCluster"
+
+  /api/v1/residue/{id}:
+    get:
+      operationId: getResidueCluster
+      summary: Get details of a specific crypto debt residue cluster
+      tags: [debt]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResidueCluster"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: patchResidueCluster
+      summary: Transition state of a residue cluster (open -> promoted | excluded | accepted)
+      tags: [debt]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResidueClusterPatch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResidueCluster"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/criticality:
+    get:
+      operationId: listAssetCriticalities
+      summary: List asset business criticalities and ownership mappings
+      tags: [criticality]
+      parameters:
+        - name: targetId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssetCriticality"
+    put:
+      operationId: setAssetCriticality
+      summary: Set or update asset business criticality mapping
+      tags: [criticality]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetCriticality"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetCriticality"
+
+  /api/v1/criticality/import:
+    post:
+      operationId: importAssetCriticalityCsv
+      summary: Import asset business criticalities from CSV (CMDB bulk load)
+      tags: [criticality]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CriticalityImportResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cloud/keys:
+    get:
+      operationId: listCloudKeys
+      summary: Discover cryptographic keys from cloud providers (AWS KMS via LocalStack)
+      tags: [cloud]
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudKeysResponse"
+
+  /api/v1/estate/coverage:
+    get:
+      operationId: getEstateCoverage
+      summary: Get aggregated crypto coverage and debt trends across the estate
+      tags: [estate]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EstateCoverage"
+
+
 components:
   parameters:
     ScanId:
@@ -1177,6 +1384,8 @@ components:
           additionalProperties: { type: integer }
         totalFindings: { type: integer }
         stats: { $ref: "#/components/schemas/ScanStats" }
+        coverageRatio: { type: [number, "null"] }
+        residueMass: { type: [number, "null"] }
 
     DriftChangedItem:
       type: object
@@ -1194,6 +1403,8 @@ components:
         resolvedCount: { type: integer }
         changedCount: { type: integer }
         netRiskDelta: { type: number }
+        coverageDelta: { type: [number, "null"] }
+        residueMassDelta: { type: [number, "null"] }
 
     Drift:
       type: object
@@ -1215,7 +1426,7 @@ components:
 
     AlertType:
       type: string
-      enum: [new-critical, cert-expiring, drift, probe-downgrade]
+      enum: [new-critical, cert-expiring, drift, probe-downgrade, residue-rise]
 
     Alert:
       type: object
@@ -1321,3 +1532,145 @@ components:
         recordCount: { type: integer }
         headHash: { type: string }
         details: { type: [string, "null"] }
+
+    CoverageCertificate:
+      type: object
+      required: [scanId, artifactCount, totalMass, attributedMass, excludedMass, residueMass, coverageRatio, residueClusterCount, computedAt]
+      properties:
+        scanId: { type: string }
+        artifactCount: { type: integer }
+        totalMass: { type: number }
+        attributedMass: { type: number }
+        excludedMass: { type: number }
+        residueMass: { type: number }
+        coverageRatio: { type: number }
+        residueClusterCount: { type: integer }
+        computedAt: { type: string, format: date-time }
+
+    ArtifactCoverage:
+      type: object
+      required: [artifactHash, path, totalMass, attributed, excluded, residue, coverageRatio]
+      properties:
+        artifactHash: { type: string }
+        path: { type: string }
+        totalMass: { type: number }
+        attributed: { type: number }
+        excluded: { type: number }
+        residue: { type: number }
+        coverageRatio: { type: number }
+
+    ResidueOccurrence:
+      type: object
+      required: [artifactHash, path, range]
+      properties:
+        artifactHash: { type: string }
+        path: { type: string }
+        range:
+          type: array
+          items: { type: integer }
+
+    ResidueClusterState:
+      type: string
+      enum: [open, promoted, excluded, accepted]
+
+    ResidueCluster:
+      type: object
+      required: [id, contentHash, signalTypes, magnitude, occurrences, state, firstSeen, lastSeen]
+      properties:
+        id: { type: string }
+        contentHash: { type: string }
+        signalTypes:
+          type: array
+          items: { type: string }
+        magnitude: { type: number }
+        occurrences:
+          type: array
+          items: { $ref: "#/components/schemas/ResidueOccurrence" }
+        state: { $ref: "#/components/schemas/ResidueClusterState" }
+        justification: { type: [string, "null"] }
+        owner: { type: [string, "null"] }
+        firstSeen: { type: string, format: date-time }
+        lastSeen: { type: string, format: date-time }
+
+    ResidueClusterPatch:
+      type: object
+      required: [state]
+      properties:
+        state: { $ref: "#/components/schemas/ResidueClusterState" }
+        justification: { type: [string, "null"] }
+        owner: { type: [string, "null"] }
+
+    AssetFacing:
+      type: string
+      enum: [internal, external]
+
+    CriticalitySource:
+      type: string
+      enum: [manual, import]
+
+    AssetCriticality:
+      type: object
+      required: [targetId, pathPattern, criticality, businessOwner, dataClassification, facing, source]
+      properties:
+        targetId: { type: string }
+        pathPattern: { type: string }
+        criticality: { $ref: "#/components/schemas/Criticality" }
+        businessOwner: { type: string }
+        dataClassification: { type: string }
+        facing: { $ref: "#/components/schemas/AssetFacing" }
+        source: { $ref: "#/components/schemas/CriticalitySource" }
+
+    CriticalityImportResponse:
+      type: object
+      required: [imported, records]
+      properties:
+        imported: { type: integer }
+        records:
+          type: array
+          items: { $ref: "#/components/schemas/AssetCriticality" }
+
+    CloudKeyRecord:
+      type: object
+      required: [provider, keyId, algorithm, keySize, rotationAgeDays, policyCompliant]
+      properties:
+        provider: { type: string }
+        keyId: { type: string }
+        algorithm: { type: string }
+        keySize: { type: integer }
+        rotationAgeDays: { type: integer }
+        policyCompliant: { type: boolean }
+        identityId: { type: [string, "null"] }
+
+    CloudKeysResponse:
+      type: object
+      required: [keys, roadmap]
+      properties:
+        keys:
+          type: array
+          items: { $ref: "#/components/schemas/CloudKeyRecord" }
+        roadmap: { type: string }
+
+    TargetCoverageSummary:
+      type: object
+      required: [targetId, targetName, coverageRatio, residueMass, totalMass]
+      properties:
+        targetId: { type: string }
+        targetName: { type: string }
+        coverageRatio: { type: number }
+        residueMass: { type: number }
+        totalMass: { type: number }
+
+    EstateCoverage:
+      type: object
+      required: [overallCoverageRatio, totalMass, attributedMass, excludedMass, residueMass, totalClusters, targets]
+      properties:
+        overallCoverageRatio: { type: number }
+        totalMass: { type: number }
+        attributedMass: { type: number }
+        excludedMass: { type: number }
+        residueMass: { type: number }
+        totalClusters: { type: integer }
+        targets:
+          type: array
+          items: { $ref: "#/components/schemas/TargetCoverageSummary" }
+

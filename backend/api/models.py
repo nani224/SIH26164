@@ -368,6 +368,8 @@ class ScanSnapshot(BaseModel):
     bands: dict[str, int]
     totalFindings: int
     stats: ScanStats
+    coverageRatio: float | None = None
+    residueMass: float | None = None
 
 
 class DriftChangedItem(BaseModel):
@@ -381,6 +383,8 @@ class DriftSummary(BaseModel):
     resolvedCount: int
     changedCount: int
     netRiskDelta: float
+    coverageDelta: float | None = None
+    residueMassDelta: float | None = None
 
 
 class Drift(BaseModel):
@@ -398,6 +402,7 @@ class AlertType(StrEnum):
     CERT_EXPIRING = "cert-expiring"
     DRIFT = "drift"
     PROBE_DOWNGRADE = "probe-downgrade"
+    RESIDUE_RISE = "residue-rise"
 
 
 class Alert(BaseModel):
@@ -480,4 +485,116 @@ class AuditVerifyResponse(BaseModel):
     recordCount: int
     headHash: str
     details: str | None = None
+
+
+class CoverageCertificate(BaseModel):
+    scanId: str
+    artifactCount: int
+    totalMass: float
+    attributedMass: float
+    excludedMass: float
+    residueMass: float
+    coverageRatio: float
+    residueClusterCount: int
+    computedAt: datetime
+
+
+class ArtifactCoverage(BaseModel):
+    artifactHash: str
+    path: str
+    totalMass: float
+    attributed: float
+    excluded: float
+    residue: float
+    coverageRatio: float
+
+
+class ResidueOccurrence(BaseModel):
+    artifactHash: str
+    path: str
+    range: list[int]
+
+
+class ResidueClusterState(StrEnum):
+    OPEN = "open"
+    PROMOTED = "promoted"
+    EXCLUDED = "excluded"
+    ACCEPTED = "accepted"
+
+
+class ResidueCluster(BaseModel):
+    id: str
+    contentHash: str
+    signalTypes: list[str]
+    magnitude: float
+    occurrences: list[ResidueOccurrence]
+    state: ResidueClusterState
+    justification: str | None = None
+    owner: str | None = None
+    firstSeen: datetime
+    lastSeen: datetime
+
+
+class ResidueClusterPatch(BaseModel):
+    state: ResidueClusterState
+    justification: str | None = None
+    owner: str | None = None
+
+
+class AssetFacing(StrEnum):
+    INTERNAL = "internal"
+    EXTERNAL = "external"
+
+
+class CriticalitySource(StrEnum):
+    MANUAL = "manual"
+    IMPORT = "import"
+
+
+class AssetCriticality(BaseModel):
+    targetId: str
+    pathPattern: str
+    criticality: Criticality
+    businessOwner: str
+    dataClassification: str
+    facing: AssetFacing
+    source: CriticalitySource
+
+
+class CriticalityImportResponse(BaseModel):
+    imported: int
+    records: list[AssetCriticality]
+
+
+class CloudKeyRecord(BaseModel):
+    provider: str
+    keyId: str
+    algorithm: str
+    keySize: int
+    rotationAgeDays: int
+    policyCompliant: bool
+    identityId: str | None = None
+
+
+class CloudKeysResponse(BaseModel):
+    keys: list[CloudKeyRecord]
+    roadmap: str
+
+
+class TargetCoverageSummary(BaseModel):
+    targetId: str
+    targetName: str
+    coverageRatio: float
+    residueMass: float
+    totalMass: float
+
+
+class EstateCoverage(BaseModel):
+    overallCoverageRatio: float
+    totalMass: float
+    attributedMass: float
+    excludedMass: float
+    residueMass: float
+    totalClusters: int
+    targets: list[TargetCoverageSummary]
 
