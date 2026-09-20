@@ -8,33 +8,29 @@ def test_real_world_sample_detected_correctly() -> None:
     in bench/real_world/ -- see its README for what this is (and isn't)
     before trusting these numbers as a general accuracy claim.
 
-    Measured 2026-09-19 (M4, Track CC) after closing the largest
-    false-negative cluster: precision 1.0 (zero false positives -- see
-    docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md for
-    the OpenSSL EVP_CIPHER_fetch fix that restored this to 1.0 in M3, and
-    docs/decisions/backend/016-python-key-method-type-annotation.md for
-    the M4 fix below, which added 6 new true positives without
-    introducing any new false positive), recall 0.8125 (26/32, up from
-    0.625 -- closed pyjwt's `key.sign()`/`key.verify()` cluster by
-    resolving `key`'s family from a real static fact: the enclosing
-    function's own parameter type annotation, e.g. `key: RSAPrivateKey`,
-    not a guess or cross-file dataflow). Remaining 6 misses: a Java JCA
-    dispatcher class where the algorithm name is a caller-supplied
-    variable (no cross-file dataflow), an mbedTLS EC keygen call the
-    labeler correctly left unlabelled as family-ambiguous, one pyjwt
-    `verify()` call whose key type comes from a project-specific type
-    alias (`AllowedECKeys`, deliberately not hardcoded -- see ADR 016),
-    one pyjwt `verify()` call on a local variable rather than a typed
-    parameter (needs real dataflow, not just signature inspection), and
-    the pre-existing Go bare-attribute-reference gaps documented in this
-    directory's README. This is a floor, not a target: it must not
-    regress below this, but 0.8125 recall is itself the honest current
-    number, not something to chase back up by weakening the corpus or
-    the labels.
+    Measured 2026-09-20 (M7, Track CC) after growing the corpus from 32 to
+    56 usages (9 to 14 files): precision 0.9583 (2 false positives -- both
+    real `aes.NewCipher(key)` calls in `x_crypto_ssh_keys.go` that the
+    detector correctly finds, but that this corpus's own blind labeller
+    chose to attribute to a downstream call instead; see
+    docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md
+    for why the labels were NOT retroactively edited to "fix" this), still
+    above the 0.95 floor enforced by bench/check_precision_floor.py.
+    Recall 0.8214 (46/56, down from 0.875 purely because the corpus grew
+    faster than detector coverage -- 28/32 old usages are still all
+    found). 10 misses total: the 4 pre-existing ones (2 Go `cipher.NewCTR`
+    generic-interface, 2 pyjwt type-alias/local-variable gaps, unchanged),
+    3 more instances of that same Go generic-cipher-interface gap in
+    `x_crypto_ssh_keys.go`, and 3 new gap categories found this pass (no
+    Python PBKDF2 API coverage, one attribute-bound hash resolution case)
+    -- see the README's numbered gap list for detail on all ten. This is a
+    floor, not a target: it must not regress below this, but the honest
+    number moved because the corpus got harder, not because anything
+    broke.
     """
     result = evaluate()
-    assert result["precision"] == 1.0
-    assert result["recall"] == 0.8125
-    assert result["false_positives"] == []
-    assert result["truth_count"] == 32
-    assert result["detected_count"] == 26
+    assert result["precision"] == 0.9583
+    assert result["recall"] == 0.8214
+    assert len(result["false_positives"]) == 2
+    assert result["truth_count"] == 56
+    assert result["detected_count"] == 48

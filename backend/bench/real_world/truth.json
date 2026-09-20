@@ -47,5 +47,38 @@
     {"family": "AES", "function": "tag", "line": 129},
     {"family": "AES", "function": "decrypt", "line": 186},
     {"family": "AES", "function": "verify", "line": 201}
-  ]
+  ],
+  "x_crypto_autocert.go": [
+    {"family": "RSA", "function": "keygen", "line": 636},
+    {"family": "ECDSA", "function": "keygen", "line": 638},
+    {"family": "ECDSA", "function": "keygen", "line": 940}
+  ],
+  "x_crypto_ssh_keys.go": [
+    {"family": "RSA", "function": "verify", "line": 579},
+    {"family": "DSA", "function": "verify", "line": 694},
+    {"family": "DSA", "function": "sign", "line": 732},
+    {"family": "Ed25519", "function": "verify", "line": 810},
+    {"family": "ECDSA", "function": "verify", "line": 906},
+    {"family": "ECDSA", "function": "verify", "line": 1053},
+    {"family": "Ed25519", "function": "verify", "line": 1164},
+    {"family": "AES", "function": "decrypt", "line": 1516},
+    {"family": "AES", "function": "decrypt", "line": 1522},
+    {"family": "AES", "function": "encrypt", "line": 1567},
+    {"family": "MD5", "function": "digest", "line": 1916},
+    {"family": "SHA-2", "function": "digest", "line": 1930}
+  ],
+  "django_hashers.py": [
+    {"family": "SHA-2", "function": "digest", "line": 327},
+    {"family": "HMAC", "function": "keyderive", "line": 333},
+    {"family": "SHA-1", "function": "digest", "line": 382},
+    {"family": "SHA-2", "function": "digest", "line": 498},
+    {"family": "SHA-2", "function": "digest", "line": 514},
+    {"family": "MD5", "function": "digest", "line": 665}
+  ],
+  "django_crypto.py": [
+    {"family": "HMAC", "function": "tag", "line": 61},
+    {"family": "SHA-2", "function": "digest", "line": 89},
+    {"family": "HMAC", "function": "keyderive", "line": 93}
+  ],
+  "spring_security_Pbkdf2PasswordEncoder.java": []
 }

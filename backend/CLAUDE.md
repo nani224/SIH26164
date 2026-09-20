@@ -32,11 +32,18 @@ claim something works unless you ran it and saw the output.
 
 ## Measured floor
 
-**Starter fixtures only** (`bench/fixtures/`, 25 files, 56 labelled
-Python + Java + C/C++ crypto usages — see `bench/README.md`): precision
-1.000, recall 1.000, F1 1.000, measured 2026-09-19 via
+**Starter fixtures only** (`bench/fixtures/`, 27 files, 64 labelled
+Python + Java + Go + C/C++ crypto usages — see `bench/README.md`):
+precision 1.000, recall 1.000, F1 1.000, measured 2026-09-20 via
 `uv run python bench/evaluate.py`. Grew from 15 (Python-only) to 40 (M1,
-Java) to 56 (M2, C/C++) usages this Track CC pass.
+Java) to 56 (M2, C/C++) to 62 (M7, Go sign/verify) to 64 (M7, Java
+SecretKeyFactory) usages this Track CC pass.
+
+**Real-world HOLD** (`bench/real_world/`, 14 real third-party files, 4
+languages, 56 labelled usages — see `bench/real_world/README.md`):
+precision 0.9583, recall 0.8214, measured 2026-09-20 via
+`uv run python bench/real_world/evaluate.py`. Still not the brief's full
+150-usage Loop B1 DEV/HOLD split; grown from 32 usages/9 files this pass.
 
 This is **not** the brief's Layer A/B corpus or a Loop B1 DEV/HOLD result
 — those don't exist yet (no real third-party projects have been sourced or

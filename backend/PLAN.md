@@ -235,6 +235,71 @@ dependency-ordered milestones:
       2026-09-20 PROGRESS.md entry for full detail.
 
 Track CC v0.3 mandate (M0-M5) complete.
+
+## Track CC — remaining detection work (2026-09-20, in progress)
+
+Follow-on mandate: close the 3 gaps M0-M5's own final report listed as
+remaining. `feature/cc-detection` (the mandate's stated branch) does not
+exist in the repo -- continuing on `claude/inspiring-hamilton-p6ig7n` as
+established this session, flagged rather than silently substituted.
+
+- [x] **M6** — Go bare-function-reference cluster (4 of 6 remaining
+      real-world FNs, picked as highest value). Ported Python's existing
+      `attr.node` fix to `engine/source_go.py`/`go_crypto.scm`. Real
+      false positive caught and fixed during implementation (HMAC hash-
+      argument double-counting). Recall 0.8125 -> 0.875 (28/32), zero
+      new false positives, Layer A unchanged (56/56), 170 tests green.
+      See ADR 018 and 2026-09-20 PROGRESS.md entry.
+- [x] **M7** — Grow HOLD corpus toward 150 usages: 32 -> 56 usages, 9 -> 14
+      files (Python 5, Go 4, Java 3, C 2). 5 new real files sourced and
+      blind-labelled (5 parallel corpus-labeler subagents), label-before-
+      run discipline held throughout. 2 real detector capability gaps
+      found and closed before labelling their motivating files (Go
+      crypto/dsa sign/verify, Java SecretKeyFactory/PBKDF2 -- Layer A
+      62->64). Precision 1.0 -> 0.9583 (still above the 0.95 floor);
+      recall 0.875 -> 0.8214 (corpus outgrew coverage, not a regression --
+      all 28 previously-found usages still found). 2 "false positives"
+      root-caused to a labelling-convention mismatch, not a code defect,
+      and the labels were deliberately NOT edited after the run to fix
+      them (see ADR 019) -- numbers recorded exactly as measured. Still
+      well short of 150; a wolfSSL C candidate was searched for and not
+      found, documented honestly rather than skipped silently. 176 tests
+      green. See ADR 019 and 2026-09-20 PROGRESS.md entry.
+- [x] **M8** —
+      **M8b (done)**: proved the precision-floor gate fails red for real.
+      On a throwaway branch (`track-cc-m8b-precision-gate-proof`, off
+      `origin/main`), deliberately made every unrecognized Python
+      attribute call fire as a bogus MD5 finding. Confirmed locally
+      (Layer A precision 0.8615, real-world 0.1722, both FAIL) and then
+      for real on GitHub's own infrastructure: opened PR #12, the
+      `backend-ci` job ran and concluded `failure` (5 pytest failures,
+      including both precision-floor regression tests catching the drop
+      before the dedicated `bench/check_precision_floor.py` step even
+      ran). Reverted the very next commit, confirmed precision back to
+      1.0/1.0 locally, pushed, closed PR #12 without merging (branch
+      delete was denied -- outside session's GitHub scope -- but the
+      branch is inert and the PR is closed).
+      **M8a (BLOCKED - needs human repo creation)**: external-repo proof
+      of the cross-repo reusable-workflow form needs a human to create
+      one empty repo -- this session's GitHub App access cannot create
+      repositories via the API (confirmed architectural 403 earlier this
+      engagement). Exact instruction + `uses:` snippet documented in
+      docs/decisions/backend/020-m8a-external-repo-proof-blocked.md
+      rather than left vague.
+- [x] **M9** — Rewrote `backend/bench/README.md` into the full handoff
+      doc: quick-start commands for all 3 scripts (`evaluate.py`,
+      `real_world/evaluate.py`, `check_precision_floor.py`), a Layer A vs
+      real_world comparison table, the 5-step blind-labelling protocol
+      spelled out (source -> label blind -> commit labels alone -> run
+      once -> never edit labels post-run), current numbers with today's
+      date and real command output, the 10 real_world false negatives
+      grouped into 5 gap categories (cross-referencing the full
+      line-by-line detail in `bench/real_world/README.md`), and an index
+      of all 8 relevant ADRs (013-020). EXIT criterion ("a person who has
+      never seen this repo can reproduce your numbers from that file
+      alone") verified by re-running all 3 commands fresh before writing
+      the numbers down.
+
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.
 
 ---
