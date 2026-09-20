@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 
 from api import db, stub_data
 from api.db_models import (
@@ -139,6 +139,37 @@ def get_scan(scan_id: str) -> Scan | None:
 def list_findings(scan_id: str) -> list[Finding]:
     with db.session_scope() as session:
         records = session.exec(select(FindingRecord).where(FindingRecord.scan_id == scan_id)).all()
+        return [db.record_to_finding(r) for r in records]
+
+
+def count_findings(scan_id: str) -> int:
+    """Real SQL COUNT, no row materialization -- used by list_findings_page's
+    fast path so the FindingPage.total field doesn't require pulling every row."""
+    with db.session_scope() as session:
+        result = session.exec(
+            select(func.count()).select_from(FindingRecord).where(FindingRecord.scan_id == scan_id)
+        ).one()
+        return int(result)
+
+
+def list_findings_page(scan_id: str, *, offset: int, limit: int) -> list[Finding]:
+    """SQL-level LIMIT/OFFSET fast path for the (band/family/surface/source/
+    minConfidence/needsReview/q/sort)-free case -- found via the G4 perf pass:
+    list_findings() always materializes every finding for the scan into a full
+    Pydantic Finding (nested risk/location submodels) before any filtering or
+    pagination happens, which measured at ~700-780ms p50/p95 for a 10k-finding
+    scan's default GET /findings call against a real running server -- far over
+    the mandate's 150ms budget. This path only ever constructs up to `limit`
+    Finding objects, ordered by id for stable pagination (matches the DB's
+    natural insertion order, same as the unsorted fallback path already did)."""
+    with db.session_scope() as session:
+        records = session.exec(
+            select(FindingRecord)
+            .where(FindingRecord.scan_id == scan_id)
+            .order_by(col(FindingRecord.id))
+            .offset(offset)
+            .limit(limit)
+        ).all()
         return [db.record_to_finding(r) for r in records]
 
 
