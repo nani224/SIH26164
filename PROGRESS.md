@@ -125,6 +125,38 @@
   ======================== 4 passed, 2 warnings in 0.44s ========================
   ```
 
+## M6 — DEBT-CLOSURE LOOP
+- **Status**: COMPLETED & VERIFIED
+- **Changes**:
+  - Implemented `backend/engine/debt.py`:
+    - CLI commands: `ecdat debt list|show|promote|exclude|accept`.
+    - `promote_cluster`: Scaffolds a working detection rule stub with its fixture and marks state as `promoted-to-rule`.
+    - `exclude_cluster`: Requires written justification and owner, marks state as `excluded`.
+    - `accept_cluster`: Records why residue is tolerated, marks state as `accepted`.
+    - Persistent debt store `debt_store.json` keyed by content hash so closed clusters never resurface and carry across estates.
+  - Created `backend/tests/test_debt_closure.py`:
+    - Verified CLI operations (`list`, `show`, `exclude`, `accept`).
+    - Verified validation guards (empty justification/owner rejected).
+    - Proven end-to-end on a real residue cluster: promoting the cluster generated a working rule, residue dropped by that cluster's exact mass (-32.0), and recall rose (+1 finding).
+- **Real Verification Output**:
+  ```text
+  tests/test_debt_closure.py .
+  CLUSTER ID       STATE            OWNER           JUSTIFICATION
+  ---------------------------------------------------------------------------
+  hash_abc_123     excluded         alice           Benign table
+  .
+  [M6 End-to-End Promotion]
+    Target residue cluster ID: c8d35ec6bc6c107e253944053a2cf840bf55e554faf2b00b3ff166d1fbddc162
+    Target residue cluster mass: 32.0
+    Baseline residue mass: 32.0
+    New residue mass: 0
+    Residue drop: 32.0 (expected == 32.0)
+    Recall gain: +1 finding
+  .
+  ======================== 3 passed, 2 warnings in 0.44s ========================
+  ```
+
+
 
 
 
