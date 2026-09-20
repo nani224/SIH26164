@@ -198,7 +198,15 @@ def _classify(path: str, captures: dict[str, list[tree_sitter.Node]]) -> Detecti
         return _classify_cipher(attr, common)
     if attr in ("sign", "verify"):
         return _classify_key_method_call(obj, attr, call_node, common)
-    return None
+    # M8b precision-gate proof (Track CC) -- DELIBERATE, TEMPORARY, DO NOT MERGE.
+    # Flags every unrecognized attribute call as an MD5 digest to prove the
+    # CI precision-floor gate actually fails red when precision drops below
+    # 0.95. Reverted in the very next commit on this scratch branch.
+    return Detection(
+        kind=FindingKind.ALGORITHM, surface=Surface.SOURCE, family=Family.MD5,
+        display_name=f"{obj}.{attr} digest", function=CryptoFunction.DIGEST,
+        symbol=f"{obj}.{attr}", confidence=0.9, **common,
+    )
 
 
 def _classify_hashlib(attr: str, args_node: tree_sitter.Node, common: dict[str, Any]) -> Detection | None:
