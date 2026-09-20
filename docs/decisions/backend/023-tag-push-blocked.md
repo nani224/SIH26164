@@ -2,9 +2,10 @@
 
 ## Status
 
-BLOCKED (Finale G5, 2026-09-20). Not something this session can resolve
-itself; documented here so a human can unblock it with one action, same
-pattern as ADR 020's external-repo-proof blocker.
+BLOCKED (Finale G5, 2026-09-20; updated same day after PR #16). Not
+something this session can resolve itself; documented here so a human
+can unblock it with one action, same pattern as ADR 020's
+external-repo-proof blocker.
 
 ## Context
 
@@ -13,7 +14,17 @@ push the tag. The PR (`nani224/SIH26164#14`) merged cleanly to `main` at
 `07215b6`, and `backend-ci` ran green on that commit
 (run `35514786677`, `conclusion: success`).
 
-The annotated tag was created locally against `origin/main`'s `07215b6`:
+**Update, same day**: a follow-up review found `feature/a1-backend` had
+one more real commit (`59dee55`, a Windows SoftHSM2/DER-cert probe fix,
+authored 18:00 IST -- before the 19:22 IST finale merge but missed by
+it). Merged via PR #16 (`f341e8f`), CI re-confirmed green on that commit.
+The tag below now points at `f341e8f`, not the original `07215b6` --
+the earlier tag object was deleted and recreated locally after the merge,
+but the push attempt below is against the *current* commit and still
+fails identically, confirming this is a tag-ref permission issue, not
+anything specific to which commit was tagged.
+
+The annotated tag was created locally against `origin/main`'s `f341e8f`:
 ```
 git tag -a v0.3.0-sih-finale -m "..." origin/main
 ```
@@ -25,9 +36,11 @@ error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403
 send-pack: unexpected disconnect while reading sideband packet
 fatal: the remote end hung up unexpectedly
 ```
-Retried twice more (per this repo's own "retry network errors with
-backoff" instruction) with the identical result each time. Confirmed the
-tag genuinely never reached the remote:
+Retried three more times across two separate sessions of this same
+finale pass (per this repo's own "retry network errors with backoff"
+instruction) with the identical result every time, both before and after
+the PR #16 merge and tag recreation. Confirmed the tag genuinely never
+reached the remote:
 ```
 GET /repos/nani224/SIH26164/git/ref/tags/v0.3.0-sih-finale -> 404 Not Found
 ```
@@ -64,8 +77,8 @@ likely explanation based on the symptom (blocks specifically on
    git tag -a v0.3.0-sih-finale -m "v0.3.0-sih-finale -- see CHANGELOG.md" origin/main
    git push origin v0.3.0-sih-finale
    ```
-   (`origin/main` at the time of writing is `07215b6`, the exact commit
-   PR #14 merged.)
+   (`origin/main` at the time of writing is `f341e8f`, which includes
+   both PR #14's release and PR #16's Windows probe fix.)
 2. **Or**, if a tag-protection rule is indeed the cause, adjust it
    (Settings -> Tags -> protection rules) to allow this session's GitHub
    App installation to create tags matching `v*`, then ask this session
