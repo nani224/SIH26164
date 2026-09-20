@@ -325,6 +325,37 @@ the authoritative number and update the README/PROGRESS.md with it.
     - Desktop (1440×900): `public/screenshots/viewports/screen-12-trend-1440.png`
     - Laptop (1280×720): `public/screenshots/viewports/screen-12-trend-1280.png`
     - Mobile (390×844): `public/screenshots/viewports/screen-12-trend-390.png`
-  - Performance: CLS < 0.1 verified across all viewports.
 - `pnpm build`: Exit code 0 (All 16 routes prerendered statically).
+
+## 2026-09-20 — Track A2 Milestone 3: Screen 13 (Cryptographic Drift Analysis)
+
+### 1. Delivery Summary
+- Implemented **Screen 13: Cryptographic Drift Analysis** (`/drift`) providing two-snapshot differential inspection of cryptographic posture over time.
+- Consumes `GET /api/v1/targets/{id}/drift` with target selector dropdown and snapshot comparison badges.
+- Drift Summary Bento Metrics:
+  - Added Assets (+1 new findings, Ember Red).
+  - Resolved Assets (-1 remediated findings, Lattice Teal).
+  - Changed Bands (1 posture shifts, Grover Amber).
+  - Net Risk Delta (-12.4 pts exposure reduction).
+- Three Distinct Category Sections:
+  1. **Newly Added Cryptographic Assets**: Highlights newly introduced Shor-vulnerable algorithms/keys, location, risk band badge, and PQC recommendation. Clicking opens `FindingDrawer`.
+  2. **Resolved / Remediated Assets**: Highlights excised or upgraded assets with "Zero Threat Active" badges.
+  3. **Changed Severity Postures**: Shows findings whose risk band transitioned between snapshots with visual shift indicator (`fromBand` &rarr; `toBand`). Clicking opens `FindingDrawer`.
+- Interactive category tabs (`All Drift`, `Added`, `Resolved`, `Changed`) and live text search filter.
+- Fully wired to global `useAppStore` `openDrawer` for deep finding inspection.
+
+### 2. Verification Gates (100% Passed)
+- `pnpm typecheck`: Exit code 0 (0 errors).
+- `pnpm lint`: Exit code 0 (0 warnings/errors).
+- `pnpm knip`: Exit code 0 (0 unused exports/dependencies).
+- `pnpm vitest run src/app/drift/drift.test.tsx`: Exit code 0 (5/5 unit tests passed).
+- `pnpm playwright test e2e/drift.spec.ts`: Exit code 0 (2/2 E2E tests passed):
+  - Real-browser axe-core a11y in Dark & Light modes: 0 critical, 0 serious violations.
+  - Interactive flow: category tab filtering, search filtering, and FindingDrawer open/dismiss.
+  - Multi-viewport screenshots captured:
+    - Desktop (1440×900): `public/screenshots/viewports/screen-13-drift-1440.png`
+    - Laptop (1280×720): `public/screenshots/viewports/screen-13-drift-1280.png`
+    - Mobile (390×844): `public/screenshots/viewports/screen-13-drift-390.png`
+  - Performance: CLS < 0.1 verified across all viewports.
+- `pnpm build`: Exit code 0 (All 17 routes prerendered statically).
 
