@@ -129,7 +129,7 @@ def test_end_to_end_residue_cluster_promotion(tmp_path: Path, monkeypatch: pytes
     cluster_mass = target_cluster.mass
     cluster_slice = artifact_content[target_cluster.start : target_cluster.end]
 
-    print(f"\n[M6 End-to-End Promotion]")
+    print("\n[M6 End-to-End Promotion]")
     print(f"  Target residue cluster ID: {target_cluster.id}")
     print(f"  Target residue cluster mass: {cluster_mass}")
     print(f"  Baseline residue mass: {initial_residue_mass}")

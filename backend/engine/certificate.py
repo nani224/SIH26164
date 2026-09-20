@@ -16,7 +16,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from engine.attribute.ledger import AttributionLedger, ResidueCluster
+from engine.attribute.ledger import AttributionLedger
 
 
 @dataclass(frozen=True)

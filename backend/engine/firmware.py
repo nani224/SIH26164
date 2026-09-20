@@ -141,14 +141,12 @@ def extract_firmware(
     fmt = is_firmware_image(data)
     if fmt == "cpio":
         return extract_cpio(data, max_files=max_files, max_bytes=max_bytes)
-    elif fmt == "squashfs":
-        # Squashfs header parsing (96-byte super block)
-        if len(data) >= 96:
-            try:
-                # Squashfs superblock has inode count, block size, compression, bytes used
-                bytes_used = struct.unpack("<Q", data[40:48])[0]
-                # Return the partition image slice for scanning
-                return [("squashfs_root.img", data[: min(len(data), bytes_used if bytes_used > 0 else len(data))])]
-            except struct.error:
-                return [("squashfs_root.img", data)]
+    elif fmt == "squashfs" and len(data) >= 96:
+        try:
+            # Squashfs superblock has inode count, block size, compression, bytes used
+            bytes_used = struct.unpack("<Q", data[40:48])[0]
+            slice_len = min(len(data), bytes_used if bytes_used > 0 else len(data))
+            return [("squashfs_root.img", data[:slice_len])]
+        except struct.error:
+            return [("squashfs_root.img", data)]
     return []

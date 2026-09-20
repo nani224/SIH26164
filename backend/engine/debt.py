@@ -90,7 +90,10 @@ def show_cluster(
     cluster_id: str, clusters: list[Any], store_path: Path = DEBT_STORE_PATH
 ) -> dict[str, Any] | None:
     debt_store = load_debt_store(store_path)
-    matching = [c for c in clusters if (getattr(c, "id", None) or (c.get("id") if isinstance(c, dict) else None)) == cluster_id]
+    matching = [
+        c for c in clusters
+        if (getattr(c, "id", None) or (c.get("id") if isinstance(c, dict) else None)) == cluster_id
+    ]
     if not matching:
         return None
     c = matching[0]
@@ -165,7 +168,11 @@ def detect_promoted_cluster(source: bytes, path: str = "<source>", artifact_hash
                 line=None,
                 symbol="promoted_cluster",
                 snippet=f"Promoted residue cluster {short_id}",
-                source=FindingSource.AST if path.endswith((".py", ".go", ".java", ".c")) else FindingSource.BINARY_CONSTANT,
+                source=(
+                    FindingSource.AST
+                    if path.endswith((".py", ".go", ".java", ".c"))
+                    else FindingSource.BINARY_CONSTANT
+                ),
                 confidence=0.96,
                 spans=[span],
             )
@@ -280,11 +287,11 @@ def cli_main(argv: list[str] | None = None) -> int:
             return 0
 
         elif args.debt_action == "show":
-            rec = debt_store.get(args.cluster_id)
-            if not rec:
+            rec_show = debt_store.get(args.cluster_id)
+            if not rec_show:
                 print(f"Cluster {args.cluster_id} not found.")
                 return 1
-            print(json.dumps(asdict(rec), indent=2))
+            print(json.dumps(asdict(rec_show), indent=2))
             return 0
 
         elif args.debt_action == "exclude":

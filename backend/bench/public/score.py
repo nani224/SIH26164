@@ -24,11 +24,15 @@ _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
-from api.models import Context, Criticality, Exposure, Policy, Scan
-from api.cbom import build_cbom
-from engine.attribute import compute_ledger
-from engine.certificate import embed_coverage_in_cbom, generate_coverage_certificate
-from engine.scanner import scan
+from api.cbom import build_cbom  # noqa: E402
+from api.models import Context, Criticality, Exposure, Policy  # noqa: E402
+from engine.attribute import compute_ledger  # noqa: E402
+from engine.certificate import (  # noqa: E402
+    CoverageCertificate,
+    embed_coverage_in_cbom,
+    generate_coverage_certificate,
+)
+from engine.scanner import scan  # noqa: E402
 
 DEFAULT_TRUTH = _BACKEND_ROOT / "bench" / "truth.json"
 FIXTURES_DIR = _BACKEND_ROOT / "bench" / "fixtures"
@@ -179,7 +183,6 @@ def match_detections(
 
     for t_item in truth:
         t_file, t_fam, t_fn, t_line = t_item
-        matched = False
         for d_item in detected:
             if d_item in matched_det:
                 continue
@@ -196,12 +199,10 @@ def match_detections(
                 or {t_fn.lower(), d_fn.lower()} <= {"", "unknown"}
             )
 
-            if fam_match and fn_match:
-                if abs(t_line - d_line) <= line_tolerance:
-                    tp.add(t_item)
-                    matched_det.add(d_item)
-                    matched = True
-                    break
+            if fam_match and fn_match and abs(t_line - d_line) <= line_tolerance:
+                tp.add(t_item)
+                matched_det.add(d_item)
+                break
 
     fp = detected - matched_det
     fn = truth - tp
@@ -236,7 +237,7 @@ def score_cbom(
     }
 
 
-def run_benchmark_all() -> tuple[dict[str, Any], dict[str, Any]]:
+def run_benchmark_all() -> tuple[dict[str, Any], CoverageCertificate]:
     """Run full benchmark scan across fixtures and score the resulting CBOM."""
     policy = Policy(
         id="bench_policy",
@@ -257,7 +258,7 @@ def run_benchmark_all() -> tuple[dict[str, Any], dict[str, Any]]:
 
     # Compute ledger & coverage certificate across fixtures
     import hashlib
-    from engine.attribute import compute_ledger
+
     from engine.attribute.ledger import AttributionLedger
     from engine.extract import extract_all
 
@@ -382,7 +383,10 @@ def main() -> int:
         print(json.dumps(scores, indent=2))
     else:
         print(f"precision={scores['precision']} recall={scores['recall']} f1={scores['f1']}")
-        print(f"truth={scores['truth_count']} detected={scores['detected_count']} tp={scores['true_positives']} fp={scores['false_positives']} fn={scores['false_negatives']}")
+        print(
+            f"truth={scores['truth_count']} detected={scores['detected_count']} "
+            f"tp={scores['true_positives']} fp={scores['false_positives']} fn={scores['false_negatives']}"
+        )
         if scores.get("coverage"):
             print("Coverage Certificate:", scores["coverage"])
 

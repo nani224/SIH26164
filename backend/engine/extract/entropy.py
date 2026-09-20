@@ -38,9 +38,9 @@ def extract_entropy(
     if n < 64:
         return []
 
-    overall_entropy = shannon_entropy(source)
     # Thresholds:
-    # If file is text / source code, baseline entropy is low (~4.0 - 5.5). A sustained region with H >= 6.8 is suspicious.
+    # If file is text / source code, baseline entropy is low (~4.0 - 5.5).
+    # A sustained region with H >= 6.8 is suspicious.
     # If binary, baseline is ~5.5 - 6.5. A sustained region with H >= 7.4 is suspicious.
     is_source = path.endswith((".py", ".go", ".java", ".c", ".h", ".cpp", ".js", ".ts", ".txt", ".json"))
     threshold = 6.8 if is_source else 7.4

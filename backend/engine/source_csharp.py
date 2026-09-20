@@ -6,9 +6,9 @@ Detects cryptographic usages in C# (.cs) source files:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import re
-from typing import Any
 
 from api.models import CryptoFunction, Family, FindingKind, FindingSource, Surface
 from engine.models import Detection, Span
@@ -16,11 +16,23 @@ from engine.models import Detection, Span
 _CSHARP_PATTERNS: list[tuple[re.Pattern[str], Family, CryptoFunction, str, int | None]] = [
     (re.compile(r"\bAes\.Create\(\)"), Family.AES, CryptoFunction.ENCRYPT, "Aes.Create()", 256),
     (re.compile(r"\b(?:new\s+)?AesGcm\s*\("), Family.AES, CryptoFunction.ENCRYPT, "AesGcm", 256),
-    (re.compile(r"\b(?:new\s+)?ChaCha20Poly1305\s*\("), Family.CHACHA20, CryptoFunction.ENCRYPT, "ChaCha20Poly1305", 256),
+    (
+        re.compile(r"\b(?:new\s+)?ChaCha20Poly1305\s*\("),
+        Family.CHACHA20,
+        CryptoFunction.ENCRYPT,
+        "ChaCha20Poly1305",
+        256,
+    ),
     (re.compile(r"\bRSA\.Create\((?:(\d+))?\)"), Family.RSA, CryptoFunction.KEYGEN, "RSA.Create()", 2048),
     (re.compile(r"\bRSACryptoServiceProvider\b"), Family.RSA, CryptoFunction.KEYGEN, "RSACryptoServiceProvider", 2048),
     (re.compile(r"\bECDsa\.Create\(\)"), Family.ECDSA, CryptoFunction.KEYGEN, "ECDsa.Create()", 256),
-    (re.compile(r"\bECDiffieHellman\.Create\(\)"), Family.ECDH, CryptoFunction.KEYDERIVE, "ECDiffieHellman.Create()", 256),
+    (
+        re.compile(r"\bECDiffieHellman\.Create\(\)"),
+        Family.ECDH,
+        CryptoFunction.KEYDERIVE,
+        "ECDiffieHellman.Create()",
+        256,
+    ),
     (re.compile(r"\bDSACryptoServiceProvider\b"), Family.DSA, CryptoFunction.SIGN, "DSACryptoServiceProvider", 1024),
     (re.compile(r"\bSHA256\.(?:Create\(\)|HashData\b)"), Family.SHA_2, CryptoFunction.DIGEST, "SHA256", None),
     (re.compile(r"\bSHA384\.(?:Create\(\)|HashData\b)"), Family.SHA_2, CryptoFunction.DIGEST, "SHA384", None),
@@ -32,7 +44,13 @@ _CSHARP_PATTERNS: list[tuple[re.Pattern[str], Family, CryptoFunction, str, int |
     (re.compile(r"\b(?:new\s+)?HMACSHA512\s*(?:\(|\.Create\b)"), Family.HMAC, CryptoFunction.TAG, "HMACSHA512", None),
     (re.compile(r"\b(?:new\s+)?HMACSHA1\s*(?:\(|\.Create\b)"), Family.HMAC, CryptoFunction.TAG, "HMACSHA1", None),
     (re.compile(r"\b(?:new\s+)?HMACMD5\s*(?:\(|\.Create\b)"), Family.HMAC, CryptoFunction.TAG, "HMACMD5", None),
-    (re.compile(r"\b(?:TripleDESCryptoServiceProvider\b|TripleDES\.Create\(\))"), Family.THREE_DES, CryptoFunction.ENCRYPT, "TripleDES", 192),
+    (
+        re.compile(r"\b(?:TripleDESCryptoServiceProvider\b|TripleDES\.Create\(\))"),
+        Family.THREE_DES,
+        CryptoFunction.ENCRYPT,
+        "TripleDES",
+        192,
+    ),
     (re.compile(r"\b(?:DESCryptoServiceProvider\b|DES\.Create\(\))"), Family.DES, CryptoFunction.ENCRYPT, "DES", 56),
     (re.compile(r"\bRC2CryptoServiceProvider\b"), Family.RC4, CryptoFunction.ENCRYPT, "RC2", 128),
 ]
@@ -51,10 +69,8 @@ def detect_code(source: bytes, path: str = "<source>", artifact_hash: str | None
             snippet = text[max(0, match.start() - 20) : min(len(text), match.end() + 20)].strip()
             key_size = default_key_size
             if match.groups() and match.group(1):
-                try:
+                with contextlib.suppress(ValueError):
                     key_size = int(match.group(1))
-                except ValueError:
-                    pass
 
             span = Span(
                 artifact_hash=artifact_hash,

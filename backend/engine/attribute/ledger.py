@@ -10,7 +10,7 @@ Cluster states: open | promoted-to-rule | excluded | accepted.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 from engine.attribute.claim import attribute_claims
@@ -161,7 +161,8 @@ def compute_ledger(
     )
 
     assert ledger.verify_invariant(), (
-        f"Conservation invariant violated: {attributed_mass} + {excluded_mass} + {residue_mass} != {total_suspicion_mass}"
+        f"Conservation invariant violated: {attributed_mass} + {excluded_mass} + {residue_mass} "
+        f"!= {total_suspicion_mass}"
     )
 
     return ledger

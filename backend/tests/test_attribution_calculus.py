@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -82,7 +81,7 @@ def test_conservation_invariant_on_all_corpus_artifacts() -> None:
         total_excluded_mass_all += ledger.excluded_mass
         total_residue_mass_all += ledger.residue_mass
 
-    print(f"\n[M3 Attribution Calculus Invariant Report]")
+    print("\n[M3 Attribution Calculus Invariant Report]")
     print(f"  Corpus artifacts audited: {fixture_count}")
     print(f"  Total suspicion mass: {total_suspicion_mass_all:.2f}")
     print(f"  Attributed mass: {total_attributed_mass_all:.2f}")

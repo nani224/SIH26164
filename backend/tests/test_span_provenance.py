@@ -59,7 +59,7 @@ def test_bench_corpus_100_percent_span_coverage(capsys: pytest.CaptureFixture[st
     coverage_rate = findings_with_spans / total_findings
     coarse_rate = coarse_spans / total_spans if total_spans > 0 else 0.0
 
-    print(f"\n[M1 Span Provenance Report]")
+    print("\n[M1 Span Provenance Report]")
     print(f"  Total findings: {total_findings}")
     print(f"  Findings with spans: {findings_with_spans} ({coverage_rate * 100:.1f}%)")
     print(f"  Total spans: {total_spans}")
@@ -91,7 +91,7 @@ def test_span_bounds_on_all_bench_fixtures() -> None:
             assert len(det.spans) >= 1, f"Detection {det.display_name} in {fixture.name} has no spans!"
             for span in det.spans:
                 assert span.artifact_hash == artifact_hash
-                assert 0 <= span.start, f"Negative span start {span.start} in {fixture.name}"
+                assert span.start >= 0, f"Negative span start {span.start} in {fixture.name}"
                 assert span.start <= span.end, f"span.start ({span.start}) > span.end ({span.end}) in {fixture.name}"
                 assert span.end <= len(content), (
                     f"span.end ({span.end}) exceeds file length ({len(content)}) in {fixture.name}"
@@ -101,7 +101,7 @@ def test_span_bounds_on_all_bench_fixtures() -> None:
 
 @given(
     code=st.text(
-        alphabet=st.characters(blacklist_categories=("Cs",)),
+        alphabet=st.characters(blacklist_categories=("Cs",)),  # type: ignore[arg-type]
         max_size=2000,
     )
 )
@@ -119,7 +119,7 @@ def test_property_python_span_bounds(code: str) -> None:
 
 @given(
     code=st.text(
-        alphabet=st.characters(blacklist_categories=("Cs",)),
+        alphabet=st.characters(blacklist_categories=("Cs",)),  # type: ignore[arg-type]
         max_size=2000,
     )
 )

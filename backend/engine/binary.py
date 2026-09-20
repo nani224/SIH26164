@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import hashlib
 import struct
-from pathlib import Path
-from typing import Any
 
 from api.models import CryptoFunction, Family, FindingKind, FindingSource, Surface
 from engine.models import Detection, Span
@@ -79,7 +77,7 @@ def scan_binary(source: bytes, rel_path: str, artifact_hash: str | None = None) 
 
     if b_format == "pe":
         try:
-            import pefile
+            import pefile  # type: ignore[import-untyped]
             pe = pefile.PE(data=source, fast_load=True)
             for section in getattr(pe, "sections", []):
                 s_name = section.Name.decode("latin1", errors="ignore").strip("\x00")
@@ -95,7 +93,7 @@ def scan_binary(source: bytes, rel_path: str, artifact_hash: str | None = None) 
     elif b_format == "macho":
         try:
             import lief
-            binary = lief.parse(raw=list(source))
+            binary = lief.parse(raw=list(source))  # type: ignore[call-arg]
             if binary is not None:
                 for section in getattr(binary, "sections", []):
                     s_name = section.name

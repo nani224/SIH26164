@@ -9,10 +9,7 @@ Verifies:
 from __future__ import annotations
 
 import ast
-import hashlib
 from pathlib import Path
-
-import pytest
 
 from engine.extract import (
     extract_all,
@@ -23,7 +20,6 @@ from engine.extract import (
     extract_literals,
     extract_tables,
 )
-from engine.models import Span
 
 EXTRACT_DIR = Path(__file__).parent.parent / "engine" / "extract"
 
@@ -84,7 +80,6 @@ def test_tables_positive_and_negative() -> None:
 
 def test_entropy_positive_and_negative() -> None:
     # Positive: 128 bytes of uniformly distributed random bytes (high entropy H ~ 8.0)
-    import secrets
 
     # Deterministic pseudo-random 128 bytes with all 256 symbols evenly distributed
     random_blob = bytes((i * 97 + 13) % 256 for i in range(256))
@@ -119,7 +114,7 @@ uint32_t quarter_round(uint32_t a, uint32_t b) {
 """
     spans = extract_arx(arx_source, path="arx.c")
     assert len(spans) >= 1
-    assert any("arx" in s.signal_type for s in spans)
+    assert any("arx" in (s.signal_type or "") for s in spans)
 
     # Negative source: plain arithmetic
     benign_c = b"""
@@ -224,7 +219,7 @@ def test_extract_determinism_three_runs() -> None:
 
     assert len(run1) > 0
     assert run1 == run2 == run3
-    for s1, s2, s3 in zip(run1, run2, run3):
+    for s1, s2, s3 in zip(run1, run2, run3, strict=True):
         assert s1.start == s2.start == s3.start
         assert s1.end == s2.end == s3.end
         assert s1.producing_rule == s2.producing_rule == s3.producing_rule

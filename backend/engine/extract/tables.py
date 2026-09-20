@@ -117,7 +117,8 @@ def extract_tables(
     # 3. Source-code table parsing: array of 256 numbers forming a permutation
     # For source files, look for bracketed sequences containing 256 unique byte values
     if path.endswith((".py", ".c", ".h", ".cpp", ".java", ".go")):
-        for match in re.finditer(r"\[([^\]]{500,4000})\]|\{([^}]{500,4000})\}", source.decode("latin1", errors="ignore")):
+        decoded = source.decode("latin1", errors="ignore")
+        for match in re.finditer(r"\[([^\]]{500,4000})\]|\{([^}]{500,4000})\}", decoded):
             bracket_text = match.group(0)
             numbers: list[int] = []
             for num_str in _HEX_OR_INT_LITERAL.findall(bracket_text):

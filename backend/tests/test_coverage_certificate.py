@@ -12,7 +12,6 @@ import json
 from pathlib import Path
 
 import jsonschema
-import pytest
 
 from api.cbom import build_cbom
 from api.stub_data import default_scan, list_findings

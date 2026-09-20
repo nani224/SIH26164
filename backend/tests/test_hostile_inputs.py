@@ -11,13 +11,11 @@ Validates that:
 from __future__ import annotations
 
 import struct
-from pathlib import Path
-import pytest
 
 from engine import binary, firmware, source_csharp, source_rust
 
 
-def test_hostile_pe_truncated():
+def test_hostile_pe_truncated() -> None:
     """Truncated PE headers should be handled gracefully without crashing."""
     # Truncated DOS header (< 64 bytes)
     detections = binary.scan_binary(b"MZ\x00\x00", "truncated.exe")
@@ -31,7 +29,7 @@ def test_hostile_pe_truncated():
     assert isinstance(detections, list)
 
 
-def test_hostile_pe_corrupted_nt_header():
+def test_hostile_pe_corrupted_nt_header() -> None:
     """PE with invalid NT signature or corrupted headers."""
     buf = bytearray(256)
     buf[:2] = b"MZ"
@@ -42,7 +40,7 @@ def test_hostile_pe_corrupted_nt_header():
     assert isinstance(detections, list)
 
 
-def test_hostile_macho_corrupted():
+def test_hostile_macho_corrupted() -> None:
     """Mach-O with corrupted headers or invalid command lengths."""
     # Truncated Mach-O 64 header (< 32 bytes)
     detections = binary.scan_binary(b"\xfe\xed\xfa\xcf\x00\x00", "corrupt.dylib")
@@ -57,7 +55,7 @@ def test_hostile_macho_corrupted():
     assert isinstance(detections, list)
 
 
-def test_hostile_elf_corrupted():
+def test_hostile_elf_corrupted() -> None:
     """ELF with corrupted section header offsets."""
     buf = bytearray(64)
     buf[:4] = b"\x7fELF"
@@ -91,7 +89,7 @@ def _make_cpio_entry(name: str, payload: bytes) -> bytes:
         b"00000000",  # devminor
         b"00000000",  # rdevmajor
         b"00000000",  # rdevminor
-        f"{len(name_bytes):08x}".encode("ascii"), # namesize
+        f"{len(name_bytes):08x}".encode("ascii"),  # namesize
         b"00000000",  # check
     ]
     struct.pack_into("8s8s8s8s8s8s8s8s8s8s8s8s8s", header, 6, *fields)
@@ -102,7 +100,7 @@ def _make_cpio_entry(name: str, payload: bytes) -> bytes:
     return bytes(header) + name_bytes + name_pad + payload + payload_pad
 
 
-def test_firmware_path_traversal_cpio_rejected():
+def test_firmware_path_traversal_cpio_rejected() -> None:
     """CPIO archives containing path traversal payloads must be sanitized or rejected."""
     payload = b"root:x:0:0:root:/root:/bin/bash\n"
     cpio_data = _make_cpio_entry("../../../../../../etc/shadow", payload)
@@ -110,13 +108,13 @@ def test_firmware_path_traversal_cpio_rejected():
 
     extracted = firmware.extract_firmware(cpio_data)
     # The path traversal entry MUST NOT be extracted with dangerous path
-    for path, content in extracted:
+    for path, _content in extracted:
         assert ".." not in path
         assert not path.startswith("/")
         assert not path.startswith("\\")
 
 
-def test_firmware_resource_limits():
+def test_firmware_resource_limits() -> None:
     """Firmware extractor must respect max_files and max_bytes bounds."""
     large_payload = b"A" * 1024
     cpio_data = _make_cpio_entry("testfile.txt", large_payload)
@@ -127,7 +125,7 @@ def test_firmware_resource_limits():
     assert total <= 1024
 
 
-def test_hostile_source_inputs():
+def test_hostile_source_inputs() -> None:
     """Source detectors must handle invalid UTF-8 and strange syntax safely."""
     bad_bytes = b"\xff\xfe\x00\x12\x80\x90" * 50
     rust_detections = source_rust.detect_code(bad_bytes, "corrupt.rs")
