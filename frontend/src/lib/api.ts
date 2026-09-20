@@ -1,4 +1,22 @@
-import type { Finding, Scan, Policy, RemediationPlanItem, GraphNode, GraphEdge, RiskBands } from '../types/crypto';
+import type {
+  Finding,
+  Scan,
+  Policy,
+  RemediationPlanItem,
+  GraphNode,
+  GraphEdge,
+  RiskBands,
+  Target,
+  TargetCreate,
+  TargetPatch,
+  EstateSummary,
+  EstateTrend,
+  Drift,
+  Alert,
+  ProbeResult,
+  HsmInventory,
+  AuditVerifyResponse,
+} from '../types/crypto';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -138,3 +156,116 @@ export async function triageFinding(
   });
   return handleResponse<Finding>(res);
 }
+
+// Continuous Operation Endpoints (v0.3.0)
+
+export async function fetchEstateSummary(): Promise<EstateSummary> {
+  const res = await fetch(`${API_BASE}/api/v1/estate/summary`);
+  return handleResponse<EstateSummary>(res);
+}
+
+export async function fetchTargets(): Promise<Target[]> {
+  const res = await fetch(`${API_BASE}/api/v1/targets`);
+  return handleResponse<Target[]>(res);
+}
+
+export async function fetchTarget(id: string): Promise<Target> {
+  const res = await fetch(`${API_BASE}/api/v1/targets/${id}`);
+  return handleResponse<Target>(res);
+}
+
+export async function createTarget(payload: TargetCreate): Promise<Target> {
+  const res = await fetch(`${API_BASE}/api/v1/targets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Target>(res);
+}
+
+export async function patchTarget(id: string, payload: TargetPatch): Promise<Target> {
+  const res = await fetch(`${API_BASE}/api/v1/targets/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Target>(res);
+}
+
+export async function deleteTarget(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/v1/targets/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API Error ${res.status}: ${text || res.statusText}`);
+  }
+}
+
+export async function scanTargetNow(id: string): Promise<Scan> {
+  const res = await fetch(`${API_BASE}/api/v1/targets/${id}/scan-now`, {
+    method: 'POST',
+  });
+  return handleResponse<Scan>(res);
+}
+
+export async function fetchTargetDrift(
+  id: string,
+  params?: { fromScanId?: string; toScanId?: string }
+): Promise<Drift> {
+  const query = new URLSearchParams();
+  if (params?.fromScanId) query.set('fromScanId', params.fromScanId);
+  if (params?.toScanId) query.set('toScanId', params.toScanId);
+  const qs = query.toString();
+  const url = `${API_BASE}/api/v1/targets/${id}/drift${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url);
+  return handleResponse<Drift>(res);
+}
+
+export async function fetchAlerts(params?: {
+  targetId?: string;
+  type?: string;
+  acknowledged?: boolean;
+}): Promise<Alert[]> {
+  const query = new URLSearchParams();
+  if (params?.targetId) query.set('targetId', params.targetId);
+  if (params?.type) query.set('type', params.type);
+  if (params?.acknowledged !== undefined) query.set('acknowledged', String(params.acknowledged));
+  const qs = query.toString();
+  const url = `${API_BASE}/api/v1/alerts${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url);
+  return handleResponse<Alert[]>(res);
+}
+
+export async function acknowledgeAlert(id: string): Promise<Alert> {
+  const res = await fetch(`${API_BASE}/api/v1/alerts/${id}/ack`, {
+    method: 'PATCH',
+  });
+  return handleResponse<Alert>(res);
+}
+
+export async function fetchProbes(targetId?: string): Promise<ProbeResult[]> {
+  const query = new URLSearchParams();
+  if (targetId) query.set('targetId', targetId);
+  const qs = query.toString();
+  const url = `${API_BASE}/api/v1/probes${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url);
+  return handleResponse<ProbeResult[]>(res);
+}
+
+export async function fetchHsmInventory(): Promise<HsmInventory> {
+  const res = await fetch(`${API_BASE}/api/v1/hsm/inventory`);
+  return handleResponse<HsmInventory>(res);
+}
+
+export async function fetchEstateTrend(days?: number): Promise<EstateTrend> {
+  const url = `${API_BASE}/api/v1/estate/trend${days ? `?days=${days}` : ''}`;
+  const res = await fetch(url);
+  return handleResponse<EstateTrend>(res);
+}
+
+export async function verifyAudit(): Promise<AuditVerifyResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/audit/verify`);
+  return handleResponse<AuditVerifyResponse>(res);
+}
+

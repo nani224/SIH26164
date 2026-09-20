@@ -265,3 +265,33 @@ the authoritative number and update the README/PROGRESS.md with it.
   - `mosca-matrix.spec.ts`: Flow test ($Z$ horizon re-score with stationary classically broken assets), keyboard-only walkthrough, axe-core a11y, multi-viewport visual QA, CLS measurement -> PASSED.
   - `finale-integration.spec.ts`: Complete end-to-end integration test (upload -> live stages -> overview -> rescore -> triage -> CBOM -> 2D graph) in both Dark and Light themes -> PASSED.
 - `pnpm build`: Exit code 0 (All 14 static routes prerendered, all bundles within budget).
+
+## 2026-09-20 — Track A2 Milestone 1: Screen 11 (Continuous Estate Console)
+
+### 1. Delivery Summary
+- Implemented **Screen 11: Cryptographic Estate Console** (`/estate`) transitioning ECDAT from single-scan inspection to continuous multi-target posture monitoring.
+- Top bento metric grid: Total Targets (active vs paused breakdown), Total Scans completed (with live sync timestamp), Critical Findings (with direct jump to inventory), PQC Readiness Score Gauge (0-100% progress bar), and Active Alerts badge.
+- Live telemetry with 30s auto-refresh via TanStack Query (`refetchInterval: 30000`) and manual refresh button.
+- Monitored Targets Table: Name, URI, kind badges (`repo`, `path`, `endpoint`), cryptographic policy, schedule, relative last scan time, health status, and quick actions.
+- Interactive operations:
+  - "Scan Now" button with spinner triggering `POST /api/v1/targets/:id/scan-now`, updating estate summary and scan telemetry.
+  - "Register Target" accessible modal with validation, schedule presets, policy selection, and TanStack Query cache invalidation.
+  - "Edit Target" modal for updating schedule, policy, and enabled status.
+  - "Delete Target" confirmation modal with safe preservation of historical scan logs.
+  - Target filtering by search query (name/URI), kind (`all`, `repo`, `path`, `endpoint`), and status (`all`, `enabled`, `paused`).
+  - Toast notifications with deep links to scan results upon scan trigger.
+
+### 2. Verification Gates (100% Passed)
+- `pnpm typecheck`: Exit code 0 (0 errors).
+- `pnpm lint`: Exit code 0 (0 warnings/errors).
+- `pnpm knip`: Exit code 0 (0 unused exports/dependencies).
+- `pnpm vitest run src/app/estate/estate.test.tsx`: Exit code 0 (5/5 unit tests passed).
+- `pnpm playwright test e2e/estate.spec.ts`: Exit code 0 (2/2 E2E tests passed):
+  - Real-browser axe-core a11y in Dark & Light modes: 0 critical, 0 serious violations.
+  - Full interactive flow: search filter, scan trigger, modal registration.
+  - Multi-viewport screenshots captured:
+    - Desktop (1440×900): `public/screenshots/viewports/screen-11-estate-1440.png`
+    - Laptop (1280×720): `public/screenshots/viewports/screen-11-estate-1280.png`
+    - Mobile (390×844): `public/screenshots/viewports/screen-11-estate-390.png`
+  - Performance: CLS < 0.1 verified across all viewports.
+- `pnpm build`: Exit code 0 (All 15 routes prerendered statically).
