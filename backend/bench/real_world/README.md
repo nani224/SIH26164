@@ -79,7 +79,7 @@ after this run to make the number look better; it is recorded exactly as
 measured.
 
 Every remaining false negative is one of the gaps documented below -- see
-`backend/PROGRESS.md`'s dated entries for the full false-negative list.
+`docs/engineering/backend/PROGRESS.md`'s dated entries for the full false-negative list.
 This number is a floor (`tests/test_bench_real_world.py`), not a target
 -- don't chase it back up by weakening the corpus or the labels; closing
 the gaps below for real is what would honestly move it.

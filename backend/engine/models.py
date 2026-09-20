@@ -7,7 +7,7 @@ this means engine/ currently depends on api/ for shared vocabulary enums
 (Family, FindingKind, ...), which is backwards from a clean-architecture
 standpoint (api should depend on engine, not vice versa). That dependency
 direction was set by Phase 0 (api.models is where the contract-driven
-enums live) and is accepted as debt for now -- see backend/LEARNINGS.md.
+enums live) and is accepted as debt for now -- see docs/engineering/backend/LEARNINGS.md.
 """
 
 from __future__ import annotations

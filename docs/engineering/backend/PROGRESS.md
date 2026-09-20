@@ -722,7 +722,7 @@ had 3 files / 7 usages before this session.
 across both branches that exist in this repo) found **no evidence a
 larger corpus or a genuine HOLD set was ever built and then lost** --
 it never existed. That's a real, permanent gap, not something reduced.
-Also found: `backend/PLAN.md`'s Phase 1 entry already documents the
+Also found: `docs/engineering/backend/PLAN.md`'s Phase 1 entry already documents the
 brief's original "~70 usages, 0.986 recall" reference honestly as
 unmeasured-in-this-repo, so this gap was known, just not closed.
 
@@ -1229,7 +1229,7 @@ snippet exercising all 6 rule branches (md5, hashlib.new, hmac.new+SHA-1,
 RSA keygen with key_size kwarg, EC keygen with curve, AES/3DES ciphers)
 and confirmed every field (family, function, key_size, curve,
 underlying_hash_family) before writing the fixture set — see
-`backend/LEARNINGS.md` for the tree-sitter API details confirmed this way.
+`docs/engineering/backend/LEARNINGS.md` for the tree-sitter API details confirmed this way.
 
 ### Loops run
 

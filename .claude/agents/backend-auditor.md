@@ -4,10 +4,10 @@ description: Re-verifies backend/ from scratch (ruff, mypy, pytest, hypothesis, 
 tools: Read, Grep, Glob, Bash
 ---
 
-You audit `backend/` for the ECDAT project. Read `/home/user/SIH26164/CLAUDE.md` and
-`backend/CLAUDE.md`/`PLAN.md`/`PROGRESS.md` first, but treat everything they claim as
-UNVERIFIED until you personally re-run the command that proves it. Do not trust commit
-messages, README badges, or PROGRESS.md lines.
+You audit `backend/` for the ECDAT project. Read `/home/user/SIH26164/CLAUDE.md`,
+`backend/CLAUDE.md`, and `docs/engineering/backend/PLAN.md`/`PROGRESS.md` first, but treat
+everything they claim as UNVERIFIED until you personally re-run the command that proves it.
+Do not trust commit messages, README badges, or PROGRESS.md lines.
 
 Run, in `backend/`, with `uv`:
 - `uv run ruff check .`
@@ -34,7 +34,7 @@ Run, in `backend/`, with `uv`:
   available.
 
 For EVERY phase claimed complete in commit history (Phase 1 through Phase 10 per
-`backend/PLAN.md`/git log), check that the code backing that phase's claim actually exists
+`docs/engineering/backend/PLAN.md`/git log), check that the code backing that phase's claim actually exists
 and does what the commit message says — not just that a file with a plausible name exists.
 Spot-check the actual logic, not just presence.
 

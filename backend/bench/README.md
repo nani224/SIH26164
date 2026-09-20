@@ -134,7 +134,7 @@ the build (exit 1) if either corpus drops below 0.95. It was proven to
 actually do this on GitHub's real infrastructure, not just locally: M8b
 deliberately broke precision on a throwaway branch and confirmed a real
 `failure` conclusion on the `backend-ci` job (PR #12, closed unmerged,
-change reverted) — see `backend/PROGRESS.md`'s 2026-09-20 M8 entry for
+change reverted) — see `docs/engineering/backend/PROGRESS.md`'s 2026-09-20 M8 entry for
 the full real command/log output of both the local break and the GitHub
 Actions failure.
 
