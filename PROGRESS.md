@@ -79,4 +79,21 @@
   ======================== 4 passed, 2 warnings in 0.96s ========================
   ```
 
+## M4 — COVERAGE CERTIFICATE
+- **Status**: COMPLETED & VERIFIED
+- **Changes**:
+  - Implemented `backend/engine/certificate.py`:
+    - Generates `CoverageCertificate` with total mass, attributed, excluded, residue, coverage ratio, residue cluster count, and top clusters with locations.
+    - Generates signed attestation manifest using HMAC-SHA256 and canonical JSON serialization.
+    - Implemented `embed_coverage_in_cbom` which embeds coverage properties (`ecdat:coverage:*`) into `metadata.properties` and the certificate into `annotations`.
+  - Created `backend/tests/test_coverage_certificate.py`:
+    - Verified strict CycloneDX 1.6 schema validation on CBOMs carrying the certificate.
+    - Verified reproducibility: identical input produces strictly identical coverage numbers and attestation hashes.
+- **Real Verification Output**:
+  ```text
+  tests/test_coverage_certificate.py ..
+  ======================== 2 passed, 3 warnings in 0.44s ========================
+  ```
+
+
 
