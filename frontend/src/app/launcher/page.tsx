@@ -19,12 +19,15 @@ import {
   ArrowRight,
   Shield,
   FileCheck,
+  GitBranch,
+  GitPullRequest,
 } from 'lucide-react';
 
 export default function ScanLauncherPage() {
   const router = useRouter();
   const { crqcZ, setCrqcZ, setActiveScanId } = useAppStore();
 
+  const [activeMode, setActiveMode] = useState<'manual' | 'ci'>('manual');
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: number; hash: string } | null>({
     name: 'ntro-core-infrastructure-snapshot.tar.gz',
     size: 28450190,
@@ -96,7 +99,117 @@ export default function ScanLauncherPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Mode Switcher: Manual vs CI/CD */}
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2" role="tablist" aria-label="Ingestion Mode Selection">
+        <button
+          role="tab"
+          aria-selected={activeMode === 'manual'}
+          onClick={() => setActiveMode('manual')}
+          className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${
+            activeMode === 'manual'
+              ? 'bg-[var(--surface-card)] border border-[var(--crypto-pqc-border)] text-[var(--crypto-pqc)] shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-raised)]'
+          }`}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span>Manual Target Ingestion</span>
+        </button>
+
+        <button
+          role="tab"
+          aria-selected={activeMode === 'ci'}
+          onClick={() => setActiveMode('ci')}
+          className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${
+            activeMode === 'ci'
+              ? 'bg-[var(--surface-card)] border border-[var(--crypto-pqc-border)] text-[var(--crypto-pqc)] shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-raised)]'
+          }`}
+        >
+          <GitPullRequest className="w-3.5 h-3.5" />
+          <span>CI / CD Pipeline Trigger</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-[var(--crypto-pqc-bg)] border border-[var(--crypto-pqc-border)] text-[var(--crypto-pqc)] font-bold">
+            ROADMAP
+          </span>
+        </button>
+      </div>
+
+      {activeMode === 'ci' ? (
+        <div className="space-y-6" data-testid="launcher-ci-panel">
+          <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">
+                  Automated CI/CD Pipeline Execution
+                </h2>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                  Trigger automated scans directly from pull requests or build pipelines with precision exit codes.
+                </p>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--band-medium-bg)] border border-[var(--band-medium-border)] text-[var(--band-medium)] font-bold">
+                [Roadmap: GitHub Actions / GitLab CI runner pending]
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* GitHub Actions */}
+              <div className="p-4 rounded-lg bg-[var(--surface-base)] border border-[var(--border-subtle)] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                    <GitBranch className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+                    <span>GitHub Actions Workflow</span>
+                  </span>
+                  <span className="text-[9px] text-[var(--text-muted)]">.github/workflows</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Integrate into your PR check suite. Fails on CRITICAL findings, uploads CycloneDX CBOM and SARIF reports.
+                </p>
+                <pre className="p-2.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-secondary)] overflow-x-auto">
+{`- name: Run ECDAT Scan
+  uses: nani224/SIH26164/.github/actions/ecdat-scan@main
+  with:
+    fail_on: critical
+    upload_cbom: true`}
+                </pre>
+              </div>
+
+              {/* GitLab CI */}
+              <div className="p-4 rounded-lg bg-[var(--surface-base)] border border-[var(--border-subtle)] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5 text-[var(--crypto-classical)]" />
+                    <span>GitLab CI Runner</span>
+                  </span>
+                  <span className="text-[9px] text-[var(--text-muted)]">.gitlab-ci.yml</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Execute offline scans in air-gapped sovereign runner enclaves without external network access.
+                </p>
+                <pre className="p-2.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-secondary)] overflow-x-auto">
+{`ecdat-scan:
+  stage: test
+  image: ghcr.io/nani224/ecdat-scanner:latest
+  script:
+    - ecdat scan --offline --format sarif,cbom`}
+                </pre>
+              </div>
+            </div>
+
+            {/* Webhook Execution snippet */}
+            <div className="p-4 rounded-lg bg-[var(--surface-base)] border border-[var(--border-subtle)] space-y-2">
+              <span className="font-bold text-xs text-[var(--text-primary)]">
+                Webhook / REST API Scan Trigger
+              </span>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Trigger scans programmatically via target scan endpoints:
+              </p>
+              <pre className="p-2.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--crypto-pqc)] overflow-x-auto">
+curl -X POST http://localhost:8000/api/v1/targets/target-001/scan
+              </pre>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Ingestion Dropzone & Parameters */}
         <div className="lg:col-span-2 space-y-6">
           {/* Dropzone */}
@@ -327,7 +440,7 @@ export default function ScanLauncherPage() {
             <div className="pt-2">
               <button
                 onClick={() => router.push('/overview')}
-                className="w-full py-2 rounded bg-[var(--crypto-safe-classical)] text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                className="w-full py-2 rounded bg-[var(--crypto-pqc)] text-[var(--surface-base)] font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
               >
                 <span>OPEN SCAN OVERVIEW CONSOLE</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -336,6 +449,7 @@ export default function ScanLauncherPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

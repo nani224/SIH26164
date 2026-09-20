@@ -394,3 +394,40 @@ the authoritative number and update the README/PROGRESS.md with it.
   - Performance: CLS < 0.1 verified across all viewports.
 - `pnpm build`: Exit code 0 (All 18 routes prerendered statically).
 
+## 2026-09-20 — Track A2 Milestone 5: HSM Inventory + Audit Log Hash-Chain Verification + CI Surfaces
+
+### 1. Delivery Summary
+- **HSM Partition Inventory Surface (`/inventory`)**:
+  - Integrated dual-mode tab switcher on `/inventory`: "Discovered Assets Catalog" and "Hardware HSM Partitions (PKCS#11)".
+  - Deep-link support via `?surface=hardware-hsm` query parameter (wrapped in React `<Suspense>` for static export optimization).
+  - SoftHSM2 slot enumeration consuming `GET /api/v1/hsm/inventory`:
+    - Slot 0: `SoftHSM v2 Slot 0 - Root Vault` (RSA-4096, ECDSA P-256, AES-256, ML-KEM-768).
+    - Slot 1: `SoftHSM v2 Slot 1 - Payment Tokenizer` (AES-256-XTS, ML-DSA-65, 3DES-168).
+  - Overview bento metrics: SoftHSM2 Slots (2), Total Keys (7), Post-Quantum Keys (2), Shor-Vulnerable (2), Classically Broken (1).
+  - PQC Readiness Badges: `POST-QUANTUM`, `SHOR-VULNERABLE`, `CLASSICALLY-BROKEN`, `QUANTUM-SAFE` using semantic OKLCH tokens with 100% WCAG AA contrast.
+  - Interactive key drawer deep-link: clicking any HSM key opens `FindingDrawer` with full risk score, Mosca metrics, and NIST PQC remediation target.
+- **Cryptographic Audit Log Hash-Chain Verification Control (`AuditVerifySeal`)**:
+  - Created reusable `AuditVerifySeal` component consuming `GET /api/v1/audit/verify`.
+  - Visual cryptographic seal: `CHAIN VALID` / `TAMPERED` status pill with glowing shield.
+  - Displays record count (1,248 verified immutable ledger entries) and SHA-256 head hash (`7f9a8b1c...`) with copy-to-clipboard functionality.
+  - Interactive "Re-verify" control with spinning state.
+  - Integrated into both the Estate Console (`/estate`) and HSM Inventory (`/inventory`).
+- **CI/CD Pipeline Surfaces & Honest Roadmap Annotations**:
+  - `/estate`: Added "CI/CD Pipeline Surfaces & Automation" section detailing the reusable GitHub Actions workflow (`.github/workflows/ecdat-scan-reusable.yml`) and GitLab CI air-gapped sovereign container runner (`.gitlab-ci.yml`), featuring honest `[Roadmap: GitHub Actions / GitLab CI runner pending]` annotations.
+  - `/launcher`: Added "CI / CD Pipeline Trigger" tab with honest `[Roadmap: GitHub Actions / GitLab CI runner pending]` annotations, workflow configuration instructions, and webhook cURL examples.
+
+### 2. Verification Gates (100% Passed)
+- `pnpm typecheck`: Exit code 0 (0 errors).
+- `pnpm lint`: Exit code 0 (0 warnings/errors).
+- `pnpm knip`: Exit code 0 (0 unused exports/dependencies).
+- `pnpm vitest run src/app/inventory/inventory.test.tsx src/app/estate/estate.test.tsx`: Exit code 0 (14/14 unit tests passed).
+- `pnpm playwright test e2e/hsm-audit-ci.spec.ts`: Exit code 0 (2/2 E2E tests passed):
+  - Real-browser axe-core a11y in Dark & Light modes: 0 critical, 0 serious violations.
+  - Interactive flow: SoftHSM2 partition inspection, FindingDrawer deep-link, audit hash-chain verification, CI surface inspection.
+  - Multi-viewport screenshots captured:
+    - Desktop (1440×900): `public/screenshots/viewports/screen-04-hsm-inventory-1440.png`
+    - Laptop (1280×720): `public/screenshots/viewports/screen-04-hsm-inventory-1280.png`
+    - Mobile (390×844): `public/screenshots/viewports/screen-04-hsm-inventory-390.png`
+- `pnpm build`: Exit code 0 (All 18 routes prerendered statically).
+
+

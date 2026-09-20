@@ -62,6 +62,29 @@ describe('Screen 11: Continuous Estate Console', () => {
     expect(screen.getByPlaceholderText(/e\.g\. Core Payment Gateway/i)).toBeInTheDocument();
   });
 
+  it('renders CI/CD pipeline surfaces with honest roadmap annotations', async () => {
+    renderWithClient(<EstatePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Cryptographic Estate Console/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/GitHub Actions/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/GitLab CI Runner/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Roadmap/i).length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 4000 });
+  });
+
+  it('renders cryptographic audit hash-chain integrity verification seal', async () => {
+    renderWithClient(<EstatePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Cryptographic Estate Console/i)).toBeInTheDocument();
+      expect(screen.getByTestId('audit-verify-control')).toBeInTheDocument();
+      expect(screen.getByText(/Audit Log Hash-Chain Integrity/i)).toBeInTheDocument();
+      expect(screen.getByText(/CHAIN VALID/i)).toBeInTheDocument();
+      expect(screen.getByText(/1,248/i)).toBeInTheDocument();
+    }, { timeout: 4000 });
+  });
+
   it('passes accessibility audits on estate console screen', async () => {
     const { container } = renderWithClient(<EstatePage />);
 

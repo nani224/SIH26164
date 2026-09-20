@@ -13,6 +13,7 @@ import {
   fetchPolicies,
 } from '../../lib/api';
 import type { Target, TargetKind, TargetCreate, TargetPatch, Policy } from '../../types/crypto';
+import { AuditVerifySeal } from '../../components/AuditVerifySeal';
 import {
   Shield,
   Layers,
@@ -34,6 +35,8 @@ import {
   Clock,
   X,
   Sparkles,
+  GitPullRequest,
+  Terminal,
 } from 'lucide-react';
 
 export default function EstatePage() {
@@ -716,6 +719,100 @@ export default function EstatePage() {
             </table>
           </div>
         )}
+      </section>
+
+      {/* CI/CD Pipeline Surfaces & Continuous Inspection Gates */}
+      <section aria-label="CI/CD Pipeline Integrations" className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--border-subtle)] pb-3">
+          <div>
+            <div className="flex items-center gap-1.5 text-xs text-[var(--crypto-pqc)] font-bold mb-0.5">
+              <GitPullRequest className="w-3.5 h-3.5" />
+              <span>CI/CD PIPELINE SURFACES & AUTOMATION</span>
+            </div>
+            <h2 className="text-base font-bold text-[var(--text-primary)]">
+              Continuous Cryptographic Gates & PR Inspection
+            </h2>
+            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+              Automated precision gate enforcement for pull requests and CI pipelines.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--crypto-pqc-bg)] border border-[var(--crypto-pqc-border)] text-[var(--crypto-pqc)] font-bold">
+              PRECISION GATE ACTIVE
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* GitHub Actions Card */}
+          <div className="p-4 rounded-lg bg-[var(--surface-base)] border border-[var(--border-subtle)] space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <GitBranch className="w-4 h-4 text-[var(--crypto-pqc)]" />
+                <span className="font-bold text-sm text-[var(--text-primary)]">GitHub Actions</span>
+              </div>
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--crypto-pqc-bg)] border border-[var(--crypto-pqc-border)] text-[var(--crypto-pqc)] font-bold"
+                title="Status: Action ready; webhook daemon runner under continuous development"
+              >
+                REUSABLE WORKFLOW
+              </span>
+            </div>
+
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Reusable action <code className="text-[var(--text-primary)]">.github/workflows/ecdat-scan-reusable.yml</code> executes deterministic scans on PR events and fails PR checks on CRITICAL findings.
+            </p>
+
+            <div className="p-2.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-secondary)] space-y-1">
+              <div>uses: nani224/SIH26164/.github/actions/ecdat-scan@main</div>
+              <div className="text-[var(--text-muted)]">with: fail_on: critical | upload_cbom: true</div>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] pt-1">
+              <span className="text-[var(--band-medium)] font-bold">
+                [Roadmap: GitHub Actions / GitLab CI runner pending]
+              </span>
+              <span className="text-[var(--crypto-pqc)] font-semibold">Exit Code 1 on Critical</span>
+            </div>
+          </div>
+
+          {/* GitLab CI Card */}
+          <div className="p-4 rounded-lg bg-[var(--surface-base)] border border-[var(--border-subtle)] space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-[var(--crypto-classical)]" />
+                <span className="font-bold text-sm text-[var(--text-primary)]">GitLab CI Runner</span>
+              </div>
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--crypto-classical-bg)] border border-[var(--crypto-classical-border)] text-[var(--crypto-classical)] font-bold"
+                title="Status: Air-gapped container runner pending continuous daemon hook"
+              >
+                CONTAINERIZED
+              </span>
+            </div>
+
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Air-gapped container runner executing offline binary and repository analysis within isolated sovereign enclave environments.
+            </p>
+
+            <div className="p-2.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-secondary)] space-y-1">
+              <div>image: ghcr.io/nani224/ecdat-scanner:latest</div>
+              <div className="text-[var(--text-muted)]">script: - ecdat scan --offline --format sarif,cbom</div>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] pt-1">
+              <span className="text-[var(--band-medium)] font-bold">
+                [Roadmap: GitHub Actions / GitLab CI runner pending]
+              </span>
+              <span className="text-[var(--crypto-classical)] font-semibold">Air-gapped Sovereign</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Cryptographic Audit Log Hash-Chain Integrity Seal */}
+      <section aria-label="Cryptographic Audit Integrity" className="mt-2">
+        <AuditVerifySeal variant="card" />
       </section>
 
       {/* Register Target Modal */}
