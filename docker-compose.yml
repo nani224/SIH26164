@@ -44,5 +44,66 @@ services:
     profiles:
       - redis
 
+  # Weak-TLS demo target for the live TLS probe (POST /probes/tls) --
+  # same weak-cipher config as docker-compose.test.yml's test-target-legacy-tls,
+  # duplicated here (not `include:`d) so `make demo` needs no second compose
+  # file. Cert/key are generated on first start by the container itself; if
+  # your environment blocks that container's own outbound `apk add openssl`
+  # (e.g. a TLS-intercepting egress proxy the container doesn't trust), mount
+  # a pre-generated cert/key pair at the same paths instead -- see
+  # docs/decisions/backend/021-g2-real-stack-verification.md for the exact
+  # host-generated-cert workaround this was verified against.
+  demo-weak-tls:
+    image: nginx:alpine
+    container_name: ecdat-demo-weak-tls
+    restart: unless-stopped
+    ports:
+      - "8443:443"
+    profiles:
+      - demo
+    command: >
+      /bin/sh -c "
+      mkdir -p /etc/nginx/ssl &&
+      apk add --no-cache openssl &&
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout /etc/nginx/ssl/server.key -out /etc/nginx/ssl/server.crt \
+        -subj '/CN=ecdat-demo-weak-tls' &&
+      cat << 'EOF' > /etc/nginx/conf.d/default.conf
+      server {
+          listen 443 ssl;
+          ssl_certificate /etc/nginx/ssl/server.crt;
+          ssl_certificate_key /etc/nginx/ssl/server.key;
+          ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+          ssl_ciphers 'ECDHE-RSA-AES128-SHA:AES128-SHA:DES-CBC3-SHA:RC4-SHA';
+          ssl_prefer_server_ciphers on;
+          location / {
+              return 200 'legacy-tls-ok\n';
+          }
+      }
+      EOF
+      nginx -g 'daemon off;'
+      "
+
+  # Local container registry for the registry probe surface (air-gapped --
+  # never a real external registry).
+  demo-registry:
+    image: registry:2
+    container_name: ecdat-demo-registry
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    profiles:
+      - demo
+
+  # SoftHSM2 is NOT containerized here: PKCS#11 needs the softhsm2 shared
+  # library + its on-disk token store reachable from wherever `api` runs
+  # its process (probes/hsm.py resolves /usr/lib/softhsm/libsofthsm2.so or
+  # $SOFTHSM2_LIB). For `make demo`'s all-in-docker path, install
+  # `softhsm2` + `opensc` in backend/Dockerfile's runtime stage and mount a
+  # persistent volume at /var/lib/softhsm/tokens; for local/CI runs, install
+  # softhsm2 on the host and run `api` outside docker instead -- both are
+  # real, supported paths, not a gap papered over. Documented, not yet
+  # wired into the `api` image build (see ADR 021).
+
 volumes:
   ecdat-data:
