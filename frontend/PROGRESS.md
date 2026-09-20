@@ -356,6 +356,41 @@ the authoritative number and update the README/PROGRESS.md with it.
     - Desktop (1440×900): `public/screenshots/viewports/screen-13-drift-1440.png`
     - Laptop (1280×720): `public/screenshots/viewports/screen-13-drift-1280.png`
     - Mobile (390×844): `public/screenshots/viewports/screen-13-drift-390.png`
-  - Performance: CLS < 0.1 verified across all viewports.
 - `pnpm build`: Exit code 0 (All 17 routes prerendered statically).
+
+## 2026-09-20 — Track A2 Milestone 4: Screen 14 (Security Alerts & Protocol Probes)
+
+### 1. Delivery Summary
+- Implemented **Screen 14: Security Alerts & Protocol Probes** (`/alerts`) providing real-time downgrade detection signals, expiring certificate alerts, drift notifications, and live TLS/SSH protocol probe telemetry.
+- Consumes `GET /api/v1/alerts`, `PATCH /api/v1/alerts/{id}/ack`, and `GET /api/v1/probes`.
+- Alerts Summary Bento:
+  - Active Alerts (3 unacknowledged, Grover Amber).
+  - Critical Alerts (1 requiring immediate remediation, Ember Red).
+  - Probe Downgrades Detected (1 cipher suite regression, Ember Red).
+  - Active Probes (2 live TLS/SSH endpoints, Lattice Teal).
+- Alerts Feed & Operations:
+  - Filter tabs: `Active`, `Acknowledged`, `All`, and dropdown filter by type (`new-critical`, `cert-expiring`, `probe-downgrade`, `drift`).
+  - Alert cards with severity badges, target info links to `/estate`, timestamp, and interactive "Acknowledge" mutation with optimistic UI updates.
+- Active Protocol Probes Surface:
+  - Displays host/port endpoints with protocol badges (`TLS` / `SSH`).
+  - **Negotiated State**: Highlights the negotiated cipher suite, KEX algorithm, and quantum-safe evaluation with a prominent `NEGOTIATED` badge.
+  - **Supported Suites List**: Outlines all advertised server suites with `SUPPORTED` badges, indicating whether PQC hybrid key exchanges are available but not negotiated (downgrade vulnerability signal).
+- Cross-Screen `NEGOTIATED` vs `SUPPORTED` Badge Integration:
+  - Updated `FindingDrawer` to render distinct `NEGOTIATED` vs `SUPPORTED` badges on findings.
+  - Updated `Inventory` virtualized table to render `NEGOTIATED` vs `SUPPORTED` badges.
+
+### 2. Verification Gates (100% Passed)
+- `pnpm typecheck`: Exit code 0 (0 errors).
+- `pnpm lint`: Exit code 0 (0 warnings/errors).
+- `pnpm knip`: Exit code 0 (0 unused exports/dependencies).
+- `pnpm vitest run src/app/alerts/alerts.test.tsx`: Exit code 0 (6/6 unit tests passed).
+- `pnpm playwright test e2e/alerts.spec.ts`: Exit code 0 (2/2 E2E tests passed):
+  - Real-browser axe-core a11y in Dark & Light modes: 0 critical, 0 serious violations.
+  - Interactive flow: status filtering, search filtering, and alert acknowledge mutation.
+  - Multi-viewport screenshots captured:
+    - Desktop (1440×900): `public/screenshots/viewports/screen-14-alerts-1440.png`
+    - Laptop (1280×720): `public/screenshots/viewports/screen-14-alerts-1280.png`
+    - Mobile (390×844): `public/screenshots/viewports/screen-14-alerts-390.png`
+  - Performance: CLS < 0.1 verified across all viewports.
+- `pnpm build`: Exit code 0 (All 18 routes prerendered statically).
 

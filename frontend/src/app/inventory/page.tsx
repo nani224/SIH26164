@@ -289,6 +289,17 @@ export default function InventoryPage() {
                           label={f.family ?? undefined}
                           size="sm"
                         />
+                        {f.negotiated !== undefined && f.negotiated !== null && (
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider border ${
+                              f.negotiated
+                                ? 'bg-[var(--crypto-pqc-bg)] text-[var(--crypto-pqc)] border-[var(--crypto-pqc-border)]'
+                                : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+                            }`}
+                          >
+                            {f.negotiated ? 'NEGOTIATED' : 'SUPPORTED'}
+                          </span>
+                        )}
                         {isProposed && (
                           <span
                             title="[Proposed: Hardware security module & cloud discovery pending backend implementation]"
