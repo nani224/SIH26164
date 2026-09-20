@@ -235,4 +235,29 @@ dependency-ordered milestones:
       2026-09-20 PROGRESS.md entry for full detail.
 
 Track CC v0.3 mandate (M0-M5) complete.
+
+## Track CC — remaining detection work (2026-09-20, in progress)
+
+Follow-on mandate: close the 3 gaps M0-M5's own final report listed as
+remaining. `feature/cc-detection` (the mandate's stated branch) does not
+exist in the repo -- continuing on `claude/inspiring-hamilton-p6ig7n` as
+established this session, flagged rather than silently substituted.
+
+- [x] **M6** — Go bare-function-reference cluster (4 of 6 remaining
+      real-world FNs, picked as highest value). Ported Python's existing
+      `attr.node` fix to `engine/source_go.py`/`go_crypto.scm`. Real
+      false positive caught and fixed during implementation (HMAC hash-
+      argument double-counting). Recall 0.8125 -> 0.875 (28/32), zero
+      new false positives, Layer A unchanged (56/56), 170 tests green.
+      See ADR 018 and 2026-09-20 PROGRESS.md entry.
+- [ ] **M7** — Grow HOLD corpus toward 150 usages (currently 32), label-
+      before-run discipline unchanged. Not started.
+- [ ] **M8** — CI hardening: prove the precision-floor gate fails red
+      when breached (deliberately, then revert), and either get a real
+      external-repo proof of the reusable Action or document the exact
+      blocked-on-human-repo-creation instruction. Not started.
+- [ ] **M9** — `backend/bench/README.md` handoff doc: every benchmark,
+      every corpus, the blind-labelling protocol, current numbers dated,
+      documented FN clusters. Not started.
+
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.

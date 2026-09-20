@@ -1,5 +1,75 @@
 # ECDAT Backend — Progress
 
+## 2026-09-20 — Track CC M6: Go bare-function-reference cluster closed
+
+Follow-on mandate after M0-M5 completion: 3 gaps remained, picked in
+order starting with the highest-value one (4 of 6 remaining real-world
+false negatives). Ported Python's existing bare-attribute-reference fix
+(`source_python.py`'s `attr.node` query capture) to Go: `hashFunc:
+sha256.New,` and `s.BlockFunc(aes.NewCipher)` in
+`gorilla_securecookie.go` pass a function *value* without calling it --
+Go's query previously only matched `call_expression` nodes.
+
+`engine/queries/go_crypto.scm` gained a second pattern matching every
+`pkg.Func` selector expression, called or not; `engine/source_go.py`
+factored the existing pkg/fn lookup table into `_resolve_pkg_fn` (shared
+by the real-call and bare-reference paths) and filters out selectors
+that ARE actually called (already handled by the call path).
+
+Real false positive caught and fixed during implementation, not after:
+the existing `hmac.New(sha256.New, key)` test fixture produced **two**
+findings for one line under the naive new pattern (the HMAC finding,
+which already captures `sha256` via `underlying_hash_family`, plus a
+redundant standalone SHA-2 reference finding) -- fixed with
+`_is_hmac_new_hash_argument`, which recognizes and skips a bare
+reference specifically in the hash-constructor argument slot of
+`hmac.New(...)`. Full design in
+`docs/decisions/backend/018-go-bare-function-reference.md`.
+
+```
+$ uv run python bench/real_world/evaluate.py
+precision=1.0 recall=0.875 f1=0.9333
+truth=32 detected=28 tp=28
+```
+
+Recall 0.8125 -> 0.875 (28/32, both target Go false negatives closed at
+their real lines), **zero new false positives**. Layer A unaffected
+(56/56, no existing fixture exercises this pattern) -- 5 new dedicated
+unit tests added instead (struct-field reference, call-argument
+reference, the HMAC double-count guard as its own named regression
+test, an unrecognized-package negative case).
+
+```
+$ uv run ruff check .
+All checks passed!
+$ uv run mypy --strict .
+Success: no issues found in 74 source files
+$ uv run pytest --cov -q
+170 passed, 4 warnings in 16.43s   (was 166 before this pass; +5 new Go
+                                     tests, +1 real-world floor update)
+TOTAL coverage 93%
+$ uv run python scripts/contract_diff.py
+No contract drift.
+$ uv run python bench/evaluate.py   (Layer A, unaffected)
+precision=1.0 recall=1.0 f1=1.0
+truth=56 detected=56 tp=56
+$ uv run python bench/check_precision_floor.py
+Layer A (bench/fixtures): precision=1.0 (floor 0.95) -- PASS
+real_world (HOLD): precision=1.0 (floor 0.95) -- PASS
+```
+
+While updating `bench/real_world/README.md`, corrected a second stale
+claim (gap #1's closing sentence still said "Go has no equivalent
+capture yet" after the fix landed in the same edit pass -- caught before
+committing, not left inconsistent).
+
+Not started this session: M7 (corpus growth toward 150 usages), M8 (CI
+hardening + external-repo proof), M9 (bench/README.md handoff doc). 4
+real-world false negatives remain, all previously documented and
+unaffected by this fix: two Go `cipher.NewCTR(block, iv)` calls (generic
+interface parameter, needs real dataflow) and the two pyjwt gaps M4 left
+open (project-specific type alias, verify-on-local-variable).
+
 ## 2026-09-20 — Track CC M5 complete: real blocked PR on GitHub's actual infrastructure
 
 Finished what the previous entry left open. First, opened a real PR

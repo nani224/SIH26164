@@ -45,48 +45,43 @@ into this repo as a copied file. (A later Track CC mandate reversed this
 as "over-cautious" and said paramiko is usable via fetch-to-/tmp-only,
 never committed -- not yet acted on.)
 
-## Result (2026-09-19, M4 Track CC, 9 files / 32 usages / 4 languages)
+## Result (2026-09-20, M6 Track CC, 9 files / 32 usages / 4 languages)
 
 ```
 $ uv run python bench/real_world/evaluate.py
-precision=1.0 recall=0.8125 f1=0.8966
-truth=32 detected=26 tp=26
+precision=1.0 recall=0.875 f1=0.9333
+truth=32 detected=28 tp=28
 ```
 
-**26/32, zero false positives.** Two things happened to get here, same
-session: (1) growing the corpus to include 2 new OpenSSL usages exposed a
-real precision bug (`EVP_CIPHER_fetch` firing as a standalone ENCRYPT
-regardless of how the fetched handle was actually used) that briefly
-dropped precision to 0.8889, below the 0.95 floor -- caught by this exact
-HOLD run, fixed same-session (`docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md`),
-restoring precision to 1.0 and *improving* recall as a side effect (the
-fix also found 4 real OpenSSL operations the old heuristic was missing).
-(2) M4 then closed the corpus's single largest false-negative cluster --
-pyjwt's `key.sign()`/`key.verify()` calls, 8 misses -- by resolving
-`key`'s family from a real static fact (the enclosing function's own
-parameter type annotation) rather than a guess; 6 of the 8 closed with
-zero new false positives (`docs/decisions/backend/016-python-key-method-type-annotation.md`).
+**28/32, zero false positives.** M3 fixed a real precision bug found by
+growing this corpus (OpenSSL `EVP_CIPHER_fetch`, see ADR 015); M4 closed
+pyjwt's `key.sign()`/`key.verify()` cluster (6/8, ADR 016); M6 closed
+Go's bare-function-reference cluster (`hashFunc: sha256.New,` and
+`s.BlockFunc(aes.NewCipher)` in `gorilla_securecookie.go`, both now
+detected at their real lines, see ADR 018) -- a direct port of the
+equivalent fix already living on the Python side. Zero new false
+positives at each step; precision has stayed at 1.0 since the M3 fix.
 
 Every remaining false negative is one of the gaps documented below -- see
-`backend/PROGRESS.md`'s 2026-09-19 entries for the full false-negative
-list. This number is a floor (`tests/test_bench_real_world.py`), not a
-target -- don't chase it back up by weakening the corpus or the labels;
-closing the gaps below for real is what would honestly move it.
+`backend/PROGRESS.md`'s dated entries for the full false-negative list.
+This number is a floor (`tests/test_bench_real_world.py`), not a target
+-- don't chase it back up by weakening the corpus or the labels; closing
+the gaps below for real is what would honestly move it.
 
 ## What this did *not* find (real gaps, noted honestly, not silently fixed)
 
-1. **Bare attribute references in Go aren't detected**, only calls.
-   `hashFunc: sha256.New,` and `s.BlockFunc(aes.NewCipher)` in
-   `gorilla_securecookie.go` (139, 148) pass a function *value*, never
-   call it -- Go's query only matches direct call nodes, so this
-   registry-style pattern is a false negative there. **This is already
-   fixed on the Python side**: `pyjwt_algorithms.py`'s equivalent pattern
-   (`SHA256: ClassVar[HashlibHash] = hashlib.sha256`, lines 320-322) *is*
-   correctly detected (`source_python.py`'s `attr.node` query capture,
-   landed in an earlier session) -- this file previously claimed
-   otherwise; that was stale and is corrected here per the project's
-   "re-derive, don't quote" bookkeeping rule. Go has no equivalent
-   capture yet -- a real, still-open, language-specific gap.
+1. **Bare attribute/function references** -- fixed in both languages as
+   of M6. `hashFunc: sha256.New,` and `s.BlockFunc(aes.NewCipher)` in
+   `gorilla_securecookie.go` (139, 148) pass a function *value* without
+   calling it; Go's query previously only matched direct call nodes, so
+   this registry-style pattern was a false negative there. Fixed in M6
+   (ADR 018) by porting the same `attr.node`-style capture Python
+   already had (`source_python.py`, landed in an earlier session for
+   `pyjwt_algorithms.py`'s `SHA256: ClassVar[HashlibHash] = hashlib.sha256`,
+   lines 320-322 -- this file previously, incorrectly, claimed that
+   pattern was still undetected in Python too; corrected per the
+   project's "re-derive, don't quote" bookkeeping rule when this gap was
+   revisited). Both languages now share the same mechanism.
 2. **Intra-file type inference for `key.sign(...)`/`key.verify(...)`
    in `pyjwt_algorithms.py` is now mostly resolved** (M4, ADR 016): 6 of
    8 occurrences (RSA/ECDSA/Ed25519 sign, RSA verify x2) are detected by
