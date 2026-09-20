@@ -1,4 +1,4 @@
-.PHONY: help demo demo-down demo-seed dev test clean compose-up compose-down
+.PHONY: help demo demo-down demo-seed dev test benchmark clean compose-up compose-down
 
 help:
 	@echo "ECDAT — Enterprise Cryptographic Discovery & Analysis Tool"
@@ -8,6 +8,7 @@ help:
 	@echo "  make demo-seed     - Seeds demo policy & benchmark corpus into a local SQLite file, no Docker"
 	@echo "  make dev           - Runs backend and frontend development servers"
 	@echo "  make test          - Runs all backend and frontend test suites"
+	@echo "  make benchmark     - Runs ECDAT benchmark evaluation and Crypto Mass Conservation certificate"
 	@echo "  make compose-up    - Starts all services via Docker Compose (base profile only)"
 	@echo "  make compose-down  - Stops Docker Compose services"
 	@echo "  make clean         - Cleans temporary artifacts and caches"
@@ -40,6 +41,9 @@ dev:
 test:
 	uv run --directory backend pytest
 	pnpm --dir frontend test:unit
+
+benchmark:
+	uv run --directory backend python bench/public/score.py --all
 
 compose-up:
 	docker compose up --build -d

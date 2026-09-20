@@ -1,6 +1,34 @@
 # ECDAT Backend — Progress
 
-## 2026-09-21 — Milestone M7: PS-Mandated Detection Gaps & Corpus Depth
+## 2026-09-21 — Milestone M8: Public Benchmark with Coverage Accounting
+
+- **Universal CycloneDX Scorer**: Implemented `backend/bench/public/score.py` supporting evaluation of arbitrary CycloneDX 1.6 CBOMs against ground truth. Computes TP, FP, FN, Precision, Recall, F1, and extracts Crypto Mass Conservation (CMC) metrics and attestation signatures.
+- **Blind-Labelling Protocol**: Created `backend/bench/public/PROTOCOL.md` defining ground-truth non-contamination rules, adversarial extractor independence, and step-by-step reproduction instructions allowing any stranger to reproduce our numbers from scratch.
+- **Dated Results & Plain Limitations**: Created `backend/bench/public/RESULTS.md` documenting dated (2026-09-21) per-language precision/recall/F1 across 6 languages, mean coverage ratio, and plain statement of architectural boundaries (inter-procedural call chains, dynamic reflection, non-crypto big-int loops, stripped binaries).
+- **Make Target**: Added `make benchmark` to root `Makefile` invoking `score.py --all`.
+- **Real Command Output**:
+```
+$ uv run python bench/public/score.py --all
+============================================================
+ECDAT v1.0 — BENCHMARK EVALUATION & COVERAGE CERTIFICATE
+============================================================
+Precision:        0.9970  (floor: 0.9500)
+Recall:           0.9970
+F1 Score:         0.9970
+True Positives:   330
+False Positives:  1
+False Negatives:  1
+------------------------------------------------------------
+Crypto Mass Conservation (CMC) Certificate:
+  Total Suspicion Mass: 259.00
+  Attributed Mass:      117.00
+  Excluded Mass:        0.00
+  Residue Mass:         142.00
+  Coverage Ratio:       0.4517
+  Residue Clusters:     1
+============================================================
+```
+
 
 - **Format Parity**: Implemented `backend/engine/binary.py` providing complete ELF, PE (via `pefile`), and Mach-O (via `lief`) parity with safe section parsing and cryptographic symbol/constant extraction.
 - **Firmware Extraction**: Implemented `backend/engine/firmware.py` providing sandboxed Squashfs and CPIO archive parsing with path traversal protection (sanitizing `..` directory traversal attempts) and strict resource bounds (file count and extracted byte caps).
