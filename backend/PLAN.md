@@ -354,4 +354,28 @@ All 10 backend engineering phases for SIH26164 are fully implemented, verified, 
 - [x] Security audits: AST air-gap verification clean (`scripts/verify_airgap.py`), zero contract drift (`scripts/contract_diff.py`)
 - [x] Full regression test suite: 144/144 passed
 
+## Track A1 Functional Proof Pass (P1-P7) [DONE, 2026-09-20]
+- [x] All 7 proofs run against a real live server, not unit tests (see
+      `docs/decisions/backend/` and the session's own commit history)
+- [x] 1 real bug found and fixed: drift finding-identity collision missing
+      `location.line` (`88afa13`, merged to main at `02135b9`)
+
+## Finale — Final Integration, Verification & Release (G1-G5) [DONE, 2026-09-20]
+Branch `release/v0.3.0` from `main`. Loops G1 (pre-flight gates) through
+G5 (release) all run for real against a live stack.
+- [x] G1: every backend/bench/frontend/contract gate re-run clean
+- [x] G2: real stack up (api, web MSW-off, weak-TLS container, local
+      registry, host SoftHSM2); sandbox-specific workarounds documented
+      in ADR 021, not baked into committed files
+- [x] G3: 14-step real continuous-operation scenario run in full depth
+      once (1 real bug found+fixed: `/estate/trend` day-aggregation
+      producing scores up to 400.0, fixed to 62.9) plus a lighter second
+      pass on the dynamic core (scheduler->drift->alert)
+- [x] G4: cross-cutting pass, 3 more real bugs found and fixed
+      (`/specimen` keyboard-a11y violation; `GET /findings` p50
+      710ms->8.34ms; `postcss` HIGH CVEs), 1 real exception documented
+      (`cryptography` CVEs blocked by `sslyze`'s own version pin, ADR 022)
+- [x] G5: README rewritten with only real dated numbers, DEMO_SCRIPT.md
+      and CHANGELOG.md added, `make demo` wired to the real Docker stack
+
 
