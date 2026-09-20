@@ -13,8 +13,31 @@ enums live) and is accepted as debt for now -- see backend/LEARNINGS.md.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from api.models import CryptoFunction, Family, Finding, FindingKind, FindingSource, ScanStats, Surface
+
+
+@dataclass(frozen=True)
+class Span:
+    """A bounded evidence range within an artifact consumed by a detection rule or extractor."""
+
+    artifact_hash: str
+    kind: Literal["byte", "ast"]
+    start: int
+    end: int
+    producing_rule: str
+    coarse: bool = False
+
+    def __post_init__(self) -> None:
+        if self.start < 0:
+            raise ValueError(f"Span start must be >= 0, got {self.start}")
+        if self.end < self.start:
+            raise ValueError(f"Span end ({self.end}) must be >= start ({self.start})")
+
+    @property
+    def length(self) -> int:
+        return self.end - self.start
 
 
 @dataclass
@@ -36,6 +59,7 @@ class Detection:
     mode: str | None = None
     curve: str | None = None
     underlying_hash_family: Family | None = None  # set for HMAC, drives V derivation
+    spans: list[Span] = field(default_factory=list)
 
 
 @dataclass
@@ -46,3 +70,4 @@ class ScanResult:
             files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0
         )
     )
+    spans_by_finding: dict[str, list[Span]] = field(default_factory=dict)

@@ -13,6 +13,7 @@ the callback fires inline, not concurrently.
 
 from __future__ import annotations
 
+import hashlib
 import time
 import uuid
 from collections.abc import Callable
@@ -33,7 +34,7 @@ from api.models import (
 )
 from engine import source_c, source_go, source_java, source_python
 from engine.factors import derive_risk
-from engine.models import Detection, ScanResult
+from engine.models import Detection, ScanResult, Span
 from engine.recommend import recommend
 
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".mypy_cache", ".ruff_cache"}
@@ -52,10 +53,19 @@ _AES_SBOX_16 = bytes([
 ])
 
 
-def _detect_binary(source: bytes, rel_path: str) -> list[Detection]:
+def _detect_binary(source: bytes, rel_path: str, artifact_hash: str | None = None) -> list[Detection]:
+    if artifact_hash is None:
+        artifact_hash = hashlib.sha256(source).hexdigest()
     detections: list[Detection] = []
     if _AES_SBOX_16 in source:
         offset = source.find(_AES_SBOX_16)
+        span = Span(
+            artifact_hash=artifact_hash,
+            kind="byte",
+            start=offset,
+            end=offset + 256,
+            producing_rule="binary.aes_sbox",
+        )
         detections.append(
             Detection(
                 kind=FindingKind.ALGORITHM,
@@ -70,6 +80,7 @@ def _detect_binary(source: bytes, rel_path: str) -> list[Detection]:
                 source=FindingSource.BINARY_CONSTANT,
                 confidence=0.95,
                 key_size=128,
+                spans=[span],
             )
         )
     return detections
@@ -98,7 +109,8 @@ def _iter_source_files(target: Path) -> list[Path]:
 
 
 def _to_finding(detection: Detection, policy: Policy) -> Finding:
-    return Finding(
+    offset = detection.spans[0].start if detection.spans else None
+    finding = Finding(
         id=f"finding_{uuid.uuid4().hex[:12]}",
         kind=detection.kind,
         surface=detection.surface,
@@ -108,7 +120,7 @@ def _to_finding(detection: Detection, policy: Policy) -> Finding:
         mode=detection.mode,
         curve=detection.curve,
         function=detection.function,
-        location=Location(path=detection.path, line=detection.line, offset=None, layer=None),
+        location=Location(path=detection.path, line=detection.line, offset=offset, layer=None),
         symbol=detection.symbol,
         snippet=detection.snippet,
         source=detection.source,
@@ -117,6 +129,8 @@ def _to_finding(detection: Detection, policy: Policy) -> Finding:
         recommendation=recommend(detection),
         triage=Triage(),
     )
+    object.__setattr__(finding, "spans", list(detection.spans))
+    return finding
 
 
 def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) -> ScanResult:
@@ -133,6 +147,7 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
     skipped_oversized = 0
     findings: list[Finding] = []
     by_surface: dict[str, int] = {}
+    spans_by_finding: dict[str, list[Span]] = {}
 
     for i, file_path in enumerate(files, start=1):
         if i == 1:
@@ -149,19 +164,21 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         rel_path = (
             file_path.relative_to(target).as_posix() if target.is_dir() else file_path.name
         )
+        artifact_hash = hashlib.sha256(source).hexdigest()
         if file_path.suffix == ".go":
-            detections = source_go.detect_code(source, rel_path)
+            detections = source_go.detect_code(source, rel_path, artifact_hash)
         elif file_path.suffix == ".java":
-            detections = source_java.detect_code(source, rel_path)
+            detections = source_java.detect_code(source, rel_path, artifact_hash)
         elif file_path.suffix in _C_FAMILY_EXTENSIONS:
-            detections = source_c.detect_code(source, rel_path)
+            detections = source_c.detect_code(source, rel_path, artifact_hash)
         elif file_path.suffix in {".bin", ".elf", ".so"}:
-            detections = _detect_binary(source, rel_path)
+            detections = _detect_binary(source, rel_path, artifact_hash)
         else:
-            detections = source_python.detect(rel_path, source)
+            detections = source_python.detect(rel_path, source, artifact_hash)
         for detection in detections:
             finding = _to_finding(detection, policy)
             findings.append(finding)
+            spans_by_finding[finding.id] = list(detection.spans)
             by_surface[finding.surface.value] = by_surface.get(finding.surface.value, 0) + 1
             emit("finding", findingId=finding.id, family=finding.family.value if finding.family else None)
 
@@ -179,4 +196,4 @@ def scan(target: Path, policy: Policy, on_event: EventCallback | None = None) ->
         errors=errors,
         skippedPrefilter=skipped_oversized,
     )
-    return ScanResult(findings=findings, stats=stats)
+    return ScanResult(findings=findings, stats=stats, spans_by_finding=spans_by_finding)
