@@ -31,3 +31,25 @@
   ======================== 4 passed, 2 warnings in 1.09s ========================
   ```
   All existing scanner & detector tests (69 items) pass green.
+
+## M2 — RULE-INDEPENDENT EXTRACTORS (`backend/engine/extract/`)
+- **Status**: COMPLETED & VERIFIED
+- **Changes**:
+  - Implemented rule-independent extractors in `backend/engine/extract/`:
+    - `tables.py`: 256-byte bijections over 0..255 (cipher-agnostic S-box shape) & binary u32 constant tables with high pairwise Hamming distance.
+    - `entropy.py`: Shannon entropy sliding window flagging sustained high-entropy regions inside low-entropy artifacts.
+    - `arx.py`: ARX opcode density in binaries and AST subtrees composing rotate + XOR in source.
+    - `bigint.py`: Modular-exponentiation loop shapes (conservative multiply-reduce cycles).
+    - `framing.py`: Structural PEM, DER ASN.1 sequences, and Base64 blocks (without algorithm keywords).
+    - `literals.py`: Large numeric arrays, key-length shaped literals (256/512/1024/2048/3072/4096), and high-entropy string constants.
+    - `__init__.py`: Aggregates all extractors with `extract_all()`.
+  - Created `backend/tests/test_extractors.py`:
+    - Verified architectural independence: `extract/` strictly does not import from `rules/` or `source_*` or `scanner`.
+    - Tested each extractor on a positive fixture and a benign negative fixture.
+    - Verified determinism: identical input produces identical spans across 3 runs.
+- **Real Verification Output**:
+  ```text
+  tests/test_extractors.py ........
+  ======================== 8 passed, 2 warnings in 0.33s ========================
+  ```
+

@@ -26,8 +26,10 @@ class Span:
     kind: Literal["byte", "ast"]
     start: int
     end: int
-    producing_rule: str
+    producing_rule: str = ""
     coarse: bool = False
+    signal_type: str | None = None
+    magnitude: float = 1.0
 
     def __post_init__(self) -> None:
         if self.start < 0:
