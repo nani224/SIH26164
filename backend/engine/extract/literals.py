@@ -50,6 +50,10 @@ def extract_literals(
     if artifact_hash is None:
         artifact_hash = hashlib.sha256(source).hexdigest()
 
+    # Literals are a source-level signal only
+    if not path.endswith((".py", ".go", ".java", ".c", ".h", ".cpp", ".cc", ".cxx", ".js", ".ts", ".rs")):
+        return []
+
     spans: list[Span] = []
     text = source.decode("latin1", errors="ignore")
 

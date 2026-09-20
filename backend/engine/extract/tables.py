@@ -62,54 +62,57 @@ def extract_tables(
                 i += 1
 
     # 2. Binary u32 constant tables (>= 8 words, unique, mean Hamming dist >= 12)
-    # Check aligned 4-byte sequences in binary chunks
+    # Check aligned 4-byte sequences in binary chunks across all 4 byte alignments
     if n >= 32:
-        word_count = n // 4
-        words_le = [struct.unpack("<I", source[j * 4 : (j + 1) * 4])[0] for j in range(word_count)]
-        
-        # Scan for runs of >= 8 unique words with high entropy / high hamming distance
-        k = 0
-        while k <= len(words_le) - 8:
-            candidate = words_le[k : k + 8]
-            # Check for non-trivial words (not all zero, not small integers < 256, and not ASCII text)
-            is_ascii = all((w & 0x80808080) == 0 for w in candidate)
-            has_high_bits = any((w & 0x80000000) != 0 for w in candidate)
-            if (
-                not is_ascii
-                and has_high_bits
-                and len(set(candidate)) == 8
-                and all(w >= 0x100 for w in candidate)
-                and _pairwise_hamming_distance(candidate) >= 12.0
-            ):
-                # Extend as far as possible
-                end_k = k + 8
-                while end_k < len(words_le):
-                    w = words_le[end_k]
-                    if w in set(words_le[k:end_k]) or w < 0x100:
-                        break
-                    extended = words_le[k : end_k + 1]
-                    if _pairwise_hamming_distance(extended) < 11.0:
-                        break
-                    end_k += 1
+        for align in (0, 1, 2, 3):
+            sub = source[align:]
+            word_count = len(sub) // 4
+            if word_count < 8:
+                continue
+            words_le = [struct.unpack("<I", sub[j * 4 : (j + 1) * 4])[0] for j in range(word_count)]
 
-                start_byte = k * 4
-                end_byte = end_k * 4
-                # Don't overlap with already detected bijection
-                if not any(s.start <= start_byte and end_byte <= s.end for s in spans):
-                    spans.append(
-                        Span(
-                            artifact_hash=artifact_hash,
-                            kind="byte",
-                            start=start_byte,
-                            end=end_byte,
-                            producing_rule="extract.tables.constant_words",
-                            signal_type="table.constant_words",
-                            magnitude=float(end_byte - start_byte),
+            # Scan for runs of >= 8 unique words with high entropy / high hamming distance
+            k = 0
+            while k <= len(words_le) - 8:
+                candidate = words_le[k : k + 8]
+                non_ascii_count = sum(1 for w in candidate if (w & 0x80808080) != 0)
+                high_bit_count = sum(1 for w in candidate if (w & 0x80000000) != 0)
+                if (
+                    non_ascii_count >= 5
+                    and high_bit_count >= 2
+                    and len(set(candidate)) == 8
+                    and all(w >= 0x100 for w in candidate)
+                    and _pairwise_hamming_distance(candidate) >= 12.0
+                ):
+                    # Extend as far as possible
+                    end_k = k + 8
+                    while end_k < len(words_le):
+                        w = words_le[end_k]
+                        if w in set(words_le[k:end_k]) or w < 0x100:
+                            break
+                        extended = words_le[k : end_k + 1]
+                        if _pairwise_hamming_distance(extended) < 11.0:
+                            break
+                        end_k += 1
+
+                    start_byte = align + k * 4
+                    end_byte = align + end_k * 4
+                    # Don't overlap with already detected bijection or existing table
+                    if not any(max(s.start, start_byte) < min(s.end, end_byte) for s in spans):
+                        spans.append(
+                            Span(
+                                artifact_hash=artifact_hash,
+                                kind="byte",
+                                start=start_byte,
+                                end=end_byte,
+                                producing_rule="extract.tables.constant_words",
+                                signal_type="table.constant_words",
+                                magnitude=float(end_byte - start_byte),
+                            )
                         )
-                    )
-                k = end_k
-            else:
-                k += 1
+                    k = end_k
+                else:
+                    k += 1
 
     # 3. Source-code table parsing: array of 256 numbers forming a permutation
     # For source files, look for bracketed sequences containing 256 unique byte values
