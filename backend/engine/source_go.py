@@ -68,6 +68,36 @@ def _resolve_pkg_fn(pkg: str, fn: str) -> _PkgFnInfo | None:
             FindingKind.ALGORITHM, Family.ED25519, CryptoFunction.KEYGEN,
             "Ed25519 key generation", "ed25519.GenerateKey", 0.95,
         )
+    if pkg == "rsa" and fn in ("SignPKCS1v15", "SignPSS"):
+        return (
+            FindingKind.ALGORITHM, Family.RSA, CryptoFunction.SIGN,
+            "RSA signing", f"rsa.{fn}", 0.9,
+        )
+    if pkg == "rsa" and fn in ("VerifyPKCS1v15", "VerifyPSS"):
+        return (
+            FindingKind.ALGORITHM, Family.RSA, CryptoFunction.VERIFY,
+            "RSA signature verification", f"rsa.{fn}", 0.9,
+        )
+    if pkg == "ecdsa" and fn in ("Sign", "SignASN1"):
+        return (
+            FindingKind.ALGORITHM, Family.ECDSA, CryptoFunction.SIGN,
+            "ECDSA signing", f"ecdsa.{fn}", 0.9,
+        )
+    if pkg == "ecdsa" and fn in ("Verify", "VerifyASN1"):
+        return (
+            FindingKind.ALGORITHM, Family.ECDSA, CryptoFunction.VERIFY,
+            "ECDSA signature verification", f"ecdsa.{fn}", 0.9,
+        )
+    if pkg == "ed25519" and fn == "Sign":
+        return (
+            FindingKind.ALGORITHM, Family.ED25519, CryptoFunction.SIGN,
+            "Ed25519 signing", "ed25519.Sign", 0.92,
+        )
+    if pkg == "ed25519" and fn == "Verify":
+        return (
+            FindingKind.ALGORITHM, Family.ED25519, CryptoFunction.VERIFY,
+            "Ed25519 signature verification", "ed25519.Verify", 0.92,
+        )
     if pkg == "aes" and fn == "NewCipher":
         return (
             FindingKind.ALGORITHM, Family.AES, CryptoFunction.ENCRYPT,

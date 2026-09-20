@@ -151,3 +151,53 @@ def test_go_bare_reference_unrecognized_package_not_flagged() -> None:
     }
     """
     assert detect_code(code) == []
+
+
+def test_go_rsa_sign_and_verify() -> None:
+    # M7: extended coverage beyond keygen -- found while sourcing a real
+    # HOLD candidate (golang.org/x/crypto/ssh) that uses these and
+    # nothing else.
+    code = b"""
+    package main
+    import "crypto/rsa"
+    func run() {
+        _ = rsa.SignPKCS1v15(nil, priv, 0, hashed)
+        _ = rsa.VerifyPKCS1v15(pub, 0, hashed, sig)
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 2
+    sign = next(d for d in detections if d.function == CryptoFunction.SIGN)
+    assert sign.family == Family.RSA
+    verify = next(d for d in detections if d.function == CryptoFunction.VERIFY)
+    assert verify.family == Family.RSA
+
+
+def test_go_ecdsa_sign_and_verify() -> None:
+    code = b"""
+    package main
+    import "crypto/ecdsa"
+    func run() {
+        _, _ = ecdsa.Sign(rand, priv, hash)
+        _ = ecdsa.Verify(pub, hash, r, s)
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 2
+    assert {d.function for d in detections} == {CryptoFunction.SIGN, CryptoFunction.VERIFY}
+    assert all(d.family == Family.ECDSA for d in detections)
+
+
+def test_go_ed25519_sign_and_verify() -> None:
+    code = b"""
+    package main
+    import "crypto/ed25519"
+    func run() {
+        _ = ed25519.Sign(priv, msg)
+        _ = ed25519.Verify(pub, msg, sig)
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 2
+    assert {d.function for d in detections} == {CryptoFunction.SIGN, CryptoFunction.VERIFY}
+    assert all(d.family == Family.ED25519 for d in detections)
