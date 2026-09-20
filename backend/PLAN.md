@@ -286,8 +286,18 @@ established this session, flagged rather than silently substituted.
       engagement). Exact instruction + `uses:` snippet documented in
       docs/decisions/backend/020-m8a-external-repo-proof-blocked.md
       rather than left vague.
-- [ ] **M9** — `backend/bench/README.md` handoff doc: every benchmark,
-      every corpus, the blind-labelling protocol, current numbers dated,
-      documented FN clusters. Not started.
+- [x] **M9** — Rewrote `backend/bench/README.md` into the full handoff
+      doc: quick-start commands for all 3 scripts (`evaluate.py`,
+      `real_world/evaluate.py`, `check_precision_floor.py`), a Layer A vs
+      real_world comparison table, the 5-step blind-labelling protocol
+      spelled out (source -> label blind -> commit labels alone -> run
+      once -> never edit labels post-run), current numbers with today's
+      date and real command output, the 10 real_world false negatives
+      grouped into 5 gap categories (cross-referencing the full
+      line-by-line detail in `bench/real_world/README.md`), and an index
+      of all 8 relevant ADRs (013-020). EXIT criterion ("a person who has
+      never seen this repo can reproduce your numbers from that file
+      alone") verified by re-running all 3 commands fresh before writing
+      the numbers down.
 
 All 10 backend engineering phases for SIH26164 are fully implemented, verified, and passing all quality gates.
