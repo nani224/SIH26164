@@ -153,6 +153,25 @@ def test_go_bare_reference_unrecognized_package_not_flagged() -> None:
     assert detect_code(code) == []
 
 
+def test_go_dsa_sign_and_verify() -> None:
+    # M7: found while sourcing a real HOLD candidate (golang.org/x/crypto/ssh)
+    # that supports legacy ssh-dss host keys via crypto/dsa.
+    code = b"""
+    package main
+    import "crypto/dsa"
+    func run() {
+        r, s, _ := dsa.Sign(rand, priv, digest)
+        ok := dsa.Verify(pub, digest, r, s)
+        _, _ = r, s
+        _ = ok
+    }
+    """
+    detections = detect_code(code)
+    assert len(detections) == 2
+    assert {d.function for d in detections} == {CryptoFunction.SIGN, CryptoFunction.VERIFY}
+    assert all(d.family == Family.DSA for d in detections)
+
+
 def test_go_rsa_sign_and_verify() -> None:
     # M7: extended coverage beyond keygen -- found while sourcing a real
     # HOLD candidate (golang.org/x/crypto/ssh) that uses these and

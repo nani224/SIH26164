@@ -98,6 +98,16 @@ def _resolve_pkg_fn(pkg: str, fn: str) -> _PkgFnInfo | None:
             FindingKind.ALGORITHM, Family.ED25519, CryptoFunction.VERIFY,
             "Ed25519 signature verification", "ed25519.Verify", 0.92,
         )
+    if pkg == "dsa" and fn == "Sign":
+        return (
+            FindingKind.ALGORITHM, Family.DSA, CryptoFunction.SIGN,
+            "DSA signing", "dsa.Sign", 0.9,
+        )
+    if pkg == "dsa" and fn == "Verify":
+        return (
+            FindingKind.ALGORITHM, Family.DSA, CryptoFunction.VERIFY,
+            "DSA signature verification", "dsa.Verify", 0.9,
+        )
     if pkg == "aes" and fn == "NewCipher":
         return (
             FindingKind.ALGORITHM, Family.AES, CryptoFunction.ENCRYPT,
