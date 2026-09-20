@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ECDAT API
-  version: "0.1.0-phase0"
+  version: "0.3.0"
   description: >
     Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) API contract.
     Phase 0: this contract is implemented by an in-memory stub (see
@@ -367,6 +367,333 @@ paths:
                 items:
                   $ref: "#/components/schemas/PqcCatalogEntry"
 
+  /api/v1/targets:
+    get:
+      operationId: listTargets
+      summary: List all monitored scan targets
+      tags: [targets]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Target"
+    post:
+      operationId: createTarget
+      summary: Register a new scan target
+      tags: [targets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TargetCreate"
+      responses:
+        "201":
+          description: Target created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Target"
+
+  /api/v1/targets/{id}:
+    get:
+      operationId: getTarget
+      summary: Get target by id
+      tags: [targets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Target"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: patchTarget
+      summary: Update target configuration
+      tags: [targets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TargetPatch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Target"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteTarget
+      summary: Delete target
+      tags: [targets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Target deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/targets/{id}/scan-now:
+    post:
+      operationId: scanTargetNow
+      summary: Trigger an immediate scan for a target
+      tags: [targets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: Scan created and executed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/targets/{id}/snapshots:
+    get:
+      operationId: listTargetSnapshots
+      summary: List snapshots for a target
+      tags: [targets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScanSnapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/targets/{id}/drift:
+    get:
+      operationId: getTargetDrift
+      summary: Calculate cryptographic drift between two snapshots of a target
+      tags: [targets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: from
+          in: query
+          required: true
+          schema: { type: string }
+          description: Baseline snapshot ID
+        - name: to
+          in: query
+          required: true
+          schema: { type: string }
+          description: Target snapshot ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Drift"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/alerts:
+    get:
+      operationId: listAlerts
+      summary: List all active and historical alerts
+      tags: [alerts]
+      parameters:
+        - name: acknowledged
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alert"
+
+  /api/v1/alerts/{id}/acknowledge:
+    patch:
+      operationId: acknowledgeAlert
+      summary: Acknowledge an alert
+      tags: [alerts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/probes/tls:
+    post:
+      operationId: probeTls
+      summary: Probe an endpoint for TLS cryptographic configuration
+      tags: [probes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProbeRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProbeResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/probes/ssh:
+    post:
+      operationId: probeSsh
+      summary: Probe an endpoint for SSH cryptographic configuration
+      tags: [probes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProbeRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProbeResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/probes:
+    get:
+      operationId: listProbeResults
+      summary: List historical probe results
+      tags: [probes]
+      parameters:
+        - name: targetId
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProbeResult"
+
+  /api/v1/hsm/inventory:
+    get:
+      operationId: getHsmInventory
+      summary: Enumerate PKCS#11 / SoftHSM2 cryptographic keys and slots
+      tags: [hsm]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HsmInventory"
+
+  /api/v1/estate/summary:
+    get:
+      operationId: getEstateSummary
+      summary: High-level cryptographic estate posture and PQC readiness summary
+      tags: [estate]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EstateSummary"
+
+  /api/v1/estate/trend:
+    get:
+      operationId: getEstateTrend
+      summary: Historical estate risk trend over time
+      tags: [estate]
+      parameters:
+        - name: days
+          in: query
+          required: false
+          schema: { type: integer, default: 30 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EstateTrend"
+
+  /api/v1/audit/verify:
+    get:
+      operationId: verifyAuditChain
+      summary: Verify the cryptographic SHA-256 hash integrity of the audit log chain
+      tags: [audit]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditVerifyResponse"
+
 components:
   parameters:
     ScanId:
@@ -402,7 +729,7 @@ components:
       enum: [algorithm, certificate, key, protocol, library]
     Surface:
       type: string
-      enum: [source, binary, certificate, config, image, manifest]
+      enum: [source, binary, certificate, config, image, manifest, hardware-hsm]
     Family:
       type: string
       enum:
@@ -529,6 +856,7 @@ components:
             - $ref: "#/components/schemas/Recommendation"
             - type: "null"
         triage: { $ref: "#/components/schemas/Triage" }
+        negotiated: { type: [boolean, "null"] }
       example:
         id: finding_001
         kind: algorithm
@@ -797,3 +1125,199 @@ components:
         findingCount: { type: integer }
         scanId: { type: string }
         message: { type: string }
+
+    TargetKind:
+      type: string
+      enum: [repo, path, endpoint]
+
+    Target:
+      type: object
+      required: [id, name, kind, uri, policyId, schedule, enabled, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/TargetKind" }
+        uri: { type: string }
+        policyId: { type: string }
+        schedule: { type: string }
+        enabled: { type: boolean }
+        lastScanId: { type: [string, "null"] }
+        lastScanAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    TargetCreate:
+      type: object
+      required: [name, kind, uri, policyId, schedule, enabled]
+      properties:
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/TargetKind" }
+        uri: { type: string }
+        policyId: { type: string }
+        schedule: { type: string }
+        enabled: { type: boolean, default: true }
+
+    TargetPatch:
+      type: object
+      properties:
+        name: { type: [string, "null"] }
+        policyId: { type: [string, "null"] }
+        schedule: { type: [string, "null"] }
+        enabled: { type: [boolean, "null"] }
+
+    ScanSnapshot:
+      type: object
+      required: [id, targetId, scanId, takenAt, bands, totalFindings, stats]
+      properties:
+        id: { type: string }
+        targetId: { type: string }
+        scanId: { type: string }
+        takenAt: { type: string, format: date-time }
+        bands:
+          type: object
+          additionalProperties: { type: integer }
+        totalFindings: { type: integer }
+        stats: { $ref: "#/components/schemas/ScanStats" }
+
+    DriftChangedItem:
+      type: object
+      required: [finding, fromBand, toBand]
+      properties:
+        finding: { $ref: "#/components/schemas/Finding" }
+        fromBand: { $ref: "#/components/schemas/RiskBand" }
+        toBand: { $ref: "#/components/schemas/RiskBand" }
+
+    DriftSummary:
+      type: object
+      required: [addedCount, resolvedCount, changedCount, netRiskDelta]
+      properties:
+        addedCount: { type: integer }
+        resolvedCount: { type: integer }
+        changedCount: { type: integer }
+        netRiskDelta: { type: number }
+
+    Drift:
+      type: object
+      required: [targetId, fromSnapshotId, toSnapshotId, added, resolved, changed, summary]
+      properties:
+        targetId: { type: string }
+        fromSnapshotId: { type: string }
+        toSnapshotId: { type: string }
+        added:
+          type: array
+          items: { $ref: "#/components/schemas/Finding" }
+        resolved:
+          type: array
+          items: { $ref: "#/components/schemas/Finding" }
+        changed:
+          type: array
+          items: { $ref: "#/components/schemas/DriftChangedItem" }
+        summary: { $ref: "#/components/schemas/DriftSummary" }
+
+    AlertType:
+      type: string
+      enum: [new-critical, cert-expiring, drift, probe-downgrade]
+
+    Alert:
+      type: object
+      required: [id, type, targetId, severity, message, createdAt, acknowledged]
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/AlertType" }
+        targetId: { type: string }
+        findingId: { type: [string, "null"] }
+        severity: { $ref: "#/components/schemas/RiskBand" }
+        message: { type: string }
+        createdAt: { type: string, format: date-time }
+        acknowledged: { type: boolean }
+
+    ProbeProtocol:
+      type: string
+      enum: [tls, ssh]
+
+    ProbeRequest:
+      type: object
+      required: [targetId, host, port]
+      properties:
+        targetId: { type: string }
+        host: { type: string }
+        port: { type: integer }
+
+    ProbeResult:
+      type: object
+      required: [id, targetId, host, port, protocol, negotiated, supported, probedAt]
+      properties:
+        id: { type: string }
+        targetId: { type: string }
+        host: { type: string }
+        port: { type: integer }
+        protocol: { $ref: "#/components/schemas/ProbeProtocol" }
+        negotiated:
+          type: object
+        supported:
+          type: array
+          items: { type: object }
+        probedAt: { type: string, format: date-time }
+
+    HsmKey:
+      type: object
+      required: [type, size, label]
+      properties:
+        type: { type: string }
+        size: { type: integer }
+        label: { type: string }
+
+    HsmSlot:
+      type: object
+      required: [slot, label, keys]
+      properties:
+        slot: { type: integer }
+        label: { type: string }
+        keys:
+          type: array
+          items: { $ref: "#/components/schemas/HsmKey" }
+
+    HsmInventory:
+      type: object
+      required: [slots]
+      properties:
+        slots:
+          type: array
+          items: { $ref: "#/components/schemas/HsmSlot" }
+
+    EstateSummary:
+      type: object
+      required: [totalTargets, totalScans, totalFindings, criticalFindings, pqcReadinessScore, activeAlerts]
+      properties:
+        totalTargets: { type: integer }
+        totalScans: { type: integer }
+        totalFindings: { type: integer }
+        criticalFindings: { type: integer }
+        pqcReadinessScore: { type: number }
+        activeAlerts: { type: integer }
+
+    EstateTrendPoint:
+      type: object
+      required: [date, avgRiskScore, criticalCount, totalFindings]
+      properties:
+        date: { type: string }
+        avgRiskScore: { type: number }
+        criticalCount: { type: integer }
+        totalFindings: { type: integer }
+
+    EstateTrend:
+      type: object
+      required: [days, points]
+      properties:
+        days: { type: integer }
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/EstateTrendPoint" }
+
+    AuditVerifyResponse:
+      type: object
+      required: [status, recordCount, headHash]
+      properties:
+        status: { type: string, enum: [valid, tampered] }
+        recordCount: { type: integer }
+        headHash: { type: string }
+        details: { type: [string, "null"] }

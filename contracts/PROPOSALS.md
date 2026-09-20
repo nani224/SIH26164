@@ -10,36 +10,36 @@ This file tracks RFCs and change proposals from the frontend (`Antigravity`) to 
 
 ---
 
-### [PROPOSED] RFC-001: Executive PDF Report Stream
+### [ACCEPTED] RFC-001: Executive PDF Report Stream
 - **Endpoint**: `GET /api/v1/scans/{id}/report.pdf`
-- **Status**: Proposed (Marked as `[Proposed]` in Migration Plan / Overview UI)
+- **Status**: ACCEPTED — Implemented in v0.2.0-phase9 via `api/pdf_report.py` with `X-CBOM-SHA256` integrity header.
 - **Requested By**: Screen 9 (Migration Plan) & Screen 2 (Overview)
 - **Justification**: Senior intelligence officers require printable, offline cryptographic risk briefs.
 - **Proposed Response**: Binary application/pdf with cryptographic hash verification header `X-CBOM-Signature-SHA256`.
 
 ---
 
-### [PROPOSED] RFC-002: Hardware Security Module (HSM) Discovery Surface
+### [ACCEPTED] RFC-002: Hardware Security Module (HSM) Discovery Surface
 - **Finding Surface**: `hardware-hsm`
-- **Status**: Proposed (Marked as `[Proposed]` in Screen 4 Cryptographic Inventory)
+- **Status**: ACCEPTED — Integrated into v0.3 Continuous Operation schema. Added `hardware-hsm` to `Surface` enum and `GET /api/v1/hsm/inventory` endpoint.
 - **Requested By**: Screen 4 (Inventory)
 - **Justification**: Discovery of on-premise HSM firmware keys (PKCS#11, Luna HSM, YubiHSM) for defense communications.
 - **Proposed Schema**: Extend `surface` enum in `components['schemas']['Finding']` with `"hardware-hsm"`.
 
 ---
 
-### [PROPOSED] RFC-003: Cloud KMS & Sovereign Enclave Key Discovery Surface
+### [DECLINED] RFC-003: Cloud KMS & Sovereign Enclave Key Discovery Surface
 - **Finding Surface**: `cloud-kms`
-- **Status**: Proposed (Marked as `[Proposed]` in Screen 4 Cryptographic Inventory)
+- **Status**: DECLINED — Prohibited by Section 1 Stack Constraints and Section 2 Air-Gap Conformance: zero outbound telemetry/HTTP traffic and explicit prohibition of Cloud KMS / paid external cloud services.
 - **Requested By**: Screen 4 (Inventory)
 - **Justification**: Visibility into sovereign cloud cryptographic assets (AWS KMS, Azure Key Vault, Google Cloud HSM enclaves).
 - **Proposed Schema**: Extend `surface` enum in `components['schemas']['Finding']` with `"cloud-kms"`.
 
 ---
 
-### [PROPOSED] RFC-004: Native WebSocket Progress Event Stream
+### [ACCEPTED] RFC-004: Native WebSocket Progress Event Stream
 - **Endpoint**: `ws://<host>/api/v1/scans/{id}/events`
-- **Status**: Proposed / Implemented in Frontend WebSocket Client
+- **Status**: ACCEPTED — Merged and implemented in v0.2.0-phase4-events with stored event replay and resume via `?after=<eventId>`.
 - **Requested By**: Screen 1 (Scan Launcher)
 - **Justification**: Real-time progress streaming for large repositories without polling `GET /scans/{id}`.
 - **Proposed Message Payload**:

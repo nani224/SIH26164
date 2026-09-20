@@ -13,27 +13,44 @@ import hashlib
 import json
 import os
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import event
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, col, create_engine, select, text
 
 from api import stub_data
-from api.db_models import AuditLogRecord, FindingRecord, PolicyRecord, ScanRecord
+from api.db_models import (
+    AlertRecord,
+    AuditLogRecord,
+    FindingRecord,
+    PolicyRecord,
+    ProbeResultRecord,
+    ScanRecord,
+    ScanSnapshotRecord,
+    TargetRecord,
+)
 from api.models import (
+    Alert,
+    AlertType,
     BandCounts,
     Context,
     ContextWithGlob,
     Finding,
     Location,
     Policy,
+    ProbeProtocol,
+    ProbeResult,
     Recommendation,
     Risk,
     RiskBand,
     Scan,
+    ScanSnapshot,
     ScanStats,
+    Target,
+    TargetKind,
     Triage,
 )
 
@@ -45,6 +62,20 @@ if _is_memory:
     _engine_kwargs["poolclass"] = StaticPool
 
 engine = create_engine(DATABASE_URL, **_engine_kwargs)
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+    if "sqlite" in str(engine.url):
+        cursor = dbapi_connection.cursor()
+        with suppress(Exception):
+            cursor.execute("PRAGMA journal_mode = WAL")
+        cursor.execute("PRAGMA synchronous = OFF")
+        cursor.execute("PRAGMA cache_size = -128000")
+        cursor.execute("PRAGMA temp_store = MEMORY")
+        with suppress(Exception):
+            cursor.execute("PRAGMA mmap_size = 268435456")
+        cursor.close()
 
 
 @contextmanager
@@ -161,6 +192,7 @@ def finding_to_record(finding: Finding, scan_id: str) -> FindingRecord:
         recommendation=rec.model_dump() if rec else None,
         triage_status=finding.triage.status.value,
         triage_note=finding.triage.note,
+        negotiated=finding.negotiated,
     )
 
 
@@ -187,6 +219,7 @@ def record_to_finding(rec: FindingRecord) -> Finding:
         risk=risk,
         recommendation=Recommendation.model_validate(rec.recommendation) if rec.recommendation else None,
         triage=Triage(status=rec.triage_status, note=rec.triage_note),  # type: ignore[arg-type]
+        negotiated=rec.negotiated,
     )
 
 
@@ -246,14 +279,137 @@ def record_to_policy(rec: PolicyRecord) -> Policy:
     )
 
 
+# --- Target <-> TargetRecord -----------------------------------------------------
+
+def target_to_record(target: Target) -> TargetRecord:
+    return TargetRecord(
+        id=target.id,
+        name=target.name,
+        kind=target.kind.value,
+        uri=target.uri,
+        policy_id=target.policyId,
+        schedule=target.schedule,
+        enabled=target.enabled,
+        last_scan_id=target.lastScanId,
+        last_scan_at=target.lastScanAt,
+        created_at=target.createdAt,
+    )
+
+
+def record_to_target(rec: TargetRecord) -> Target:
+    return Target(
+        id=rec.id,
+        name=rec.name,
+        kind=TargetKind(rec.kind),
+        uri=rec.uri,
+        policyId=rec.policy_id,
+        schedule=rec.schedule,
+        enabled=rec.enabled,
+        lastScanId=rec.last_scan_id,
+        lastScanAt=_as_utc(rec.last_scan_at),
+        createdAt=_as_utc(rec.created_at) or rec.created_at,
+    )
+
+
+# --- ScanSnapshot <-> ScanSnapshotRecord -----------------------------------------
+
+def snapshot_to_record(snapshot: ScanSnapshot) -> ScanSnapshotRecord:
+    return ScanSnapshotRecord(
+        id=snapshot.id,
+        target_id=snapshot.targetId,
+        scan_id=snapshot.scanId,
+        taken_at=snapshot.takenAt,
+        bands=snapshot.bands,
+        total_findings=snapshot.totalFindings,
+        stats=snapshot.stats.model_dump(),
+    )
+
+
+def record_to_snapshot(rec: ScanSnapshotRecord) -> ScanSnapshot:
+    return ScanSnapshot(
+        id=rec.id,
+        targetId=rec.target_id,
+        scanId=rec.scan_id,
+        takenAt=_as_utc(rec.taken_at) or rec.taken_at,
+        bands=rec.bands,
+        totalFindings=rec.total_findings,
+        stats=ScanStats.model_validate(rec.stats),
+    )
+
+
+# --- Alert <-> AlertRecord -------------------------------------------------------
+
+def alert_to_record(alert: Alert) -> AlertRecord:
+    return AlertRecord(
+        id=alert.id,
+        type=alert.type.value,
+        target_id=alert.targetId,
+        finding_id=alert.findingId,
+        severity=alert.severity.value,
+        message=alert.message,
+        created_at=alert.createdAt,
+        acknowledged=alert.acknowledged,
+    )
+
+
+def record_to_alert(rec: AlertRecord) -> Alert:
+    return Alert(
+        id=rec.id,
+        type=AlertType(rec.type),
+        targetId=rec.target_id,
+        findingId=rec.finding_id,
+        severity=RiskBand(rec.severity),
+        message=rec.message,
+        createdAt=_as_utc(rec.created_at) or rec.created_at,
+        acknowledged=rec.acknowledged,
+    )
+
+
+# --- ProbeResult <-> ProbeResultRecord -------------------------------------------
+
+def probe_result_to_record(result: ProbeResult) -> ProbeResultRecord:
+    return ProbeResultRecord(
+        id=result.id,
+        target_id=result.targetId,
+        host=result.host,
+        port=result.port,
+        protocol=result.protocol.value,
+        negotiated=result.negotiated,
+        supported=result.supported,
+        probed_at=result.probedAt,
+    )
+
+
+def record_to_probe_result(rec: ProbeResultRecord) -> ProbeResult:
+    return ProbeResult(
+        id=rec.id,
+        targetId=rec.target_id,
+        host=rec.host,
+        port=rec.port,
+        protocol=ProbeProtocol(rec.protocol),
+        negotiated=rec.negotiated,
+        supported=rec.supported,
+        probedAt=_as_utc(rec.probed_at) or rec.probed_at,
+    )
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     with engine.connect() as conn:
-        try:
+        with suppress(Exception):
             conn.execute(text("ALTER TABLE scans ADD COLUMN bundle_hash VARCHAR"))
             conn.commit()
-        except Exception:
-            pass
+        with suppress(Exception):
+            conn.execute(text("ALTER TABLE findings ADD COLUMN negotiated BOOLEAN"))
+            conn.commit()
+        with suppress(Exception):
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_findings_rescore "
+                    "ON findings (scan_id, risk_classically_broken)"
+                )
+            )
+            conn.commit()
     with session_scope() as session:
         _seed_if_empty(session)
 
