@@ -95,5 +95,36 @@
   ======================== 2 passed, 3 warnings in 0.44s ========================
   ```
 
+## M5 — THE FOUR KILL TESTS
+- **Status**: COMPLETED & ALL FOUR PASSED
+- **Changes**:
+  - Implemented and verified `backend/tests/test_kill_tests.py`:
+    - **K1 SENSITIVITY**: Verified on unmodeled/custom crypto false-negative fixtures. 100% (5/5) surfaced as residue ($\ge 90\%$ threshold).
+    - **K2 SPECIFICITY**: Floor defined before running: 5.0% residue mass. Benign fixtures produced 0.00% residue mass (0.0 bytes residue over 819 bytes benign code).
+    - **K3 NON-VACUITY**:
+      - AES: baseline=0.0 -> disabled=256.0 -> restored=0.0.
+      - SHA-256: baseline=0.0 -> disabled=32.0 -> restored=0.0.
+      - MD5: baseline=0.0 -> disabled=32.0 -> restored=0.0.
+    - **K4 DIRECTIONAL VALIDITY**: Closing 3 residue clusters with rules measurably dropped residue ($\Delta \text{Residue} = -45.00$) and increased recall ($\Delta \text{Findings} = +3$).
+- **Real Verification Output**:
+  ```text
+  tests/test_kill_tests.py 
+  [K1 Sensitivity]: 5/5 (100.0%) surfaced as residue
+  .
+  [K2 Specificity]: benign residue mass = 0.0 over 819 bytes (0.00%)
+    Defined floor: 5.0%
+  .
+  [K3 Non-Vacuity AES]: baseline=0.0 -> disabled=256.0 -> restored=0.0 (OK)
+  [K3 Non-Vacuity SHA-256]: baseline=0.0 -> disabled=32.0 -> restored=0.0 (OK)
+  [K3 Non-Vacuity MD5]: baseline=0.0 -> disabled=32.0 -> restored=0.0 (OK)
+  .
+  [K4 Directional Validity]:
+    Residue delta: -45.00 (from 45.00 to 0.00)
+    Findings/Recall delta: +3 (from 0 to 3)
+  .
+  ======================== 4 passed, 2 warnings in 0.44s ========================
+  ```
+
+
 
 

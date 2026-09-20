@@ -18,14 +18,14 @@ from engine.models import Span
 # (x << n) | (x >> (32 - n)) ^ y
 # (a + b) ^ (rot...)
 _ARX_ROTATE_RE = re.compile(
-    r"(?:\(\s*(\w+)\s*<<\s*(\d+)\s*\)\s*\|\s*\(\s*\1\s*>>\s*\(?\s*(?:32|64)\s*-\s*\2\s*\)?\s*\))|"
+    r"(?:\(?\s*\w+\s*<<\s*\d+\s*\)?\s*\|\s*\(?\s*\w+\s*>>\s*\(?(?:32|64|\d+)\s*(?:-\s*\d+)?\)?\s*\)?)|"
     r"(?:(?:rotate_left|RotateLeft|rotateLeft|rotl|rotr)\s*\([^)]+\))",
     re.IGNORECASE,
 )
 
 _ARX_EXPR_RE = re.compile(
-    r"(?:[\w()]+\s*\^\s*[\w()]+\s*(?:\+|\^|<<|>>)\s*[\w()]+)|"
-    r"(?:(?:\w+\s*<<\s*\d+\s*\|\s*\w+\s*>>\s*\d+)\s*\^\s*\w+)",
+    r"(?:(?:\([^)]+\)|[\w()]+)\s*\^\s*(?:\([^)]+\)|[\w()]+))|"
+    r"(?:[\w()]+\s*\^\s*[\w()]+\s*(?:\+|\^|<<|>>)\s*[\w()]+)",
     re.IGNORECASE,
 )
 
