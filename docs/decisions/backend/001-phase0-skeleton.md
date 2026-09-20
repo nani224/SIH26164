@@ -49,7 +49,7 @@ deliver Phase 0 honestly from a clean slate.
 
 5. **CBOM schema vendoring**: `tests/fixtures/cyclonedx/bom-1.6.schema.json`
    and `jsf-0.82.schema.json` are vendored (with SHA-256 hashes recorded in
-   `backend/TOOLBELT.md`) from the official CycloneDX specification repo to
+   `docs/engineering/backend/TOOLBELT.md`) from the official CycloneDX specification repo to
    strictly validate the stub CBOM in `tests/test_cbom.py`, per the
    air-gap/vendoring rule (build-time download, pinned, vendored).
 
