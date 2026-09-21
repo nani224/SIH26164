@@ -9,10 +9,15 @@ from fastapi.testclient import TestClient
 
 from api.main import app
 
+AUTH_HEADERS = {
+    "Authorization": "Bearer ecdat-test-token-secret",
+    "X-ECDAT-Actor": "test-operator",
+}
+
 
 def test_oversized_json_request_rejected_with_413() -> None:
     """An oversized JSON request (> 1MB) to non-upload endpoint must be rejected with 413."""
-    client = TestClient(app, headers={"Authorization": "Bearer ecdat-test-token-secret", "X-ECDAT-Actor": "test-operator"})
+    client = TestClient(app, headers=AUTH_HEADERS)
 
     # Create a ~1.2 MB JSON string
     large_padding = "x" * (1200 * 1024)
@@ -21,7 +26,7 @@ def test_oversized_json_request_rejected_with_413() -> None:
     resp = client.post(
         "/api/v1/scans",
         json=payload,
-        headers={"Authorization": "Bearer ecdat-test-token-secret", "X-ECDAT-Actor": "test-operator"},
+        headers=AUTH_HEADERS,
     )
     assert resp.status_code == 413
     assert "PayloadTooLarge" in resp.text or "exceeds maximum allowed size" in resp.text
@@ -29,7 +34,7 @@ def test_oversized_json_request_rejected_with_413() -> None:
 
 def test_normal_json_request_within_limit_succeeds() -> None:
     """A normal sized JSON request (< 1MB) must not be rejected with 413."""
-    client = TestClient(app, headers={"Authorization": "Bearer ecdat-test-token-secret", "X-ECDAT-Actor": "test-operator"})
+    client = TestClient(app, headers=AUTH_HEADERS)
 
     resp = client.post(
         "/api/v1/targets",
@@ -40,14 +45,14 @@ def test_normal_json_request_within_limit_succeeds() -> None:
             "policyId": "pol_default",
             "schedule": "0 0 * * *",
         },
-        headers={"Authorization": "Bearer ecdat-test-token-secret", "X-ECDAT-Actor": "test-operator"},
+        headers=AUTH_HEADERS,
     )
     assert resp.status_code == 201
 
 
 def test_upload_endpoint_bypasses_1mb_json_cap() -> None:
     """The /api/v1/scans/upload endpoint must bypass the 1MB JSON cap for legitimate archive uploads."""
-    client = TestClient(app, headers={"Authorization": "Bearer ecdat-test-token-secret", "X-ECDAT-Actor": "test-operator"})
+    client = TestClient(app, headers=AUTH_HEADERS)
 
     # Create an in-memory zip archive > 1MB using ZIP_STORED
     buf = io.BytesIO()

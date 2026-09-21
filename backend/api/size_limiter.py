@@ -3,7 +3,8 @@
 Phase: Production Hardening (M4).
 Enforces HTTP-layer size limits:
 - 1 MB cap on ordinary JSON endpoints (HTTP 413 Payload Too Large).
-- Upload endpoints (/api/v1/scans/upload, /api/v1/criticality/import) bypass the 1MB cap and use their documented limits.
+- Upload endpoints (/api/v1/scans/upload, /api/v1/criticality/import) bypass the 1MB cap
+  and use their documented limits.
 """
 
 from __future__ import annotations

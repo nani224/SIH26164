@@ -1,9 +1,7 @@
 """ECDAT backend — FastAPI app.
 
 Scans/findings/policies are persisted (SQLModel + SQLite, api/db.py) as of
-Phase 2. There is still no real detection engine wired in (POST /scans
-still returns stub-shaped data -- that's Phase 3), no auth, no CORS
-hardening (Phase 10). See docs/engineering/backend/PLAN.md.
+Phase 2. Production hardening (auth, CORS, size limits, structured logging).
 """
 
 from __future__ import annotations
@@ -93,6 +91,7 @@ app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestSizeLimitMiddleware)
 app.add_middleware(StructuredLoggingMiddleware)
 
+# Authenticated HTTP routes
 for router in (
     scans.router, findings.router, policies.router,
     catalog.router, targets.router, probes.router, alerts.router,
@@ -105,10 +104,13 @@ for router in (
         dependencies=[Depends(verify_bearer_token), Depends(require_actor_on_write)],
     )
 
+# Unauthenticated operational endpoints
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(scans.ws_router, prefix="/api/v1")
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    detail: str = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
-    return JSONResponse(status_code=exc.status_code, content={"detail": detail})
+async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+    detail_str = str(exc.detail) if exc.detail else ""
+    content = {"error": exc.__class__.__name__, "message": detail_str, "detail": detail_str}
+    return JSONResponse(status_code=exc.status_code, content=content)

@@ -9,8 +9,7 @@ Proves:
 from __future__ import annotations
 
 import logging
-import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -38,11 +37,9 @@ def test_webhook_dispatch_logs_redact_url_on_failure(caplog: pytest.LogCaptureFi
     secret_token = "SUPER_SECRET_WEBHOOK_CREDENTIAL_987654321"
     webhook_url = f"https://hooks.example.org/webhook/v1/{secret_token}?auth={secret_token}"
 
-    with caplog.at_level(logging.WARNING):
-        # Trigger failure by pointing to non-existent or failing mock
-        with patch("httpx.Client.post", side_effect=Exception("Connection refused")):
-            success = send_alert_webhook(webhook_url, {"text": "Test alert"})
-            assert success is False
+    with caplog.at_level(logging.WARNING), patch("httpx.Client.post", side_effect=Exception("Connection refused")):
+        success = send_alert_webhook(webhook_url, {"text": "Test alert"})
+        assert success is False
 
     # Check that the secret token is completely absent from all captured log lines
     assert secret_token not in caplog.text

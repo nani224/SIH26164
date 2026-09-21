@@ -28,10 +28,7 @@ def redact_url(url: str) -> str:
         path = parsed.path
         if path and len(path) > 1:
             parts = path.strip("/").split("/")
-            if len(parts) > 1:
-                path = "/" + "/".join([parts[0]] + ["***" for _ in parts[1:]])
-            else:
-                path = "/***"
+            path = "/" + "/".join([parts[0]] + ["***" for _ in parts[1:]]) if len(parts) > 1 else "/***"
         query = "?***" if parsed.query else ""
         return f"{parsed.scheme}://{netloc}{path}{query}"
     except Exception:

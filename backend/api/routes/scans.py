@@ -50,6 +50,7 @@ from engine.scanner import scan as run_scan
 
 log = structlog.get_logger("ecdat.api.scans")
 router = APIRouter()
+ws_router = APIRouter()
 
 
 def _get_scan_or_404(scan_id: str) -> Scan:
@@ -277,7 +278,7 @@ async def get_report_pdf(scan_id: str) -> Response:
 _MAX_EVENTS_PER_SEC = 10
 
 
-@router.websocket("/scans/{scan_id}/events")
+@ws_router.websocket("/scans/{scan_id}/events")
 async def scan_events(websocket: WebSocket, scan_id: str, after: int = 0) -> None:
     """Replays the real, stored event log for a scan (see engine.scanner's
     on_event callback + store.create_scan_from_result). Scanning is

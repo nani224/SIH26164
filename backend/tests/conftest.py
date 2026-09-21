@@ -24,7 +24,8 @@ _orig_testclient_init = TestClient.__init__
 
 
 def _patched_testclient_init(self: TestClient, *args: object, **kwargs: object) -> None:
-    headers = dict(kwargs.get("headers") or {})  # type: ignore[arg-type]
+    raw_headers = kwargs.get("headers")
+    headers: dict[str, str] = dict(raw_headers) if isinstance(raw_headers, dict) else {}
     if "Authorization" not in headers and "authorization" not in headers:
         headers["Authorization"] = "Bearer ecdat-test-token-secret"
     if "X-ECDAT-Actor" not in headers and "x-ecdat-actor" not in headers:
