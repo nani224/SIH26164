@@ -10,9 +10,13 @@
 
 v0.3 is the "continuous operation" release: a real scheduler that scans a registered target unattended, real drift detection between scans, real alerting with webhook delivery, real live TLS/SSH/HSM/registry probes, and a tamper-evident audit log — proven end to end against a real running stack, not just unit tests. See [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) for a 7-minute walkthrough and [`CHANGELOG.md`](CHANGELOG.md) for the full v0.3.0 changelog.
 
+**Documentation**: [`docs/README.md`](docs/README.md) is the index — architecture, install, operations, API reference, benchmark protocol, security, and a Q&A pack, each with real dated numbers and the exact commands that produced them.
+
 ---
 
 ## Architecture
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full component diagram, data flow, and module ownership map. Summary:
 
 ```mermaid
 graph TD
@@ -67,6 +71,8 @@ graph TD
 - **Strictly deterministic**: zero ML/LLM in detection, factor attribution, or scoring. Enforced by `scripts/verify_airgap.py`, which AST-scans `api/`, `engine/`, and `scheduler/` for banned or network-capable imports (zero tolerance) and `probes/` for network-capable imports used without `probes.guard`'s destination validation.
 - **Strictly air-gapped at runtime**: `probes/guard.py` enforces a real destination allowlist (localhost/approved test containers only) for every live probe; no external calls at runtime otherwise.
 - **Contract-first**: zero contract drift, checked in CI (`scripts/contract_diff.py`) and re-verified here on 2026-09-20 (below).
+
+See [`docs/SECURITY.md`](docs/SECURITY.md) for the full threat model and hardening detail.
 
 ---
 
@@ -166,7 +172,7 @@ This is **not** the brief's full 150-usage Loop B1 DEV/HOLD split — it's a rea
 
 | Metric | Budget | Result |
 | :--- | :--- | :--- |
-| Rescore 10,000 findings | < 200ms | 149.26ms cold / ~84ms warm (see `docs/decisions/backend/` Track A1 P7 for the cold/warm explanation) |
+| Rescore 10,000 findings | < 200ms | 149.26ms cold / ~84ms warm (see `docs/engineering/backend/PROGRESS.md`'s Track A1 P1-P7 entry for the cold/warm explanation) |
 | `GET /findings`, 10,000-finding scan, default page | p95 < 150ms | **Before fix: p50 710ms, p95 773ms. After fix: p50 8.34ms, p95 10.97ms** (see CHANGELOG) |
 | Estate graph FPS (5,000+ nodes, real GPU) | ≥ 55 FPS | 60.1–60.4 FPS on real GPU hardware; a ~1.0–1.2 FPS figure seen in this sandbox is a confirmed software-rasterizer artifact (no hardware GPU here), diagnosed in an earlier session pass — not re-litigated in this one |
 
@@ -200,3 +206,4 @@ Honestly listed, not silently dropped:
 - **Custom container image scanning**: `api`/`web` images were never built in this sandbox (documented CA-trust limitation), so they were never vulnerability-scanned either — only the demo's third-party base images were.
 - **3 Playwright tests coupled to MSW-only fixture literals** (`alerts.spec.ts`, `drift.spec.ts`, `estate.spec.ts`) fail when run against the real backend instead of MSW — a test-authoring gap, not an app defect.
 - **Not yet built**: multi-tenant RBAC/SSO, cloud KMS integration, Kubernetes cluster discovery, SIEM export, ticketing-system integration, an agent fleet for distributed scanning. None of these are implied to exist anywhere else in this README.
+- **No LICENSE file**: this repository has no declared licence (`package.json`/`pyproject.toml` are both silent on it). Not something to guess at — needs an explicit decision from the project owner before this can be treated as open-source or redistributable under any specific terms.
