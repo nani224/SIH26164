@@ -156,7 +156,14 @@ def execute_target_scan(target_id: str) -> Scan:
     if not target_path.is_absolute():
         target_path = target_path.resolve()
 
+    initial_scan = store.create_initial_scan(
+        payload=ScanCreate(path=target.uri, policyId=target.policyId, crqcYears=policy.crqcYears),
+        policy=policy,
+        target_override=target.name,
+    )
+
     result: ScanResult
+    scan_status = ScanStatus.DONE
     try:
         if target_path.exists():
             result = engine_scan(target_path, policy=policy)
@@ -166,18 +173,20 @@ def execute_target_scan(target_id: str) -> Scan:
                 stats=ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0),
             )
     except Exception as exc:
-        logger.warning("Target scan path execution exception, falling back to empty result: %s", exc)
+        logger.warning("Target scan path execution exception: %s", exc)
         result = ScanResult(
             findings=[],
             stats=ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0),
         )
+        scan_status = ScanStatus.FAILED
 
     scan = store.create_scan_from_result(
         payload=ScanCreate(path=target.uri, policyId=target.policyId, crqcYears=policy.crqcYears),
         result=result,
         policy=policy,
-        scan_status=ScanStatus.DONE,
+        scan_status=scan_status,
         target_override=target.name,
+        scan_id_override=initial_scan.id,
     )
 
     # Update target last scan tracking

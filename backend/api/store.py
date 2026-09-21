@@ -37,6 +37,7 @@ from api.models import (
     ArtifactCoverage,
     AssetCriticality,
     AssetFacing,
+    BandCounts,
     ContextWithGlob,
     CoverageCertificate,
     Drift,
@@ -100,6 +101,72 @@ def resolve_policy(payload: ScanCreate, target_id: str | None = None) -> Policy:
             # policy's own path-glob contexts -- prepended, not appended.
             policy = policy.model_copy(update={"contexts": extra_contexts + policy.contexts})
     return policy
+
+
+def create_initial_scan(
+    payload: ScanCreate,
+    policy: Policy,
+    *,
+    target_override: str | None = None,
+    scan_id_override: str | None = None,
+) -> Scan:
+    """Create and persist an initial scan record in SCANNING state before execution begins."""
+    scan_id = scan_id_override or f"scan_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    scan = Scan(
+        id=scan_id,
+        target=target_override or payload.path or "uploaded-artifact",
+        status=ScanStatus.SCANNING,
+        stats=ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0),
+        bands=BandCounts(critical=0, high=0, medium=0, low=0),
+        policyId=policy.id,
+        crqcYears=policy.crqcYears,
+        startedAt=now,
+        finishedAt=None,
+        bundleHash=None,
+    )
+    with db.session_scope() as session:
+        session.add(db.scan_to_record(scan))
+        db.log_audit(
+            session,
+            action="scan.start",
+            entity_type="scan",
+            entity_id=scan_id,
+            detail={"target": scan.target, "status": scan.status.value},
+        )
+        session.commit()
+    return scan
+
+
+def recover_interrupted_scans() -> list[str]:
+    """Find all scans left in non-terminal states (queued, ingesting, scanning, scoring) and mark FAILED."""
+    recovered_ids: list[str] = []
+    non_terminal = (
+        ScanStatus.QUEUED.value,
+        ScanStatus.INGESTING.value,
+        ScanStatus.SCANNING.value,
+        ScanStatus.SCORING.value,
+    )
+    with db.session_scope() as session:
+        interrupted = session.exec(
+            select(ScanRecord).where(col(ScanRecord.status).in_(non_terminal))
+        ).all()
+        for rec in interrupted:
+            old_status = rec.status
+            rec.status = ScanStatus.FAILED.value
+            rec.finished_at = datetime.now(UTC)
+            session.add(rec)
+            db.log_audit(
+                session,
+                action="scan.recovery",
+                entity_type="scan",
+                entity_id=rec.id,
+                detail={"previous_status": old_status, "reason": "Process interrupted mid-run"},
+            )
+            recovered_ids.append(rec.id)
+        if recovered_ids:
+            session.commit()
+    return recovered_ids
 
 
 def create_scan_from_result(

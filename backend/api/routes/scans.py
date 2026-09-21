@@ -75,14 +75,21 @@ async def create_scan(payload: ScanCreate) -> Scan:
     def on_event(event_type: str, event_payload: dict[str, Any]) -> None:
         collected_events.append((event_type, event_payload))
 
+    initial_scan = store.create_initial_scan(payload, policy)
     try:
         result = run_scan(target, policy, on_event=on_event)
         scan_status = ScanStatus.DONE
-    except OSError:
+    except Exception as exc:
+        log.warning("scan_failed", scan_id=initial_scan.id, error=str(exc))
         result = ScanResult()
         scan_status = ScanStatus.FAILED
     return store.create_scan_from_result(
-        payload, result, policy, scan_status=scan_status, events=collected_events
+        payload,
+        result,
+        policy,
+        scan_status=scan_status,
+        events=collected_events,
+        scan_id_override=initial_scan.id,
     )
 
 
@@ -100,6 +107,8 @@ async def upload_scan(
     def on_event(event_type: str, event_payload: dict[str, Any]) -> None:
         collected_events.append((event_type, event_payload))
 
+    initial_scan = store.create_initial_scan(payload, policy, target_override=filename)
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
         archive_dest = tmp_path / Path(filename).name
@@ -116,12 +125,19 @@ async def upload_scan(
             bundle_hash, _ = await async_compute_stream_hash_and_save(chunk_stream(), archive_dest)
             safe_extract_archive(archive_dest, extract_dir)
         except IngestError as exc:
+            store.create_scan_from_result(
+                payload,
+                ScanResult(),
+                policy,
+                scan_status=ScanStatus.FAILED,
+                scan_id_override=initial_scan.id,
+            )
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         try:
             result = run_scan(extract_dir, policy, on_event=on_event)
             scan_status = ScanStatus.DONE
-        except OSError:
+        except Exception:
             result = ScanResult()
             scan_status = ScanStatus.FAILED
 
@@ -133,6 +149,7 @@ async def upload_scan(
             events=collected_events,
             bundle_hash=bundle_hash,
             target_override=filename,
+            scan_id_override=initial_scan.id,
         )
 
 

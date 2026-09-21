@@ -52,6 +52,14 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     get_expected_token()
     db.init_db()
     try:
+        from api import store
+
+        recovered = store.recover_interrupted_scans()
+        if recovered:
+            log.warning("interrupted_scans_recovered", count=len(recovered), scan_ids=recovered)
+    except Exception as exc:
+        log.warning("scan_recovery_failed", error=str(exc))
+    try:
         from scheduler.engine import shutdown_scheduler, start_scheduler
         start_scheduler()
     except Exception as exc:
