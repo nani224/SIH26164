@@ -1,7 +1,6 @@
-"""Target management, scheduling, snapshots, and drift detection endpoints."""
-
 from __future__ import annotations
 
+import structlog
 from fastapi import APIRouter, HTTPException, Query, status
 
 from api import store
@@ -15,17 +14,21 @@ from api.models import (
 )
 from scheduler.engine import execute_target_scan, remove_target_job, schedule_target_job
 
+log = structlog.get_logger("ecdat.api.targets")
 router = APIRouter(tags=["targets"])
 
 
 @router.get("/targets", response_model=list[Target])
 def list_targets() -> list[Target]:
-    return store.list_targets()
+    targets = store.list_targets()
+    log.info("targets_listed", count=len(targets))
+    return targets
 
 
 @router.post("/targets", response_model=Target, status_code=status.HTTP_201_CREATED)
 def create_target(payload: TargetCreate) -> Target:
     target = store.create_target(payload)
+    log.info("target_created", target_id=target.id, name=target.name)
     schedule_target_job(target)
     return target
 
@@ -34,7 +37,9 @@ def create_target(payload: TargetCreate) -> Target:
 def get_target(id: str) -> Target:
     target = store.get_target(id)
     if target is None:
+        log.warning("target_not_found", target_id=id)
         raise HTTPException(status_code=404, detail=f"Target {id} not found")
+    log.info("target_fetched", target_id=id)
     return target
 
 

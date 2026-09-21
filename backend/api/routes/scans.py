@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import structlog
 from fastapi import (
     APIRouter,
     File,
@@ -47,13 +48,16 @@ from engine.ingest import (
 from engine.models import ScanResult
 from engine.scanner import scan as run_scan
 
+log = structlog.get_logger("ecdat.api.scans")
 router = APIRouter()
 
 
 def _get_scan_or_404(scan_id: str) -> Scan:
     scan = store.get_scan(scan_id)
     if scan is None:
+        log.warning("scan_not_found", scan_id=scan_id)
         raise HTTPException(status_code=404, detail="scan not found")
+    log.info("scan_fetched", scan_id=scan_id)
     return scan
 
 

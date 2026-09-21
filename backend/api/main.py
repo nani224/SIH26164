@@ -12,11 +12,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from api import db
+from api.actor import require_actor_on_write
+from api.auth import verify_bearer_token
+from api.cors import get_cors_origins
+from api.logging_middleware import StructuredLoggingMiddleware
 from api.rate_limiter import RateLimitMiddleware
 from api.routes import (
     alerts,
@@ -35,6 +39,7 @@ from api.routes import (
     scans,
     targets,
 )
+from api.size_limiter import RequestSizeLimitMiddleware
 
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
 log = structlog.get_logger("ecdat.api")
@@ -69,8 +74,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from api.cors import get_cors_origins
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
@@ -79,12 +82,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RateLimitMiddleware)
-from api.size_limiter import RequestSizeLimitMiddleware
 app.add_middleware(RequestSizeLimitMiddleware)
-
-from fastapi import Depends
-from api.auth import verify_bearer_token
-from api.actor import require_actor_on_write
+app.add_middleware(StructuredLoggingMiddleware)
 
 for router in (
     scans.router, findings.router, policies.router,
@@ -98,12 +97,10 @@ for router in (
         dependencies=[Depends(verify_bearer_token), Depends(require_actor_on_write)],
     )
 
-# Unauthenticated public health endpoint
 app.include_router(health.router, prefix="/api/v1")
 
 
-
 @app.exception_handler(HTTPException)
-async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
-    content = {"error": exc.__class__.__name__, "message": str(exc.detail)}
-    return JSONResponse(status_code=exc.status_code, content=content)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    detail: str = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+    return JSONResponse(status_code=exc.status_code, content={"detail": detail})
