@@ -148,7 +148,7 @@ def execute_target_scan(target_id: str) -> Scan:
     if target is None:
         raise ValueError(f"Target not found: {target_id}")
 
-    policy = store.resolve_policy(ScanCreate(path=target.uri, policyId=target.policyId))
+    policy = store.resolve_policy(ScanCreate(path=target.uri, policyId=target.policyId), target_id=target.id)
     now = datetime.now(UTC)
 
     # Perform real engine scan if path/repo exists, otherwise create empty/stub result

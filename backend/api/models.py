@@ -461,6 +461,8 @@ class EstateSummary(BaseModel):
     criticalFindings: int
     pqcReadinessScore: float
     activeAlerts: int
+    internalFacingAssets: int = 0
+    externalFacingAssets: int = 0
 
 
 class EstateTrendPoint(BaseModel):

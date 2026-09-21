@@ -1505,7 +1505,9 @@ components:
 
     EstateSummary:
       type: object
-      required: [totalTargets, totalScans, totalFindings, criticalFindings, pqcReadinessScore, activeAlerts]
+      required:
+        [totalTargets, totalScans, totalFindings, criticalFindings, pqcReadinessScore,
+         activeAlerts, internalFacingAssets, externalFacingAssets]
       properties:
         totalTargets: { type: integer }
         totalScans: { type: integer }
@@ -1513,6 +1515,14 @@ components:
         criticalFindings: { type: integer }
         pqcReadinessScore: { type: number }
         activeAlerts: { type: integer }
+        internalFacingAssets:
+          type: integer
+          description: >
+            Count of explicit AssetCriticality records with facing=internal
+            (v1.0, PS clause i's internal/external split).
+        externalFacingAssets:
+          type: integer
+          description: Count of explicit AssetCriticality records with facing=external.
 
     EstateTrendPoint:
       type: object

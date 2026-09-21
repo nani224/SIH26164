@@ -36,11 +36,14 @@ from api.models import (
     Alert,
     ArtifactCoverage,
     AssetCriticality,
+    AssetFacing,
+    ContextWithGlob,
     CoverageCertificate,
     Drift,
     DriftChangedItem,
     DriftSummary,
     EstateCoverage,
+    Exposure,
     Finding,
     Policy,
     ProbeResult,
@@ -61,10 +64,17 @@ from api.models import (
 from engine.models import ScanResult
 
 
-def resolve_policy(payload: ScanCreate) -> Policy:
+def resolve_policy(payload: ScanCreate, target_id: str | None = None) -> Policy:
     """The policy a scan should score against: payload.policyId (falling
     back to the default policy) with payload.crqcYears applied as a
     per-scan override of the horizon (Z), if given.
+
+    v1.0 PS clause (iii): when target_id is given, explicit operator-managed
+    AssetCriticality records for that target are translated into additional,
+    higher-priority Policy Context entries (matched by the same first-glob-
+    wins semantics the policy's own contexts already use) -- feeding the
+    existing K/E risk factors' *input* only. engine/risk.py's formula itself
+    is never touched here or anywhere in this track.
     """
     with db.session_scope() as session:
         policy_id = payload.policyId or stub_data.DEFAULT_POLICY.id
@@ -72,6 +82,23 @@ def resolve_policy(payload: ScanCreate) -> Policy:
         policy = db.record_to_policy(rec) if rec is not None else stub_data.DEFAULT_POLICY
     if payload.crqcYears is not None:
         policy = policy.model_copy(update={"crqcYears": payload.crqcYears})
+
+    if target_id is not None:
+        criticalities = list_asset_criticalities(target_id=target_id)
+        if criticalities:
+            extra_contexts = [
+                ContextWithGlob(
+                    glob=c.pathPattern,
+                    exposure=Exposure.EXTERNAL if c.facing == AssetFacing.EXTERNAL else Exposure.INTERNAL,
+                    criticality=c.criticality,
+                    shelfLifeYears=policy.default.shelfLifeYears,
+                    migrationYears=policy.default.migrationYears,
+                )
+                for c in criticalities
+            ]
+            # Explicit, operator-set criticality takes priority over the
+            # policy's own path-glob contexts -- prepended, not appended.
+            policy = policy.model_copy(update={"contexts": extra_contexts + policy.contexts})
     return policy
 
 

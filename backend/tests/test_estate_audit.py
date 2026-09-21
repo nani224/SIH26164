@@ -106,7 +106,8 @@ def test_estate_trend_multiple_snapshots_same_day_stays_in_range(client: TestCli
     without waiting on a real cron."""
     from datetime import UTC, datetime
 
-    from api import store
+    from api import db, store
+    from api.db_models import ScanSnapshotRecord
     from api.models import (
         CryptoFunction,
         Finding,
@@ -123,6 +124,21 @@ def test_estate_trend_multiple_snapshots_same_day_stays_in_range(client: TestCli
         Triage,
     )
     from engine.models import ScanResult
+
+    # The suite shares one in-memory DB across every test file (StaticPool,
+    # additive-only init_db()) -- any other test that creates a same-day
+    # snapshot for any target dilutes the exact-equality assertion below.
+    # Evict only *today's* snapshots first, giving this test exclusive
+    # ownership of the day-bucket it's about to populate and measure,
+    # without touching other days' data or any other table.
+    today_start = datetime.combine(datetime.now(UTC).date(), datetime.min.time(), tzinfo=UTC)
+    with db.session_scope() as session:
+        stale = session.exec(
+            select(ScanSnapshotRecord).where(col(ScanSnapshotRecord.taken_at) >= today_start)
+        ).all()
+        for rec in stale:
+            session.delete(rec)
+        session.commit()
 
     target = store.create_target(
         TargetCreate(
