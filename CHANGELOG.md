@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.0.0 — Crypto Mass Conservation (CMC) & PS Gap Closure — 2026-09-21
+
+The "Crypto Mass Conservation" release. ECDAT pairs detection with mass conservation:
+measuring not just what was found, but mathematically accounting for what was unexplained
+(crypto debt residue). Closes key problem-statement (PS) gaps including business criticality
+reranking, cloud KMS key discovery (LocalStack), and cryptographic estate coverage.
+
+### Track A1 — Coverage API, Debt Ledger, PS-Gap Closure
+
+- **M1: Contract v1.0.0**: Added OpenAPI schemas for `CoverageCertificate`, `ArtifactCoverage`,
+  `ResidueCluster`, `AssetCriticality`, `CloudKeyRecord`, and `EstateCoverage`.
+- **M2: Coverage Persistence**: Persisted coverage certificates and per-artifact coverage
+  with content-hash deduplication (`save_coverage`/`get_coverage_certificate`), ensuring
+  reproducible coverage numbers and identical cluster IDs across scans. Latency budget
+  met: p95 < 150ms.
+- **M3: Debt Ledger State Machine**: Residue cluster lifecycle (`open` -> `promoted` | `excluded` | `accepted`)
+  with tamper-evident SHA-256 audit chaining. Strict validation: exclusions require justification
+  and owner; promoted clusters are terminal. Real-time alert rule `check_residue_rise`.
+- **M4: Coverage in Drift & Trend**: Wired `coverageRatio` and `residueMass` through scan snapshots
+  and calculate_drift(), tracking `coverageDelta` and `residueMassDelta`.
+- **M5: Business Criticality Reranking**: Operator-managed `AssetCriticality` records translated
+  into synthetic higher-priority `ContextWithGlob` policy entries, visibly adjusting K/E exposure
+  and Mosca risk scores on subsequent scans without altering engine formula. Derivation of
+  `internalFacingAssets`/`externalFacingAssets` in `EstateSummary`.
+- **M6: Cloud Key Discovery**: Self-hosted AWS KMS probe via LocalStack (`backend/probes/cloud_kms.py`)
+  with public key fingerprinting (`identityId`), finding join, allowlisted destination guard, and
+  clean degradation. Azure Key Vault and GCP Cloud HSM documented under `[Roadmap]`.
+- **M7: Hardening & Performance**:
+  - Benchmark on 10k findings + coverage: p95 for coverage queries < 46ms (budget: 150ms);
+    p95 for residue queries < 7ms (budget: 200ms).
+  - Security scans: `bandit` (0 high severity; 7 low non-blocking try-except-pass; 1 parameterized SQL CTE triage),
+    `pip-audit` (0 known vulnerabilities), `gitleaks` (9 verified false positives across test/mock signatures),
+    `trivy` (4 findings in `uv.lock` on `cryptography 46.0.7`, documented in ADR 017).
+  - Rate-limiter verification: confirmed no test bypass flags in compose files.
+
 ## v0.3.0-sih-finale — 2026-09-20
 
 The "continuous operation" release. ECDAT moves from a one-shot scanner to

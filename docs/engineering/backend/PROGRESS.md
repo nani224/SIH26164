@@ -1967,7 +1967,52 @@ tests/test_cloud_kms.py::test_api_endpoint_with_mocked_keys PASSED       [100%]
 5 passed in 0.41s
 ```
 
-### Next
-M7 (hardening/load/security). Continuing without a break per the mandate's own loop instruction.
+## 2026-09-21 — Milestone M7 (Hardening, Performance & Security)
+
+### What was done
+- **Load Benchmark Suite (`backend/scripts/load_test_cmc.py`)**:
+  - Seeded 10,000 findings across 500 artifacts, with a `CoverageCertificate` (totalMass: 25000.0, attributedMass: 23000.0, excludedMass: 1000.0, residueMass: 1000.0, coverageRatio: 0.92, residueClusterCount: 50), 500 `ArtifactCoverage` records, and 50 `ResidueCluster` records into the database.
+  - Benchmarked latency across 50 iterations against a live `uvicorn` server (port 8025) for all coverage and residue endpoints.
+  - Measured results:
+    - `GET /scans/{id}/coverage`: p50 3.21ms / p90 3.77ms / p95 3.97ms / p99 4.51ms (budget: 150.0ms) -> PASS
+    - `GET /scans/{id}/coverage/artifacts`: p50 10.72ms / p90 20.85ms / p95 45.89ms / p99 99.30ms (budget: 150.0ms) -> PASS
+    - `GET /residue`: p50 4.17ms / p90 4.89ms / p95 5.39ms / p99 6.63ms (budget: 200.0ms) -> PASS
+    - `GET /residue?state=open`: p50 4.02ms / p90 5.73ms / p95 6.91ms / p99 7.28ms (budget: 200.0ms) -> PASS
+    - `GET /residue/{id}`: p50 2.84ms / p90 3.81ms / p95 4.07ms / p99 5.40ms (budget: 200.0ms) -> PASS
+- **Security Scans**:
+  - `bandit -r api probes scheduler alerts`: 4865 lines scanned. 0 High severity issues. 1 Medium (B608: parameterized CTE query in `api/store.py`, verified safe with bound parameters and validated floats). 7 Low (B110: non-blocking alert checks, graceful teardowns, fallback degradation).
+  - `pip-audit`: 0 known vulnerabilities found across all dependencies.
+  - `gitleaks detect --log-opts="--all"`: 115 commits scanned (19.51 MB). 9 hits, all verified false positives (type annotations `key: Ed25519PrivateKey | Ed448PrivateKey`, function names `ed25519.GenerateKey`, and test/benchmark constants).
+  - `trivy fs --scanners vuln backend/uv.lock`: 4 vulnerabilities detected on `cryptography 46.0.7` (3 High, 1 Medium). Confirmed transitively pinned by `sslyze` (<47 bound) with all upstream fixes at >=47; documented as an accepted exception with exposure analysis in `docs/decisions/backend/017-cryptography-cve-exception.md`.
+- **Rate Limiter Configuration**:
+  - Re-verified `docker-compose.yml` and `docker-compose.test.yml`. Confirmed no `ECDAT_RATE_LIMIT_DISABLED` or `ECDAT_RATE_LIMIT_TRUST_TEST_HEADER` env vars are set.
+  - Re-verified `api/rate_limiter.py`: `X-Test-Client-Id` header is only honored when `ECDAT_RATE_LIMIT_TRUST_TEST_HEADER == "1"`.
+
+### Real benchmark output (2026-09-21, live server, port 8025)
+```
+=======================================================
+   ECDAT LOAD TEST SUITE (10k Findings + Coverage)    
+=======================================================
+Base URL: http://127.0.0.1:8025 | Iterations per endpoint: 50
+
+Endpoint                             | Budget (p95) | p50      | p90      | p95      | p99      | Status
+-----------------------------------------------------------------------------------------------
+GET /scans/{id}/coverage             | 150.0        | 3.21     | 3.77     | 3.97     | 4.51     | PASS
+GET /scans/{id}/coverage/artifacts   | 150.0        | 10.72    | 20.85    | 45.89    | 99.30    | PASS
+GET /residue                         | 200.0        | 4.17     | 4.89     | 5.39     | 6.63     | PASS
+GET /residue?state=open              | 200.0        | 4.02     | 5.73     | 6.91     | 7.28     | PASS
+GET /residue/{id}                    | 200.0        | 2.84     | 3.81     | 4.07     | 5.40     | PASS
+===============================================================================================
+[+] All load benchmarks satisfied performance budgets.
+```
+
+### Full gate output (2026-09-21, final Track A1 gate)
+```
+uv run ruff check .                    -> All checks passed!
+uv run mypy --strict .                 -> Success: no issues found in 109 source files
+uv run pytest --cov -q                 -> 225 passed in 46.56s (93% coverage)
+uv run python scripts/contract_diff.py -> No contract drift.
+uv run python scripts/verify_airgap.py -> PASSED. ECDAT runtime is strictly deterministic and air-gapped.
+```
 
 
