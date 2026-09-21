@@ -86,19 +86,61 @@ schema.
 
 ## Backup / restore
 
-The backend's entire state lives in one SQLite file
-(`DATABASE_URL`, default `sqlite:///./ecdat.db`). Back it up like any
-SQLite database:
+The backend's entire state lives in the database configured by `DATABASE_URL` (default `sqlite:///./ecdat.db`). There is no separate blob/object store to back up alongside it — uploaded scan archives are extracted into a sandboxed temp directory and discarded after scanning (see [ADR 015](decisions/backend/015-sandboxed-ingest.md)), not retained.
 
+### SQLite (Default)
+
+**Online Backup** (safe while application is running):
 ```bash
 sqlite3 ecdat.db ".backup 'ecdat-backup-$(date +%Y%m%d).db'"
 ```
 
-To restore, stop `api`, replace the database file, restart. There is no
-separate blob/object store to back up alongside it — uploaded scan
-archives are extracted into a sandboxed temp directory and discarded
-after scanning (see [ADR 015](decisions/backend/015-sandboxed-ingest.md)),
-not retained.
+**Offline Backup** (service stopped):
+```bash
+# 1. Stop the backend process
+systemctl stop ecdat-api # or kill process
+# 2. Copy database file and WAL journal
+cp ecdat.db "ecdat-backup-$(date +%Y%m%d).db"
+[ -f ecdat.db-wal ] && cp ecdat.db-wal "ecdat-backup-$(date +%Y%m%d).db-wal"
+```
+
+**Restore Procedure**:
+1. Stop the `ecdat` API service.
+2. Replace `ecdat.db` with the backup copy:
+   ```bash
+   cp "ecdat-backup-20260921.db" ecdat.db
+   rm -f ecdat.db-wal ecdat.db-shm
+   ```
+3. Verify file integrity:
+   ```bash
+   sqlite3 ecdat.db "PRAGMA integrity_check;"
+   # Output: ok
+   ```
+4. Start the backend service and verify the tamper-evident audit hash chain:
+   ```bash
+   curl -H "Authorization: Bearer $ECDAT_API_TOKEN" http://localhost:8000/api/v1/audit/verify
+   # Output: {"valid": true, "totalRecords": ...}
+   ```
+
+### PostgreSQL
+
+`DATABASE_URL` natively supports PostgreSQL connection strings (e.g. `postgresql://user:password@host:5432/ecdat_db`). The engine configuration and SQLModel models are fully dialect-compatible with PostgreSQL.
+
+**Backup**:
+```bash
+pg_dump -Fc -d "$DATABASE_URL" -f "ecdat-backup-$(date +%Y%m%d).dump"
+```
+
+**Restore Procedure**:
+1. Stop the `ecdat` API service to prevent concurrent writes.
+2. Restore the schema and data using `pg_restore`:
+   ```bash
+   pg_restore -c --if-exists -d "$DATABASE_URL" "ecdat-backup-20260921.dump"
+   ```
+3. Restart the service and verify hash-chain integrity:
+   ```bash
+   curl -H "Authorization: Bearer $ECDAT_API_TOKEN" http://localhost:8000/api/v1/audit/verify
+   ```
 
 ## Upgrade / rollback
 
