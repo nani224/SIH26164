@@ -109,6 +109,76 @@ def is_media_or_plain_text_base64(slice_bytes: bytes) -> tuple[bool, str]:
     return False, ""
 
 
+
+# 16-element half-byte (nibble) CRC-32 table values
+_CRC32_NIBBLE_INTS: frozenset[int] = frozenset([
+    0, 0x1DB71064, 0x3B6E20C8, 0x26D930AC, 0x76DC4190, 0x6B6B51F4, 0x4DB26158, 0x5005713C,
+    0x9B64C2B0, 0x86D3D2D4, 0xA00AE278, 0xBDBDF21C, 0xEDB88320, 0xF00F9344, 0xD6D6A3E8, 0xCB61B38C,
+])
+
+# 256-element full IEEE 802.3 CRC-32 table values
+_CRC32_FULL_INTS: frozenset[int] = frozenset(
+    struct.unpack("<256I", _CRC32_TABLE_BYTES)
+)
+
+
+def _parse_ints_from_array(slice_bytes: bytes) -> list[int]:
+    """Parse integer and hex literals from a numeric array code slice."""
+    import contextlib
+    import re
+    text = slice_bytes.decode("latin1", errors="ignore")
+    nums = re.findall(r"0x[0-9a-fA-F]+|\d+", text)
+    res: list[int] = []
+    for n in nums:
+        with contextlib.suppress(ValueError):
+            res.append(int(n, 16) if n.startswith(("0x", "0X")) else int(n, 10))
+    return res
+
+
+def is_crc_numeric_array(slice_bytes: bytes) -> tuple[bool, str]:
+    """Falsifiable: integer set matches standard 256-entry or 16-entry CRC-32 lookup table."""
+    ints = _parse_ints_from_array(slice_bytes)
+    if not ints:
+        return False, ""
+    int_set = frozenset(ints)
+    if int_set == _CRC32_FULL_INTS:
+        return True, "Numeric array matches IEEE 802.3 CRC-32 polynomial (0xEDB88320) 256-word table"
+    if int_set == _CRC32_NIBBLE_INTS:
+        return True, "Numeric array matches IEEE 802.3 CRC-32 half-byte (nibble) 16-word table"
+    return False, ""
+
+
+def is_ascii_text_asn1(slice_bytes: bytes) -> tuple[bool, str]:
+    """Falsifiable: byte slice is >= 95% printable ASCII text/whitespace where byte 0x30 is ASCII '0'."""
+    if not slice_bytes:
+        return False, ""
+    printable_count = sum(1 for b in slice_bytes if (32 <= b <= 126) or b in b"\r\n\t")
+    if (printable_count / len(slice_bytes)) >= 0.95:
+        return True, "Byte slice is printable ASCII text/code where 0x30 is ASCII '0', not ASN.1 DER sequence"
+    return False, ""
+
+
+def is_source_quote_bleed(slice_bytes: bytes) -> tuple[bool, str]:
+    """Falsifiable: single-quoted or multiline string span contains comment delimiters or preprocessor directives."""
+    if b"/*" in slice_bytes or b"*/" in slice_bytes:
+        return True, "String span crosses C block comment delimiters (/* or */)"
+    if b"#define" in slice_bytes or b"#include" in slice_bytes or b"#endif" in slice_bytes:
+        return True, "String span crosses C preprocessor directives (#define, #include, #endif)"
+    if slice_bytes.startswith(b"'") and b"\n" in slice_bytes:
+        return True, "Single-quoted character literal span crosses newline boundaries in source code"
+    return False, ""
+
+
+def is_benign_arx(slice_bytes: bytes) -> tuple[bool, str]:
+    """Falsifiable: ARX expression is CRC accumulator logic or Big-O asymptotic notation."""
+    low = slice_bytes.lower()
+    if b"crc" in low:
+        return True, "ARX expression operates on CRC polynomial table or accumulator"
+    if b"o(n^" in low or b"o(1)" in low or b"o(n)" in low:
+        return True, "Expression is asymptotic Big-O complexity notation in code or comments"
+    return False, ""
+
+
 def evaluate_exclusions(
     spans: list[Span],
     artifact_content: bytes,
@@ -175,6 +245,62 @@ def evaluate_exclusions(
                     span=span,
                     predicate_id="media_or_text_payload",
                     falsifiable_reason=media_reason,
+                    content_hash=slice_hash,
+                )
+                excluded_spans.append(span)
+                records.append(rec)
+                continue
+
+        # 4. CRC-32 numeric arrays in source code
+        if span.signal_type == "literals.numeric_array":
+            is_crc, crc_reason = is_crc_numeric_array(slice_bytes)
+            if is_crc:
+                rec = ExclusionRecord(
+                    span=span,
+                    predicate_id="benign_crc_table",
+                    falsifiable_reason=crc_reason,
+                    content_hash=slice_hash,
+                )
+                excluded_spans.append(span)
+                records.append(rec)
+                continue
+
+        # 5. Framing ASN.1 DER false-positives in ASCII source text
+        if span.signal_type == "framing.asn1_der":
+            is_ascii, ascii_reason = is_ascii_text_asn1(slice_bytes)
+            if is_ascii:
+                rec = ExclusionRecord(
+                    span=span,
+                    predicate_id="ascii_text_not_der",
+                    falsifiable_reason=ascii_reason,
+                    content_hash=slice_hash,
+                )
+                excluded_spans.append(span)
+                records.append(rec)
+                continue
+
+        # 6. High-entropy string literals crossing source code comments or statements
+        if span.signal_type == "literals.high_entropy_string":
+            is_bleed, bleed_reason = is_source_quote_bleed(slice_bytes)
+            if is_bleed:
+                rec = ExclusionRecord(
+                    span=span,
+                    predicate_id="source_quote_bleed",
+                    falsifiable_reason=bleed_reason,
+                    content_hash=slice_hash,
+                )
+                excluded_spans.append(span)
+                records.append(rec)
+                continue
+
+        # 7. Non-crypto ARX (CRC checksums or Big-O notation)
+        if span.signal_type == "arx.source_composite":
+            is_ben_arx, arx_reason = is_benign_arx(slice_bytes)
+            if is_ben_arx:
+                rec = ExclusionRecord(
+                    span=span,
+                    predicate_id="benign_arx",
+                    falsifiable_reason=arx_reason,
                     content_hash=slice_hash,
                 )
                 excluded_spans.append(span)
