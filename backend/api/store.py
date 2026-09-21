@@ -341,7 +341,7 @@ def rescore_scan_findings(
         # carry SQL syntax, so this isn't an injection vector despite the f-string
         # shape bandit's B608 rule flags. `ph`/`scan_id` below are the placeholder
         # token and a real bound parameter, same as the query above.
-        sql = f"""
+        sql = f"""  # nosec B608
         WITH urgency AS (
             SELECT
                 id,
@@ -424,7 +424,7 @@ def rescore_scan_findings(
             ),
             'triage', json_object('status', 'open', 'note', null)
         )
-        """
+        """  # nosec B608
         cur.execute(sql, (scan_id,))
         changed_json_strings = [r[0] for r in cur.fetchall()]
 
