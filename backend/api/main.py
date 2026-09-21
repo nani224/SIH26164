@@ -79,6 +79,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RateLimitMiddleware)
+from api.size_limiter import RequestSizeLimitMiddleware
+app.add_middleware(RequestSizeLimitMiddleware)
 
 from fastapi import Depends
 from api.auth import verify_bearer_token
