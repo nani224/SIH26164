@@ -1698,4 +1698,107 @@ pnpm test:e2e (MSW off, real backend)  -> 29/33 passed (4 explained, see README)
 - `cryptography` HIGH CVEs unfixable today without an unverified `sslyze`
   compatibility gamble (ADR 017).
 
+---
+
+## 2026-09-21 — Session (v1.0 Crypto Mass Conservation, Track A1, `feature/cmc-api`)
+
+### Status: M1-M4 done (M1-M3 inherited from a parallel session on the same
+branch, verified and one real bug fixed; M4 implemented this session)
+
+### M1-M3: inherited, independently verified before building on top
+Found real, substantial work already pushed to `origin/feature/cmc-api`
+(M1 contract, M2 persistence, M3 debt ledger) when this session first
+tried to push its own M1 draft -- did not overwrite it. Checked it out,
+ran the full gate suite from scratch rather than trusting its own
+"zero drift" commit-message claims:
+```
+uv run ruff check .        -> All checks passed!
+uv run mypy --strict .     -> Success: no issues found in 106 source files
+uv run pytest --cov -q     -> 216 passed, 1 failed (before fix)
+uv run python scripts/contract_diff.py -> No contract drift.
+```
+The one real failure: `test_audit_log_records_scan_creation` (Phase 3,
+predates v1.0) asserted exactly 1 audit row per scan creation; M2's
+coverage persistence now legitimately writes a second row
+(`action=coverage.record`) every time, since persisting a coverage
+certificate is itself an auditable action. Fixed the assertion to match
+the real, correct new behavior (2 rows, in order) rather than weakening
+it. Re-ran: 217/217 passed. Also rebased the whole branch onto
+`chore/repo-hygiene`'s actual merge commit (`3b9ecad`) -- the branch had
+silently forked from a pre-hygiene `main` despite the mandate's own
+"rebase on main first" prerequisite; clean rebase, no conflicts, gates
+re-verified green after (218/218, the +1 being M4's own new test).
+
+### M4: coverage in drift and trend
+Found two real gaps while implementing: `ScanSnapshot.coverageRatio`/
+`residueMass` existed in the Python model and DB schema (M1/M2) but were
+never populated by `create_snapshot()`, and were never declared in
+`contracts/openapi.yaml` at all (a real blind spot in
+`scripts/contract_diff.py`, which only flags contract fields missing
+from the app, never the reverse -- noted, not fixed, out of this track's
+`contracts/openapi.yaml`-only ownership of that boundary).
+`DriftSummary.coverageDelta`/`residueMassDelta` were declared in the
+contract but never computed.
+
+Wired all of it: `create_snapshot()` now looks up the scan's
+already-persisted `CoverageCertificate` and carries it onto the
+snapshot; `db.snapshot_to_record()`/`record_to_snapshot()` pass the
+fields through; `calculate_drift()` computes the deltas from the two
+snapshots being compared. Added the missing `ScanSnapshot` properties to
+`contracts/openapi.yaml`.
+
+Also found and fixed a real, currently-dormant bug while wiring this:
+`save_coverage()` persisted a certificate keyed by `cert.scanId` (a
+caller-supplied field) instead of its own explicit `scan_id` parameter --
+harmless today only because nothing in `engine/` yet populates
+`ScanResult.coverage_certificate`, so the fallback path always
+self-consistently set `cert.scanId == scan_id`. Surfaced immediately by
+M4's own test (a manually-constructed certificate for the "before" and
+"after" snapshots): `get_coverage_certificate(scan_id)` returned `None`
+for a real scan whose cert had been silently saved under a different
+key. Fixed by forcing `cert.scanId = scan_id` inside `save_coverage()`
+itself.
+
+New test, real HTTP endpoint, not just the store function:
+`test_drift_reports_falling_coverage_when_unexplained_crypto_appears`
+(`tests/test_targets_scheduler.py`) -- two snapshots with real, different
+coverage certificates (1.0 -> 0.758 coverage, 0.0 -> 24.2 residue mass)
+produce a drift response whose `summary.coverageDelta` is negative and
+`residueMassDelta` is positive, proving the exit criteria: coverage
+falls even with **zero new Findings**, because unexplained residue is
+the real signal, not just finding count.
+
+### Real request/response evidence (2026-09-21, live server, port 8020)
+```
+$ curl -sS http://127.0.0.1:8020/api/v1/scans/scan_stub_001/coverage
+{"scanId":"scan_stub_001","artifactCount":482,"totalMass":100.0,
+ "attributedMass":100.0,"excludedMass":0.0,"residueMass":0.0,
+ "coverageRatio":1.0,"residueClusterCount":0,
+ "computedAt":"2026-09-21T01:35:45.761267Z"}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/residue
+[]
+
+$ curl -sS http://127.0.0.1:8020/api/v1/criticality
+[]
+
+$ curl -sS http://127.0.0.1:8020/api/v1/cloud/keys
+{"keys":[],"roadmap":"[Roadmap] AWS KMS via LocalStack is actively
+ supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/estate/coverage
+{"overallCoverageRatio":1.0,"totalMass":0.0,"attributedMass":0.0,
+ "excludedMass":0.0,"residueMass":0.0,"totalClusters":0,"targets":[]}
+```
+All real responses from a real running server against a fresh SQLite
+file, not mocked. `cloud/keys` correctly returns an empty set with the
+roadmap note visible (LocalStack not running in this quick check) rather
+than erroring -- M6 will prove the reachable-and-returns-real-keys case
+separately.
+
+### Next
+M5 (business criticality PS gap), M6 (AWS KMS via LocalStack), M7
+(hardening/load/security). Continuing without a break per the mandate's
+own loop instruction.
+
 
