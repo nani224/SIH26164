@@ -110,7 +110,7 @@ Found and fixed real bugs that unit tests alone had not caught:
   150-usage target.
 - No custom `api`/`web` container image was built or vulnerability-scanned
   in this pass (sandbox-specific Docker build limitation, not a product
-  defect — see `docs/decisions/backend/021-g2-real-stack-verification.md`).
+  defect — see `docs/decisions/backend/022-real-stack-verification.md`).
 - 3 pre-existing Playwright tests assert on MSW-fixture-only literal
   strings and fail when run against the real backend instead of mocks —
   a test-authoring gap, not an application defect.

@@ -57,7 +57,7 @@ exact case, documented the exact one-time human action and the literal
 `uses:` snippet needed (copied verbatim from
 `.github/workflows/ecdat-scan-reusable.yml`'s own header comment, so the
 two can never drift) in
-`docs/decisions/backend/020-m8a-external-repo-proof-blocked.md`, and
+`docs/decisions/backend/021-external-repo-proof-blocked.md`, and
 marked it `[BLOCKED - needs human repo creation]` in `PLAN.md` rather than
 left vague or silently skipped.
 
@@ -140,7 +140,7 @@ instead of the constructor (inconsistent with, e.g., already-accepted
 `gorilla_securecookie.go`:148 labelling). Per "never tune on HOLD," did
 **not** edit the labels after seeing this to make the number look
 better -- documented the real cause and a forward-looking labelling
-convention instead. Full writeup: `docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md`.
+convention instead. Full writeup: `docs/decisions/backend/009-corpus-growth-and-aes-attribution.md`.
 
 Recall fell from 0.875 to 0.8214 -- purely because the corpus grew faster
 than detector coverage (all 28 previously-found usages are still found);
@@ -201,7 +201,7 @@ redundant standalone SHA-2 reference finding) -- fixed with
 `_is_hmac_new_hash_argument`, which recognizes and skips a bare
 reference specifically in the hash-constructor argument slot of
 `hmac.New(...)`. Full design in
-`docs/decisions/backend/018-go-bare-function-reference.md`.
+`docs/decisions/backend/008-go-bare-function-reference.md`.
 
 ```
 $ uv run python bench/real_world/evaluate.py
@@ -299,7 +299,7 @@ correct there too, not just on the demo PR's own branch.
 
 Full writeup, including the exact reasoning for why a same-repo demo
 replaced the originally-planned separate external repo, in
-`docs/decisions/backend/017-ci-cd-precision-gate-and-reusable-action.md`.
+`docs/decisions/backend/020-ci-cd-precision-gate.md`.
 
 Track CC v0.3 mandate (M0-M5) is now complete.
 
@@ -361,7 +361,7 @@ the user's identity -- a visible, hard-to-reverse action outside this
 session's current repo scope (`nani224/SIH26164` only). Flagged to the
 user rather than done unilaterally. Full design + exact remaining steps
 once authorized in
-`docs/decisions/backend/017-ci-cd-precision-gate-and-reusable-action.md`.
+`docs/decisions/backend/020-ci-cd-precision-gate.md`.
 Also unverified: the composite Action's cross-repo checkout step has
 only been YAML-syntax-validated, not run on GitHub's actual infrastructure.
 
@@ -388,7 +388,7 @@ against real `cryptography`-library class names (`"RSA"`, `"EllipticCurve"`,
 `"Ed25519"` substrings). No match -> no detection; never guesses. Full
 design + the two cases deliberately left unresolved (a project-specific
 type alias, and a call on a local variable rather than a parameter) in
-`docs/decisions/backend/016-python-key-method-type-annotation.md`.
+`docs/decisions/backend/007-python-key-method-type-annotation.md`.
 
 ```
 $ uv run python bench/real_world/evaluate.py
@@ -468,7 +468,7 @@ real call-sequence linkage (`EVP_CIPHER_fetch` -> `EVP_{Encrypt,Decrypt}Init{_ex
 call, not the algorithm-lookup call. Full design + a real line-attribution
 bug caught and fixed during implementation (Update-triggered detections
 were landing at the Init call's line, not the Update's) in
-`docs/decisions/backend/015-openssl-evp-cipher-context-linkage.md`.
+`docs/decisions/backend/006-openssl-evp-cipher-context-linkage.md`.
 
 Re-measured after the fix:
 
@@ -533,7 +533,7 @@ these, not `*_fetch` -- mbedTLS (`mbedtls_aes_setkey_enc/dec`,
 `mbedtls_ecdsa_genkey`, `mbedtls_gcm_setkey`), and wolfSSL
 (`wc_AesSetKey`, `wc_Des3_SetKey`, `wc_MakeRsaKey`, `wc_ecc_make_key`,
 `wc_{Sha256,Sha,Md5}Hash`, `wc_HmacSetKey`). See
-`docs/decisions/backend/014-c-cpp-detection-engine.md` for the exact
+`docs/decisions/backend/005-c-cpp-detection-engine.md` for the exact
 mapping and two things caught during development, not after:
 
 1. wolfSSL's `wc_AesSetKey`/`wc_ecc_make_key` pass key size in **bytes**,
@@ -599,7 +599,7 @@ pinnable via `uv add` before writing any code). Covers JCA/JCE `Cipher`
 (transformation-string parsing: algo/mode/padding), `KeyPairGenerator`/
 `KeyGenerator` (linked to a later `.initialize()`/`.init()` call on the
 same variable for key size/curve -- real intra-method dataflow, see
-`docs/decisions/backend/013-java-detection-engine.md` for the exact
+`docs/decisions/backend/004-java-detection-engine.md` for the exact
 mechanism and its documented limitation), `MessageDigest`, `Signature`
 (`"SHA256withRSA"` parsing), `KeyAgreement`, `Mac` (`"HmacSHA256"`
 parsing), `SSLContext`, `KeyStore`, `SecretKeySpec`, plus direct
@@ -808,7 +808,7 @@ Real defects found and fixed:
   `kind=FindingKind.KEY`, which no real detector ever emits (only
   `api/stub_data.py`'s example data uses it). Retargeted to
   `function=KEYGEN` + a Shor-broken family (the real, reachable signal) --
-  see `docs/decisions/backend/012-private-key-floor-reachability.md`. New
+  see `docs/decisions/backend/011-private-key-floor-reachability.md`. New
   end-to-end test `test_real_rsa_keygen_scan_triggers_private_key_floor`
   proves it now fires from an actual `POST /scans` + real detector run,
   not a hand-built `Detection`.
@@ -870,7 +870,7 @@ Completed enterprise security hardening, tamper-evident audit logging, and autom
 - Air-gap validation tool (`scripts/verify_airgap.py`, `tests/test_airgap.py`):
   - Static AST inspection verifying zero banned network, telemetry, or external AI/LLM modules in runtime code.
   - Verifies explicit version constraints on all runtime and development dependencies in `pyproject.toml`.
-- ADR 010 documented in `docs/decisions/backend/010-phase10-security-hardening.md`.
+- ADR 016 documented in `docs/decisions/backend/016-security-hardening.md`.
 - Gates: `ruff`, `mypy --strict`, `pytest` (112 passed), `contract_diff.py`, and `verify_airgap.py` all clean.
 
 ## 2026-09-18 — Phase 9: CycloneDX 1.6 CBOM Export & Multi-Page Executive PDF Report
@@ -884,7 +884,7 @@ Implemented complete exports and executive reporting suite:
   - Page 1: Executive Scorecard with large Mosca score, risk band badges, breakdown metric cards, and threat context.
   - Page 2: Detailed Mosca risk factor formulation and top vulnerable findings table.
   - Page 3: NIST FIPS 203/204/205 PQC migration roadmap and cryptographic air-gap integrity stamp.
-- ADR 009 documented in `docs/decisions/backend/009-phase9-reports-and-cbom.md`.
+- ADR 019 documented in `docs/decisions/backend/019-reports-and-cbom.md`.
 - Gates: `ruff`, `mypy --strict`, `pytest` (105 passed), and `contract_diff.py` all clean.
 
 ## 2026-09-18 — Phase 8: PQC Catalog & Algorithm Agility Metrics
@@ -898,7 +898,7 @@ Implemented authoritative NIST FIPS 203/204/205 PQC catalog and deterministic ag
 - Upgraded `engine/recommend.py` to route to standardized PQC algorithms based on cryptographic function and security level (e.g. RSA >= 3072 upgrading to ML-KEM-1024; RSA/ECDSA signers to ML-DSA-65/87).
 - Deterministic agility cost delta calculation (`compute_cost_delta`) evaluating key size ratios, wire overhead, and CPU delta to return `RiskCost` (`low`, `medium`, `high`).
 - Dynamic catalog generation from `NIST_PQC_CATALOG` serving `GET /api/v1/catalog/pqc`.
-- ADR 008 documented in `docs/decisions/backend/008-phase8-pqc-catalog.md`.
+- ADR 018 documented in `docs/decisions/backend/018-pqc-catalog.md`.
 - Gates: `ruff`, `mypy --strict`, `pytest` (100 passed), and `contract_diff.py` all clean.
 
 ## 2026-09-18 — Phase 7: Engine Expansion & Multi-Language Detection
@@ -908,7 +908,7 @@ Expanded the AST engine with multi-language detection and real-world attribute a
 - Added Python bare attribute reference detection in `engine/source_python.py` (`engine/queries/python_crypto.scm`), allowing detection of `hashlib.X` arguments passed into functions or constructors without calling.
 - Integrated multi-language file routing in `engine/scanner.py` supporting both `.py` and `.go`.
 - Added `bench/real_world/samples/go_crypto_sample.go` and verified precision 1.000, recall 1.000, F1 1.000 in `bench/real_world/evaluate.py`.
-- ADR 007 documented in `docs/decisions/backend/007-phase7-multi-language-detection.md`.
+- ADR 003 documented in `docs/decisions/backend/003-multi-language-detection-go.md`.
 - Gates: `ruff`, `mypy --strict`, `pytest` (95 passed), and `contract_diff.py` all clean.
 
 ## 2026-09-18 — Phase 6: Sandboxed Streaming Ingest (`POST /scans/upload`)
@@ -921,7 +921,7 @@ Implemented streaming multipart upload archive ingestion with full hostile trave
   - Symlink escape prevention inspecting link targets to disallow escapes or system directory references.
   - Decompression bomb quotas enforcing 5GB uncompressed size limit and 50,000 maximum file count.
 - Route integration in `api/routes/scans.py` extracting into ephemeral sandbox directories, running AST detection, and attaching computed `bundleHash`.
-- ADR 006 documented in `docs/decisions/backend/006-phase6-sandboxed-ingest.md`.
+- ADR 015 documented in `docs/decisions/backend/015-sandboxed-ingest.md`.
 - Gates: `ruff`, `mypy --strict`, `pytest` (90 passed), and `contract_diff.py` all clean.
 
 ## 2026-09-18 — Phase 5: Rescore Performance Budget (<200ms SLA for 10,000 findings)
@@ -931,7 +931,7 @@ Implemented in-database bulk vectorized Common Table Expression (CTE) UPDATE + R
 - Mathematical invariant pruning: classically broken algorithms ($U=1.0$ unconditionally) are excluded from the CTE calculation, cutting write locks and execution overhead while ensuring mathematical invariance.
 - Direct JSON tuple serialization (~25ms vs ~85ms standard dumps), returning pre-encoded bytes directly to Starlette `Response`.
 - Performance test gate in `tests/test_rescore_perf.py` asserts < 200ms round-trip latency on 10,000 seeded findings (measured: 105–135ms).
-- ADR 005 documented in `docs/decisions/backend/005-phase5-rescore-performance.md`.
+- ADR 014 documented in `docs/decisions/backend/014-rescore-performance.md`.
 - Gates: `ruff`, `mypy --strict`, `pytest` (79 passed), and `contract_diff.py` all clean.
 
 ## 2026-09-18 — Loop B1 starter step: real, unseen, hand-labelled Python code
@@ -1121,7 +1121,7 @@ process, restarted it, re-fetched the scan — it was still there. This
 caught a real bug: SQLite silently strips `tzinfo` from stored
 `datetime`s, so `startedAt`/`finishedAt` lost their `Z` suffix after a
 restart. Fixed in `api/db._as_utc()` (reattaches UTC on read) with a
-regression test. See `docs/decisions/backend/004-phase2-persistence.md`
+regression test. See `docs/decisions/backend/012-persistence-sqlmodel.md`
 for the write-up — this is exactly the kind of bug an in-memory-only test
 suite doesn't catch, which is why the manual restart check was worth doing.
 
@@ -1184,7 +1184,7 @@ Built a real Python detection engine per `PLAN.md`'s Phase 1 scope:
 hmac.new incl. underlying-hash resolution, RSA/EC keygen via
 `cryptography`, weak/symmetric cipher construction), `engine/families.py`
 + `engine/factors.py` (new V/F/E/K/X/Y/Z derivation feeding the Phase 0
-formula — see ADR 002), `engine/recommend.py` (family -> PQC
+formula — see ADR 010), `engine/recommend.py` (family -> PQC
 recommendation). Added a `bench/` harness (`evaluate.py` + `truth.json` +
 `fixtures/`) that produces the repo's first **real measured** number.
 
@@ -1584,7 +1584,7 @@ container registry, and host-installed SoftHSM2 (2 keys) all brought up
 and health-confirmed. Sandbox-specific workarounds (image re-tagging via
 `mirror.gcr.io`, host-generated TLS cert to avoid the sandbox's
 container-CA-trust gap) documented in
-`docs/decisions/backend/021-g2-real-stack-verification.md` -- not baked
+`docs/decisions/backend/022-real-stack-verification.md` -- not baked
 into `docker-compose.yml`/`Dockerfile`, which stay correct for a normal
 deployment host.
 
@@ -1656,7 +1656,7 @@ documented:
   `cryptography<47`, and `46.0.7` is already the newest release
   satisfying that bound, with every fix landing at `>=47` -- documented
   as an accepted, upstream-blocked exception with an exposure assessment
-  in `docs/decisions/backend/022-cryptography-cve-blocked-by-sslyze.md`.
+  in `docs/decisions/backend/017-cryptography-cve-exception.md`.
   `trivy image` on the demo's third-party base images: `nginx:alpine`
   clean, `registry:2` 27 HIGH/CRITICAL (upstream's Go binary, not an
   ECDAT-built artifact). Rate-limiter bypass env flags
@@ -1671,7 +1671,7 @@ walkthrough) and `CHANGELOG.md` (v0.3.0, grouped by track). `Makefile`'s
 `make demo` rewired to actually bring up the real Docker stack per G2's
 own exit criteria (previously only seeded a local SQLite file despite
 `docker-compose.yml` already having the services); old behavior preserved
-as `make demo-seed`. `docs/decisions/backend/021-g2-real-stack-verification.md`
+as `make demo-seed`. `docs/decisions/backend/022-real-stack-verification.md`
 written for real (docker-compose.yml already referenced this exact
 filename in a comment; the file had never actually been created).
 
@@ -1689,13 +1689,13 @@ pnpm test:e2e (MSW off, real backend)  -> 29/33 passed (4 explained, see README)
 ```
 
 ### What remains (honest, not silently dropped)
-- External-repo CI proof still blocked on a one-time human action (ADR 020).
+- External-repo CI proof still blocked on a one-time human action (ADR 021).
 - Real-world HOLD corpus (56 usages) short of the brief's 150-usage target.
 - No custom `api`/`web` container image built or vulnerability-scanned in
-  this sandbox (documented Docker build limitation, ADR 021).
+  this sandbox (documented Docker build limitation, ADR 022).
 - 3 pre-existing Playwright tests coupled to MSW-fixture-only literal
   strings fail against the real backend -- a test-authoring gap.
 - `cryptography` HIGH CVEs unfixable today without an unverified `sslyze`
-  compatibility gamble (ADR 022).
+  compatibility gamble (ADR 017).
 
 

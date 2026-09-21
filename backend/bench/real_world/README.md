@@ -66,7 +66,7 @@ truth=56 detected=48 tp=46
 the corpus from 32 to 56 usages this pass found two Go capability gaps
 (closed before running the detector on the motivating files, per the
 "extend for a real newly-found pattern before you label it" rule -- see
-`docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md`) and
+`docs/decisions/backend/009-corpus-growth-and-aes-attribution.md`) and
 three genuinely new false-negative gaps (below), plus more instances of
 one already-known gap category. Precision dropped from 1.0 to 0.9583 --
 **still above the 0.95 floor** (confirmed via
@@ -91,7 +91,7 @@ the gaps below for real is what would honestly move it.
    `gorilla_securecookie.go` (139, 148) pass a function *value* without
    calling it; Go's query previously only matched direct call nodes, so
    this registry-style pattern was a false negative there. Fixed in M6
-   (ADR 018) by porting the same `attr.node`-style capture Python
+   (ADR 008) by porting the same `attr.node`-style capture Python
    already had (`source_python.py`, landed in an earlier session for
    `pyjwt_algorithms.py`'s `SHA256: ClassVar[HashlibHash] = hashlib.sha256`,
    lines 320-322 -- this file previously, incorrectly, claimed that
@@ -99,7 +99,7 @@ the gaps below for real is what would honestly move it.
    project's "re-derive, don't quote" bookkeeping rule when this gap was
    revisited). Both languages now share the same mechanism.
 2. **Intra-file type inference for `key.sign(...)`/`key.verify(...)`
-   in `pyjwt_algorithms.py` is now mostly resolved** (M4, ADR 016): 6 of
+   in `pyjwt_algorithms.py` is now mostly resolved** (M4, ADR 007): 6 of
    8 occurrences (RSA/ECDSA/Ed25519 sign, RSA verify x2) are detected by
    reading `key`'s type straight off the enclosing function's own
    parameter annotation (a real static fact, not inference in the
@@ -149,7 +149,7 @@ the gaps below for real is what would honestly move it.
    `jcaName` **variable**, supplied by a caller in a *different* file
    (e.g. `Jwts.SIG.HS256`-style algorithm constants live elsewhere in
    jjwt), never a literal algorithm string. Our Java detector only parses
-   literal transformation strings (ADR 013) -- by design, since guessing
+   literal transformation strings (ADR 004) -- by design, since guessing
    a family from a variable name would be exactly the kind of unfounded
    inference the precision floor exists to prevent. This file
    legitimately labels to **zero** usages (confirmed by the blind
@@ -191,13 +191,13 @@ the gaps below for real is what would honestly move it.
    **the convention for future files should state explicitly that
    `aes.NewCipher`/equivalent constructor calls are the canonical
    attribution point**, and label accordingly *before* running the
-   detector, so this doesn't recur. See ADR 019.
+   detector, so this doesn't recur. See ADR 009.
 9. **Python has no PBKDF2 API surface coverage at all.** `django_crypto.py`:93
    (`hashlib.pbkdf2_hmac(...)`) and `django_hashers.py`:333 (Django's own
    `pbkdf2()` wrapper, which itself calls `hashlib.pbkdf2_hmac`) are both
    real HMAC-based key-derivation calls with no detection rule at all --
    unlike Java, which gained `SecretKeyFactory`/PBKDF2 coverage this same
-   session (see ADR 019). Found by reading source during this session's
+   session (see ADR 009). Found by reading source during this session's
    candidate-sourcing phase, *before* these two files were labelled or
    scored, so extending the Python detector for it now would have been
    legitimate "extend before you label" -- not done this pass because it
@@ -210,7 +210,7 @@ the gaps below for real is what would honestly move it.
     class-attribute reference elsewhere in the same class, e.g. line 498)
     -- resolving it needs attribute-to-class-body dataflow, a different
     (and more general) mechanism than the existing parameter-type-
-    annotation resolution used for `key.sign()`/`key.verify()` (ADR 016).
+    annotation resolution used for `key.sign()`/`key.verify()` (ADR 007).
     Not attempted; the class-attribute *declaration* itself (line 498)
     is separately detected as a bare reference, so this is specifically
     about the later *call site* that reads it back through `self`.

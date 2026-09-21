@@ -87,7 +87,7 @@ Brings up the whole real stack from a clean state: `api` (FastAPI), `web` (Next.
 make demo-down   # stop the stack
 ```
 
-> **Sandbox note**: building `api`/`web` needs ordinary internet access for `docker build`. Inside a TLS-intercepting sandbox without container-level CA trust — the environment this v0.3 pass itself ran in — the build step fails specifically for that reason (not a defect in `docker-compose.yml`/`Dockerfile`); see [`docs/decisions/backend/021-g2-real-stack-verification.md`](docs/decisions/backend/021-g2-real-stack-verification.md) for the exact workaround and why it isn't baked into the committed files. This pass's own G2–G4 verification instead ran `api`/`web` natively (Option 2 below) against real SoftHSM2, a host-launched weak-TLS container, and a local registry container — every number in this README came from that real, non-mocked stack.
+> **Sandbox note**: building `api`/`web` needs ordinary internet access for `docker build`. Inside a TLS-intercepting sandbox without container-level CA trust — the environment this v0.3 pass itself ran in — the build step fails specifically for that reason (not a defect in `docker-compose.yml`/`Dockerfile`); see [`docs/decisions/backend/022-real-stack-verification.md`](docs/decisions/backend/022-real-stack-verification.md) for the exact workaround and why it isn't baked into the committed files. This pass's own G2–G4 verification instead ran `api`/`web` natively (Option 2 below) against real SoftHSM2, a host-launched weak-TLS container, and a local registry container — every number in this README came from that real, non-mocked stack.
 
 ### Option 2 — Native (no Docker)
 
@@ -175,7 +175,7 @@ This is **not** the brief's full 150-usage Loop B1 DEV/HOLD split — it's a rea
 | Scanner | Scope | Result |
 | :--- | :--- | :--- |
 | `gitleaks` (`--log-opts="--all"`, full history, 75 commits) | Whole repo | 8 hits, **all verified false positives** on manual review (type annotations, an algorithm constant, and fabricated test/mock key material with literal `"..."`/`"SECRET"` placeholders) — no real secret ever committed |
-| `trivy fs --scanners vuln,secret` | `backend/uv.lock`, `frontend/pnpm-lock.yaml` | 5 real HIGH CVEs found. `postcss` (2 CVEs, Next.js's own internal pin) **fixed** via a `pnpm.overrides`. `cryptography` (3 CVEs) **not fixable today** — transitively pinned below the fix by `sslyze`'s own `<47` constraint; documented as an accepted, upstream-blocked exception with an exposure assessment in `docs/decisions/backend/022-cryptography-cve-blocked-by-sslyze.md` |
+| `trivy fs --scanners vuln,secret` | `backend/uv.lock`, `frontend/pnpm-lock.yaml` | 5 real HIGH CVEs found. `postcss` (2 CVEs, Next.js's own internal pin) **fixed** via a `pnpm.overrides`. `cryptography` (3 CVEs) **not fixable today** — transitively pinned below the fix by `sslyze`'s own `<47` constraint; documented as an accepted, upstream-blocked exception with an exposure assessment in `docs/decisions/backend/017-cryptography-cve-exception.md` |
 | `trivy image` | `nginx:alpine` (demo weak-TLS target) | 0 findings |
 | `trivy image` | `registry:2` (demo local registry, third-party base image) | 27 HIGH/CRITICAL findings baked into the upstream Go binary — **upstream's issue**, not an ECDAT-built artifact; this image exists only as demo scaffolding for the local-registry probe scenario |
 | `bandit` | `backend/` | All findings reviewed; genuine false positives annotated with `# nosec` + justification (parameterized SQL, pre-validated zip extraction); one multi-line CTE finding left unsuppressed due to a bandit tooling limitation, documented via a comment block |
@@ -194,7 +194,7 @@ Proven end to end against a real running stack (real scheduler, real drift, real
 
 Honestly listed, not silently dropped:
 
-- **External-repo CI proof**: the reusable GitHub Action workflow has only been proven calling itself *within* this repo, not from a genuinely external consuming repository — blocked on a one-time human action (creating that external repo), documented in `docs/decisions/backend/020-m8a-external-repo-proof-blocked.md`.
+- **External-repo CI proof**: the reusable GitHub Action workflow has only been proven calling itself *within* this repo, not from a genuinely external consuming repository — blocked on a one-time human action (creating that external repo), documented in `docs/decisions/backend/021-external-repo-proof-blocked.md`.
 - **Loop B1 DEV/HOLD corpus**: the real-world benchmark (56 usages, 4 languages) is real and honestly measured, but far short of the brief's 150+-usage, 3-unseen-project target.
 - **`cryptography` HIGH CVEs**: 3 CVEs unfixable today without an unverified `sslyze` compatibility gamble — see the security table above.
 - **Custom container image scanning**: `api`/`web` images were never built in this sandbox (documented CA-trust limitation), so they were never vulnerability-scanned either — only the demo's third-party base images were.

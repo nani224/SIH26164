@@ -51,7 +51,7 @@ services:
   # your environment blocks that container's own outbound `apk add openssl`
   # (e.g. a TLS-intercepting egress proxy the container doesn't trust), mount
   # a pre-generated cert/key pair at the same paths instead -- see
-  # docs/decisions/backend/021-g2-real-stack-verification.md for the exact
+  # docs/decisions/backend/022-real-stack-verification.md for the exact
   # host-generated-cert workaround this was verified against.
   demo-weak-tls:
     image: nginx:alpine
@@ -103,7 +103,7 @@ services:
   # persistent volume at /var/lib/softhsm/tokens; for local/CI runs, install
   # softhsm2 on the host and run `api` outside docker instead -- both are
   # real, supported paths, not a gap papered over. Documented, not yet
-  # wired into the `api` image build (see ADR 021).
+  # wired into the `api` image build (see ADR 022).
 
 volumes:
   ecdat-data:

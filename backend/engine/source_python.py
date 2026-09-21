@@ -3,7 +3,7 @@
 Deterministic AST pattern matching (no ML) over a fixed set of high-value
 patterns: hashlib digests, hmac.new, cryptography-lib RSA/EC keygen, and
 symmetric cipher construction. See engine/queries/python_crypto.scm for the
-structural query and docs/decisions/backend/002-phase1-risk-factors.md for
+structural query and docs/decisions/backend/010-risk-factor-derivation.md for
 the family/vulnerability mapping applied downstream.
 
 Known limitation (Phase 1 scope): only single-level `module.attr(...)`

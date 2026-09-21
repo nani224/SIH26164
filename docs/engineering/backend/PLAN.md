@@ -15,12 +15,12 @@
       symmetric ciphers (`engine/source_python.py`,
       `engine/queries/python_crypto.scm`)
 - [x] `engine/factors.py` + `engine/families.py`: real V/F/E/K/X/Y/Z
-      derivation feeding the Phase 0 risk formula (see ADR 002)
+      derivation feeding the Phase 0 risk formula (see ADR 010)
 - [x] `engine/recommend.py`: family -> PQC recommendation + cost deltas
 - [x] `bench/` harness: `evaluate.py`, `truth.json`, `fixtures/` (starter
       set only — see `bench/README.md`); real measured precision/recall
       for the first time (1.000/1.000 on 15 usages)
-- [x] tree-sitter grammar vendoring approach decided + documented (ADR 003:
+- [x] tree-sitter grammar vendoring approach decided + documented (ADR 002:
       official per-language PyPI packages, not `tree-sitter-language-pack`)
 - [ ] First DEV/HOLD split (Loop B1) — **still not done at real scale**.
       A small first step landed later (2026-09-18, `bench/real_world/`):
@@ -37,7 +37,7 @@
 
 ## Phase 2 — Persistence (done, this session)
 - [x] SQLModel models: scans, findings (all raw risk factors stored),
-      policies, audit_log (`api/db_models.py`) — see ADR 004
+      policies, audit_log (`api/db_models.py`) — see ADR 012
 - [x] `api/store.py` rewired to SQLite via `api/db.py`; same public
       function signatures, zero contract drift
 - [x] Every mutating store call writes an `AuditLogRecord`
@@ -105,7 +105,7 @@ job. What's real:
       directly to FastAPI `Response`, bypassing Starlette Pydantic serialization
 - [x] Automated performance & invariant gate in `tests/test_rescore_perf.py` seeding 10,000 findings
       (4,000 classically broken, 6,000 quantum-sensitive); measured round-trip: **105–135ms** (well under 200ms SLA)
-- [x] ADR 005 documented in `docs/decisions/backend/005-phase5-rescore-performance.md`
+- [x] ADR 014 documented in `docs/decisions/backend/014-rescore-performance.md`
 
 ## Phase 6 — Sandboxed Ingest (done, this session)
 - [x] OpenAPI 3.1 contract: `POST /api/v1/scans/upload` multipart/form-data schema with `bundleHash` on `Scan`
@@ -114,7 +114,7 @@ job. What's real:
 - [x] Symlink escape defense: target link verification rejecting external/system symlink targets
 - [x] Decompression bomb protection: 5GB uncompressed ceiling and 50,000 file count limit
 - [x] Ephemeral isolated extraction sandbox and end-to-end AST scan integration
-- [x] ADR 006 documented in `docs/decisions/backend/006-phase6-sandboxed-ingest.md`
+- [x] ADR 015 documented in `docs/decisions/backend/015-sandboxed-ingest.md`
 - [x] Full test suite in `tests/test_ingest_sandbox.py` and `tests/test_scans_upload.py`
 
 ## Phase 7 — Engine Expansion & Multi-Language Detection (done, this session)
@@ -128,14 +128,14 @@ job. What's real:
       sample was too thin to catch. See `PROGRESS.md`'s 2026-09-19 entry and
       `bench/real_world/README.md` for the current number -- don't quote this
       line as current.)
-- [x] ADR 007 documented in `docs/decisions/backend/007-phase7-multi-language-detection.md`
+- [x] ADR 003 documented in `docs/decisions/backend/003-multi-language-detection-go.md`
 
 ## Phase 8 — PQC Catalog & Algorithm Agility Metrics (done, this session)
 - [x] Standardized NIST PQC specifications (`engine/pqc.py`): FIPS 203 ML-KEM, FIPS 204 ML-DSA, FIPS 205 SLH-DSA
 - [x] Context-sensitive agility cost calculations matching wire, key size, and op performance deltas
 - [x] Standard-aligned recommendation generator in `engine/recommend.py`
 - [x] Integration with `GET /api/v1/catalog/pqc` endpoint
-- [x] ADR 008 documented in `docs/decisions/backend/008-phase8-pqc-catalog.md`
+- [x] ADR 018 documented in `docs/decisions/backend/018-pqc-catalog.md`
 - [x] Full test suite in `tests/test_pqc_catalog.py` (4/4 passed, 100 backend tests total)
 
 ## Phase 9 — Exports & Reports (done, this session)
@@ -145,7 +145,7 @@ job. What's real:
 - [x] Pure-Python zero-dependency multi-page Executive PDF generator (`api/pdf_report.py`, `GET /api/v1/scans/{id}/report.pdf`)
 - [x] 3-page executive layout: Executive Scorecard, Detailed Mosca Factors & Top Vulnerabilities Table, and PQC Remediation Plan
 - [x] Cryptographic air-gap SHA-256 attestation stamp on report
-- [x] ADR 009 documented in `docs/decisions/backend/009-phase9-reports-and-cbom.md`
+- [x] ADR 019 documented in `docs/decisions/backend/019-reports-and-cbom.md`
 - [x] Full test suite in `tests/test_report_pdf.py` (5/5 passed, 105 backend tests total)
 
 ## Phase 10 — Security Hardening & Production Polish (done, this session)
@@ -154,7 +154,7 @@ job. What's real:
 - [x] Sliding-window rate limiting middleware (`api/rate_limiter.py`): in-memory sliding window for mutating API endpoints
 - [x] Air-gap verification script (`scripts/verify_airgap.py`): AST validation of zero banned network/telemetry/LLM packages and pinned dependencies
 - [x] Automated test suites in `tests/test_audit_chain.py`, `tests/test_rate_limiter.py`, and `tests/test_airgap.py` (7/7 passed, 112 backend tests total)
-- [x] ADR 010 documented in `docs/decisions/backend/010-phase10-security-hardening.md`
+- [x] ADR 016 documented in `docs/decisions/backend/016-security-hardening.md`
 
 ## Status: All Phases 0-10 Complete!
 
@@ -175,7 +175,7 @@ dependency-ordered milestones:
       `MessageDigest`, `Signature`, `KeyAgreement`, `Mac`, `SSLContext`,
       `KeyStore`, `SecretKeySpec`) + direct BouncyCastle class usage. 9
       fixture files, 25 new truth entries (Layer A: 15 -> 40 usages,
-      still 1.0/1.0). See ADR 013 and 2026-09-19 PROGRESS.md entry for
+      still 1.0/1.0). See ADR 004 and 2026-09-19 PROGRESS.md entry for
       full command output.
 - [x] **M2** — C/C++ detection: `engine/source_c.py` +
       `engine/queries/c_crypto.scm`. OpenSSL 3.x `EVP_CIPHER_fetch`/
@@ -187,7 +187,7 @@ dependency-ordered milestones:
       `wc_HmacSetKey`). Confirmed existing binary AES S-box detection
       still works (and added its first-ever regression test — it had
       none). 8 fixture files (16 usages, incl. one `.cpp`), Layer A:
-      40 -> 56 usages, still 1.0/1.0. See ADR 014 and 2026-09-19
+      40 -> 56 usages, still 1.0/1.0. See ADR 005 and 2026-09-19
       PROGRESS.md entry for full command output.
 - [x] **M3** (partial, honestly not at target) — Grew HOLD corpus
       (`bench/real_world/`) from 5 files/25 usages/2 languages to 9
@@ -196,7 +196,7 @@ dependency-ordered milestones:
       committed alone before the detector ever ran against them. The
       resulting real run caught a genuine precision-floor violation
       (0.8889 < 0.95, OpenSSL `EVP_CIPHER_fetch` heuristic) -- fixed
-      same-session (ADR 015), re-measured: precision 1.0, recall 0.625
+      same-session (ADR 006), re-measured: precision 1.0, recall 0.625
       (up from 0.52). Still far short of the 150-usage target -- see
       2026-09-19 PROGRESS.md entry and `bench/real_world/README.md` for
       full numbers and remaining gaps.
@@ -208,7 +208,7 @@ dependency-ordered milestones:
       fact, not dataflow) -- 6/8 closed, 2 deliberately left unresolved
       (project-specific type alias; call on a local var, not a
       parameter). Recall 0.625 -> 0.8125, precision held at 1.0, Layer A
-      unaffected (56/56). See ADR 016 and 2026-09-19 PROGRESS.md entry.
+      unaffected (56/56). See ADR 007 and 2026-09-19 PROGRESS.md entry.
       Go's 4-FN cluster untouched -- next candidate, not attempted this
       pass.
 - [x] **M5** — `.ecdat-policy.yml` policy-as-code,
@@ -231,7 +231,7 @@ dependency-ordered milestones:
       redirected to this approach once informed. A real
       permission-propagation bug (`startup_failure`: nested job
       requesting `pull-requests: write` but only allowed `none`) was
-      caught and fixed by this exact demonstration -- see ADR 017 and
+      caught and fixed by this exact demonstration -- see ADR 020 and
       2026-09-20 PROGRESS.md entry for full detail.
 
 Track CC v0.3 mandate (M0-M5) complete.
@@ -249,7 +249,7 @@ established this session, flagged rather than silently substituted.
       false positive caught and fixed during implementation (HMAC hash-
       argument double-counting). Recall 0.8125 -> 0.875 (28/32), zero
       new false positives, Layer A unchanged (56/56), 170 tests green.
-      See ADR 018 and 2026-09-20 PROGRESS.md entry.
+      See ADR 008 and 2026-09-20 PROGRESS.md entry.
 - [x] **M7** — Grow HOLD corpus toward 150 usages: 32 -> 56 usages, 9 -> 14
       files (Python 5, Go 4, Java 3, C 2). 5 new real files sourced and
       blind-labelled (5 parallel corpus-labeler subagents), label-before-
@@ -261,10 +261,10 @@ established this session, flagged rather than silently substituted.
       all 28 previously-found usages still found). 2 "false positives"
       root-caused to a labelling-convention mismatch, not a code defect,
       and the labels were deliberately NOT edited after the run to fix
-      them (see ADR 019) -- numbers recorded exactly as measured. Still
+      them (see ADR 009) -- numbers recorded exactly as measured. Still
       well short of 150; a wolfSSL C candidate was searched for and not
       found, documented honestly rather than skipped silently. 176 tests
-      green. See ADR 019 and 2026-09-20 PROGRESS.md entry.
+      green. See ADR 009 and 2026-09-20 PROGRESS.md entry.
 - [x] **M8** —
       **M8b (done)**: proved the precision-floor gate fails red for real.
       On a throwaway branch (`track-cc-m8b-precision-gate-proof`, off
@@ -284,7 +284,7 @@ established this session, flagged rather than silently substituted.
       one empty repo -- this session's GitHub App access cannot create
       repositories via the API (confirmed architectural 403 earlier this
       engagement). Exact instruction + `uses:` snippet documented in
-      docs/decisions/backend/020-m8a-external-repo-proof-blocked.md
+      docs/decisions/backend/021-external-repo-proof-blocked.md
       rather than left vague.
 - [x] **M9** — Rewrote `backend/bench/README.md` into the full handoff
       doc: quick-start commands for all 3 scripts (`evaluate.py`,
@@ -366,7 +366,7 @@ G5 (release) all run for real against a live stack.
 - [x] G1: every backend/bench/frontend/contract gate re-run clean
 - [x] G2: real stack up (api, web MSW-off, weak-TLS container, local
       registry, host SoftHSM2); sandbox-specific workarounds documented
-      in ADR 021, not baked into committed files
+      in ADR 022, not baked into committed files
 - [x] G3: 14-step real continuous-operation scenario run in full depth
       once (1 real bug found+fixed: `/estate/trend` day-aggregation
       producing scores up to 400.0, fixed to 62.9) plus a lighter second
@@ -374,7 +374,7 @@ G5 (release) all run for real against a live stack.
 - [x] G4: cross-cutting pass, 3 more real bugs found and fixed
       (`/specimen` keyboard-a11y violation; `GET /findings` p50
       710ms->8.34ms; `postcss` HIGH CVEs), 1 real exception documented
-      (`cryptography` CVEs blocked by `sslyze`'s own version pin, ADR 022)
+      (`cryptography` CVEs blocked by `sslyze`'s own version pin, ADR 017)
 - [x] G5: README rewritten with only real dated numbers, DEMO_SCRIPT.md
       and CHANGELOG.md added, `make demo` wired to the real Docker stack
 

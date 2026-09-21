@@ -17,7 +17,7 @@ the Go/Python/Java detectors:
   `*_fetch` -- excluding them would badly hurt real-world recall for a
   detector whose whole point is finding real usages.
 
-  **Cipher-context linkage (M3 fix, see ADR 015)**: a fetched/gotten
+  **Cipher-context linkage (M3 fix, see ADR 006)**: a fetched/gotten
   cipher handle by itself is not an operation -- real-world HOLD testing
   against OpenSSL's own `demos/cipher/aesgcm.c` caught this as a real
   precision-floor violation (0.89 < 0.95): `EVP_CIPHER_fetch` was firing

@@ -25,7 +25,7 @@ Versions below are what `uv sync` resolved into `uv.lock` on 2026-09-17
 | jsonschema | 4.26.0 | pypi | MIT | Validate stub CBOM against vendored CycloneDX 1.6 schema |
 | openapi-spec-validator | 0.9.0 | pypi | Apache-2.0 | Validate contracts/openapi.yaml is real OpenAPI 3.1 |
 | tree-sitter | 0.26.0 | pypi | MIT | AST parsing core, per brief |
-| tree-sitter-python | 0.25.0 | pypi | MIT | Python grammar (compiled into wheel — see ADR 003, no separate vendoring needed) |
+| tree-sitter-python | 0.25.0 | pypi | MIT | Python grammar (compiled into wheel — see ADR 002, no separate vendoring needed) |
 | tree-sitter-go | 0.25.0 | pypi | MIT | Go grammar for Phase 7 multi-language AST detection |
 | sqlmodel | 0.0.42 | pypi | MIT | Persistence (scans/findings/policies/audit_log), per brief's stack |
 | python-multipart | 0.0.32 | pypi | Apache-2.0 | Streaming multipart upload support for Phase 6 |
@@ -48,7 +48,7 @@ never fetched at runtime, satisfying the air-gap rule.
 
 `tree-sitter-language-pack` — bundles many grammars but fetches them at
 runtime on first use, violating the air-gap rule. Use official
-per-language `tree-sitter-<lang>` PyPI packages instead (see ADR 003);
+per-language `tree-sitter-<lang>` PyPI packages instead (see ADR 002);
 each ships its grammar compiled into the wheel, pinned via `uv.lock`, no
 runtime fetch.
 

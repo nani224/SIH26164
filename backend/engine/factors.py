@@ -1,7 +1,7 @@
 """Derives a Risk (V/F/E/K/X/Y/Z + score/band) for a Detection under a Policy.
 
 New in Phase 1 -- Phase 0 only had the pure formula (engine/risk.py). See
-docs/decisions/backend/002-phase1-risk-factors.md for why each factor maps
+docs/decisions/backend/010-risk-factor-derivation.md for why each factor maps
 where it does.
 """
 
@@ -74,7 +74,7 @@ def derive_risk(detection: Detection, policy: Policy) -> Risk:
     # only ever seeded stub data, never produced by a real detector), so
     # the only real signal available today is a freshly generated private
     # key for a Shor-broken asymmetric family (function=KEYGEN, V=1.0) --
-    # see docs/decisions/backend/012-private-key-floor-reachability.md.
+    # see docs/decisions/backend/011-private-key-floor-reachability.md.
     forced_private_key = (
         detection.function == CryptoFunction.KEYGEN
         and v == 1.0
