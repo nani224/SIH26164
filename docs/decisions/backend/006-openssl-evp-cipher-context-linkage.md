@@ -1,4 +1,4 @@
-# 015 — OpenSSL EVP cipher-context linkage (M3 precision-floor fix)
+# 006 — OpenSSL EVP cipher-context linkage (M3 precision-floor fix)
 
 ## Status
 
@@ -66,7 +66,7 @@ call-sequence linkage matching OpenSSL's actual EVP API contract:
    retrieval) doesn't spuriously produce a tag/verify finding.
 4. **Never silently drop a real usage just because its consuming call
    isn't visible in this file/snippet** -- same principle as Java's
-   `KeyPairGenerator`/`initialize` linkage (ADR 013). A cipher-fetch
+   `KeyPairGenerator`/`initialize` linkage (ADR 004). A cipher-fetch
    variable never consumed by an Init call, or a ctx binding never
    consumed by an Update call, is still reported once at end-of-file (or
    when a new Init/fetch overwrites it while still unconsumed) as a
@@ -115,7 +115,7 @@ non-AEAD-mode-gets-no-tag-or-verify.
   paths, no shared ambiguity).
 - Known remaining simplification, not exercised by any current fixture or
   HOLD sample: `ctx`/cipher-handle tracking is per-variable-name within a
-  single file, not scope-aware (same limitation class as ADR 013's Java
+  single file, not scope-aware (same limitation class as ADR 004's Java
   `KeyPairGenerator` linkage) -- a variable name reused across two
   unrelated functions with different algorithms could have the second
   binding overwrite the first before its own consuming call is seen,

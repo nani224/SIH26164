@@ -4,7 +4,7 @@
 
 BLOCKED (Finale G5, 2026-09-20; updated same day after PR #16). Not
 something this session can resolve itself; documented here so a human
-can unblock it with one action, same pattern as ADR 020's
+can unblock it with one action, same pattern as ADR 021's
 external-repo-proof blocker.
 
 ## Context
@@ -64,7 +64,7 @@ actor -- including a GitHub App installation token, which this session's
 git credential is. This session has no visibility into the repo's actual
 tag-protection configuration (that's an org/repo admin setting, not
 something exposed via the GitHub App's own permission list the way
-ADR 020's repository-creation limitation was), so this is the most
+ADR 021's repository-creation limitation was), so this is the most
 likely explanation based on the symptom (blocks specifically on
 `refs/tags/*`, not `refs/heads/*`) rather than a confirmed root cause.
 

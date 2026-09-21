@@ -1,4 +1,4 @@
-# 018 — Go bare function-value references (M6)
+# 008 — Go bare function-value references (M6)
 
 ## Status
 

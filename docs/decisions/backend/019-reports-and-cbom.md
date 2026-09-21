@@ -1,4 +1,4 @@
-# ADR 009: Phase 9 CycloneDX 1.6 CBOM Export & Multi-Page Executive PDF Report
+# ADR 019: Phase 9 CycloneDX 1.6 CBOM Export & Multi-Page Executive PDF Report
 
 Status: accepted
 Date: 2026-09-18

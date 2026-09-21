@@ -1,4 +1,4 @@
-# ADR 003: tree-sitter grammar vendoring approach
+# ADR 002: tree-sitter grammar vendoring approach
 
 Status: accepted
 Date: 2026-09-17

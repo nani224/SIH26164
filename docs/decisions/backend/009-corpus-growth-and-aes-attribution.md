@@ -1,4 +1,4 @@
-# 019 — M7 real-world corpus growth: 2 capability extensions, 1 labelling-convention finding
+# 009 — M7 real-world corpus growth: 2 capability extensions, 1 labelling-convention finding
 
 ## Status
 

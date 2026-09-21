@@ -1,4 +1,4 @@
-# ADR 004: Phase 2 persistence design
+# ADR 012: Phase 2 persistence design
 
 Status: accepted
 Date: 2026-09-18

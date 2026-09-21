@@ -1,4 +1,4 @@
-# ADR 006: Phase 6 Sandboxed Streaming Ingest & Archive Traversal Protection
+# ADR 015: Phase 6 Sandboxed Streaming Ingest & Archive Traversal Protection
 
 Status: accepted
 Date: 2026-09-18

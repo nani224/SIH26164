@@ -1,4 +1,4 @@
-# ADR 002: Phase 1 risk factor derivation (V/F/E/K/X/Y/Z)
+# ADR 010: Phase 1 risk factor derivation (V/F/E/K/X/Y/Z)
 
 Status: accepted
 Date: 2026-09-17

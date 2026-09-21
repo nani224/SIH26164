@@ -1,4 +1,4 @@
-# ADR 010: Phase 10 Security Hardening, Audit Log Hash-Chaining & Air-Gap Verification
+# ADR 016: Phase 10 Security Hardening, Audit Log Hash-Chaining & Air-Gap Verification
 
 Status: accepted
 Date: 2026-09-18

@@ -1,4 +1,4 @@
-# ADR 005: Phase 5 rescore performance budget (< 200ms SLA for 10,000 findings)
+# ADR 014: Phase 5 rescore performance budget (< 200ms SLA for 10,000 findings)
 
 Status: accepted
 Date: 2026-09-18

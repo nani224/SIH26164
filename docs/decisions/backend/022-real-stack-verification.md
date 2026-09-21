@@ -1,4 +1,4 @@
-# 021 — G2 real-stack verification: sandbox-specific workarounds, not product changes
+# 022 — G2 real-stack verification: sandbox-specific workarounds, not product changes
 
 ## Status
 

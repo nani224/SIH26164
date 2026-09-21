@@ -1,4 +1,4 @@
-# ADR 008: Phase 8 Standardized NIST PQC Catalog and Agility Metrics
+# ADR 018: Phase 8 Standardized NIST PQC Catalog and Agility Metrics
 
 Status: accepted
 Date: 2026-09-18

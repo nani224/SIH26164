@@ -1,4 +1,4 @@
-# ADR 007: Phase 7 Multi-Language Engine Expansion & Attribute Reference Detection
+# ADR 003: Phase 7 Multi-Language Engine Expansion & Attribute Reference Detection
 
 Status: accepted
 Date: 2026-09-18

@@ -1,4 +1,4 @@
-# 016 — Python `key.sign()`/`key.verify()` via parameter type annotation (M4)
+# 007 — Python `key.sign()`/`key.verify()` via parameter type annotation (M4)
 
 ## Status
 
@@ -20,8 +20,8 @@ total misses), so it's the target for M4's "close the largest cluster."
 The obvious-looking fix -- track `key = rsa.generate_private_key(...)`
 style local assignments and propagate the family to later `.sign()`/
 `.verify()` calls on the same variable, mirroring the Java
-`KeyPairGenerator`/`initialize` linkage (ADR 013) and the OpenSSL EVP
-ctx linkage (ADR 015) -- doesn't apply here: `key` in every one of these
+`KeyPairGenerator`/`initialize` linkage (ADR 004) and the OpenSSL EVP
+ctx linkage (ADR 006) -- doesn't apply here: `key` in every one of these
 methods is a **function parameter**, not a locally-constructed variable.
 There is no constructor call to link back to within this file at all.
 
