@@ -65,6 +65,11 @@
     "@tailwindcss/oxide",
     "unrs-resolver"
   ],
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.18"
+    }
+  },
   "msw": {
     "workerDirectory": [
       "public"

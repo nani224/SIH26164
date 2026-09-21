@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,6 +33,7 @@ class Surface(StrEnum):
     CONFIG = "config"
     IMAGE = "image"
     MANIFEST = "manifest"
+    HARDWARE_HSM = "hardware-hsm"
 
 
 class Family(StrEnum):
@@ -194,6 +195,7 @@ class Finding(BaseModel):
     risk: Risk | None = None
     recommendation: Recommendation | None = None
     triage: Triage
+    negotiated: bool | None = None
 
 
 class ScanStats(BaseModel):
@@ -321,3 +323,280 @@ class HealthStatus(BaseModel):
 class ErrorDetail(BaseModel):
     error: str
     message: str
+
+
+class TargetKind(StrEnum):
+    REPO = "repo"
+    PATH = "path"
+    ENDPOINT = "endpoint"
+
+
+class Target(BaseModel):
+    id: str
+    name: str
+    kind: TargetKind
+    uri: str
+    policyId: str
+    schedule: str
+    enabled: bool = True
+    lastScanId: str | None = None
+    lastScanAt: datetime | None = None
+    createdAt: datetime
+
+
+class TargetCreate(BaseModel):
+    name: str
+    kind: TargetKind
+    uri: str
+    policyId: str
+    schedule: str
+    enabled: bool = True
+
+
+class TargetPatch(BaseModel):
+    name: str | None = None
+    policyId: str | None = None
+    schedule: str | None = None
+    enabled: bool | None = None
+
+
+class ScanSnapshot(BaseModel):
+    id: str
+    targetId: str
+    scanId: str
+    takenAt: datetime
+    bands: dict[str, int]
+    totalFindings: int
+    stats: ScanStats
+    coverageRatio: float | None = None
+    residueMass: float | None = None
+
+
+class DriftChangedItem(BaseModel):
+    finding: Finding
+    fromBand: RiskBand
+    toBand: RiskBand
+
+
+class DriftSummary(BaseModel):
+    addedCount: int
+    resolvedCount: int
+    changedCount: int
+    netRiskDelta: float
+    coverageDelta: float | None = None
+    residueMassDelta: float | None = None
+
+
+class Drift(BaseModel):
+    targetId: str
+    fromSnapshotId: str
+    toSnapshotId: str
+    added: list[Finding]
+    resolved: list[Finding]
+    changed: list[DriftChangedItem]
+    summary: DriftSummary
+
+
+class AlertType(StrEnum):
+    NEW_CRITICAL = "new-critical"
+    CERT_EXPIRING = "cert-expiring"
+    DRIFT = "drift"
+    PROBE_DOWNGRADE = "probe-downgrade"
+    RESIDUE_RISE = "residue-rise"
+
+
+class Alert(BaseModel):
+    id: str
+    type: AlertType
+    targetId: str
+    findingId: str | None = None
+    severity: RiskBand
+    message: str
+    createdAt: datetime
+    acknowledged: bool = False
+
+
+class ProbeProtocol(StrEnum):
+    TLS = "tls"
+    SSH = "ssh"
+
+
+class ProbeRequest(BaseModel):
+    targetId: str
+    host: str
+    port: int
+
+
+class ProbeResult(BaseModel):
+    id: str
+    targetId: str
+    host: str
+    port: int
+    protocol: ProbeProtocol
+    negotiated: dict[str, Any]
+    supported: list[Any]
+    probedAt: datetime
+
+
+class HsmKey(BaseModel):
+    type: str
+    size: int
+    label: str
+
+
+class HsmSlot(BaseModel):
+    slot: int
+    label: str
+    keys: list[HsmKey]
+
+
+class HsmInventory(BaseModel):
+    slots: list[HsmSlot]
+
+
+class EstateSummary(BaseModel):
+    totalTargets: int
+    totalScans: int
+    totalFindings: int
+    criticalFindings: int
+    pqcReadinessScore: float
+    activeAlerts: int
+    internalFacingAssets: int = 0
+    externalFacingAssets: int = 0
+
+
+class EstateTrendPoint(BaseModel):
+    date: str
+    avgRiskScore: float
+    criticalCount: int
+    totalFindings: int
+
+
+class EstateTrend(BaseModel):
+    days: int
+    points: list[EstateTrendPoint]
+
+
+class AuditVerifyStatus(StrEnum):
+    VALID = "valid"
+    TAMPERED = "tampered"
+
+
+class AuditVerifyResponse(BaseModel):
+    status: AuditVerifyStatus
+    recordCount: int
+    headHash: str
+    details: str | None = None
+
+
+class CoverageCertificate(BaseModel):
+    scanId: str
+    artifactCount: int
+    totalMass: float
+    attributedMass: float
+    excludedMass: float
+    residueMass: float
+    coverageRatio: float
+    residueClusterCount: int
+    computedAt: datetime
+
+
+class ArtifactCoverage(BaseModel):
+    artifactHash: str
+    path: str
+    totalMass: float
+    attributed: float
+    excluded: float
+    residue: float
+    coverageRatio: float
+
+
+class ResidueOccurrence(BaseModel):
+    artifactHash: str
+    path: str
+    range: list[int]
+
+
+class ResidueClusterState(StrEnum):
+    OPEN = "open"
+    PROMOTED = "promoted"
+    EXCLUDED = "excluded"
+    ACCEPTED = "accepted"
+
+
+class ResidueCluster(BaseModel):
+    id: str
+    contentHash: str
+    signalTypes: list[str]
+    magnitude: float
+    occurrences: list[ResidueOccurrence]
+    state: ResidueClusterState
+    justification: str | None = None
+    owner: str | None = None
+    firstSeen: datetime
+    lastSeen: datetime
+
+
+class ResidueClusterPatch(BaseModel):
+    state: ResidueClusterState
+    justification: str | None = None
+    owner: str | None = None
+
+
+class AssetFacing(StrEnum):
+    INTERNAL = "internal"
+    EXTERNAL = "external"
+
+
+class CriticalitySource(StrEnum):
+    MANUAL = "manual"
+    IMPORT = "import"
+
+
+class AssetCriticality(BaseModel):
+    targetId: str
+    pathPattern: str
+    criticality: Criticality
+    businessOwner: str
+    dataClassification: str
+    facing: AssetFacing
+    source: CriticalitySource
+
+
+class CriticalityImportResponse(BaseModel):
+    imported: int
+    records: list[AssetCriticality]
+
+
+class CloudKeyRecord(BaseModel):
+    provider: str
+    keyId: str
+    algorithm: str
+    keySize: int
+    rotationAgeDays: int
+    policyCompliant: bool
+    identityId: str | None = None
+
+
+class CloudKeysResponse(BaseModel):
+    keys: list[CloudKeyRecord]
+    roadmap: str
+
+
+class TargetCoverageSummary(BaseModel):
+    targetId: str
+    targetName: str
+    coverageRatio: float
+    residueMass: float
+    totalMass: float
+
+
+class EstateCoverage(BaseModel):
+    overallCoverageRatio: float
+    totalMass: float
+    attributedMass: float
+    excludedMass: float
+    residueMass: float
+    totalClusters: int
+    targets: list[TargetCoverageSummary]
+

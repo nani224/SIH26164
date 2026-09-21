@@ -4,7 +4,7 @@ Deterministic and hand-derived from public cryptanalysis results (Shor's
 algorithm breaks discrete-log/factoring in poly time; Grover's algorithm
 only square-roots a symmetric cipher's or hash's effective security).
 Nothing here is measured or tuned -- it's a fixed lookup, changeable only
-with an ADR (see docs/decisions/backend/002-phase1-risk-factors.md).
+with an ADR (see docs/decisions/backend/010-risk-factor-derivation.md).
 """
 
 from __future__ import annotations

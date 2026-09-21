@@ -86,6 +86,7 @@ class FindingRecord(SQLModel, table=True):
 
     triage_status: str = "open"
     triage_note: str | None = None
+    negotiated: bool | None = None
 
 
 class PolicyRecord(SQLModel, table=True):
@@ -127,3 +128,118 @@ class ScanEventRecord(SQLModel, table=True):
     type: str
     payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+class TargetRecord(SQLModel, table=True):
+    __tablename__ = "targets"
+
+    id: str = Field(primary_key=True)
+    name: str
+    kind: str  # repo, path, endpoint
+    uri: str
+    policy_id: str
+    schedule: str
+    enabled: bool = True
+    last_scan_id: str | None = None
+    last_scan_at: datetime | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class ScanSnapshotRecord(SQLModel, table=True):
+    __tablename__ = "scan_snapshots"
+
+    id: str = Field(primary_key=True)
+    target_id: str = Field(index=True)
+    scan_id: str = Field(index=True)
+    taken_at: datetime = Field(default_factory=_utcnow)
+    bands: dict[str, int] = Field(default_factory=dict, sa_column=Column(JSON))
+    total_findings: int = 0
+    stats: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    coverage_ratio: float | None = None
+    residue_mass: float | None = None
+
+
+class AlertRecord(SQLModel, table=True):
+    __tablename__ = "alerts"
+
+    id: str = Field(primary_key=True)
+    type: str  # new-critical, cert-expiring, drift, probe-downgrade, residue-rise
+    target_id: str = Field(index=True)
+    finding_id: str | None = None
+    severity: str  # critical, high, medium, low
+    message: str
+    created_at: datetime = Field(default_factory=_utcnow)
+    acknowledged: bool = False
+
+
+class ProbeResultRecord(SQLModel, table=True):
+    __tablename__ = "probe_results"
+
+    id: str = Field(primary_key=True)
+    target_id: str = Field(index=True)
+    host: str
+    port: int
+    protocol: str  # tls, ssh
+    negotiated: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    supported: list[Any] = Field(default_factory=list, sa_column=Column(JSON))
+    probed_at: datetime = Field(default_factory=_utcnow)
+
+
+class CoverageCertificateRecord(SQLModel, table=True):
+    __tablename__ = "coverage_certificates"
+
+    scan_id: str = Field(primary_key=True)
+    artifact_count: int
+    total_mass: float
+    attributed_mass: float
+    excluded_mass: float
+    residue_mass: float
+    coverage_ratio: float
+    residue_cluster_count: int
+    computed_at: datetime = Field(default_factory=_utcnow)
+
+
+class ArtifactCoverageRecord(SQLModel, table=True):
+    __tablename__ = "artifact_coverages"
+
+    id: str = Field(primary_key=True)
+    scan_id: str = Field(index=True)
+    artifact_hash: str = Field(index=True)
+    path: str
+    total_mass: float
+    attributed: float
+    excluded: float
+    residue: float
+    coverage_ratio: float
+
+
+class ResidueClusterRecord(SQLModel, table=True):
+    __tablename__ = "residue_clusters"
+
+    id: str = Field(primary_key=True)
+    content_hash: str = Field(index=True)
+    signal_types: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    magnitude: float
+    occurrences: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    state: str = "open"  # open, promoted, excluded, accepted
+    justification: str | None = None
+    owner: str | None = None
+    target_id: str | None = Field(default=None, index=True)
+    first_seen: datetime = Field(default_factory=_utcnow)
+    last_seen: datetime = Field(default_factory=_utcnow)
+
+
+class AssetCriticalityRecord(SQLModel, table=True):
+    __tablename__ = "asset_criticalities"
+
+    id: str = Field(primary_key=True)
+    target_id: str = Field(index=True)
+    path_pattern: str
+    criticality: str
+    business_owner: str
+    data_classification: str
+    facing: str  # internal, external
+    source: str  # manual, import
+    created_at: datetime = Field(default_factory=_utcnow)
+
+

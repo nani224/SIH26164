@@ -59,7 +59,7 @@ handed off as "needs real hardware to get the number," not "unresolved."
    that flag and the `MeshStandardMaterial` PBR lighting cost on 5,000
    instances are the next things to profile, in that order).
 5. Update `README.md`'s "Spatial Graph Framerate" row and
-   `frontend/PROGRESS.md` with the real number and the hardware/browser
+   `docs/engineering/frontend/PROGRESS.md` with the real number and the hardware/browser
    it was measured on -- don't leave the old unverified "60.1 FPS" claim
    standing once a real number exists to replace it.
 

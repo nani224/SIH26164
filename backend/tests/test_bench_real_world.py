@@ -13,7 +13,7 @@ def test_real_world_sample_detected_correctly() -> None:
     real `aes.NewCipher(key)` calls in `x_crypto_ssh_keys.go` that the
     detector correctly finds, but that this corpus's own blind labeller
     chose to attribute to a downstream call instead; see
-    docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md
+    docs/decisions/backend/009-corpus-growth-and-aes-attribution.md
     for why the labels were NOT retroactively edited to "fix" this), still
     above the 0.95 floor enforced by bench/check_precision_floor.py.
     Recall 0.8214 (46/56, down from 0.875 purely because the corpus grew

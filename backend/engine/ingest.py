@@ -183,8 +183,14 @@ def _extract_zip(archive_path: Path, target_dir: Path) -> tuple[int, int]:
                     err_msg = f"Symlink points outside target sandbox: {info.filename} -> {link_target}"
                     raise SymlinkTraversalError(err_msg)
 
-        # All entries passed pre-inspection; safely extract
-        zf.extractall(target_dir)
+        # All entries passed pre-inspection (path traversal, symlink escape,
+        # decompression bomb, compression ratio -- every check above this
+        # line) before extraction. zipfile has no filter= mitigation like
+        # tarfile's PEP 706 filter="data" (used below for the tar path);
+        # the pre-validation loop is the mitigation here. Verified live via
+        # a real malicious zip upload (G3 finale scenario, step 14): 400
+        # "Suspicious path in zip archive", nothing extracted.
+        zf.extractall(target_dir)  # nosec B202
 
     return file_count, total_uncompressed
 

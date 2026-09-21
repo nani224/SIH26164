@@ -5,10 +5,10 @@ Backend for the Enterprise Cryptographic Discovery & Analysis Tool
 Python path with a real tree-sitter detector and persists real,
 risk-scored findings to SQLite; `WS /scans/{id}/events` replays that
 scan's *real* recorded event log (stages, per-surface progress, finding
-events) with rate-limiting and resume-by-`eventId` — see `PLAN.md`'s
+events) with rate-limiting and resume-by-`eventId` — see `docs/engineering/backend/PLAN.md`'s
 Phase 4 entry for the one deliberate gap (no live streaming *during* an
 in-flight scan; `POST /scans` is still synchronous). No auth, no
-upload/sandboxing yet (Phase 6). See `PLAN.md` for what's next and
+upload/sandboxing yet (Phase 6). See `docs/engineering/backend/PLAN.md` for what's next and
 `docs/decisions/backend/` for why things are built the way they are.
 
 ## Requirements
@@ -66,7 +66,7 @@ Phase 10 will add JWT/CORS-related settings.
 
 No runtime network calls. The one build-time download this phase needed
 (the CycloneDX 1.6 JSON schema, for a CBOM-validation test) is vendored at
-`tests/fixtures/cyclonedx/` with its SHA-256 recorded in `TOOLBELT.md` —
+`tests/fixtures/cyclonedx/` with its SHA-256 recorded in `docs/engineering/backend/TOOLBELT.md` —
 `uv sync` plus the vendored fixtures is enough to run every gate above with
 no network access.
 

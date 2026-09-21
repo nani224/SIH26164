@@ -3,8 +3,8 @@
 Builds a structurally-correct CycloneDX 1.6 "cryptographic-asset" BOM from
 the in-memory stub findings. Field names/enums here are taken directly from
 the CycloneDX 1.6 JSON schema vendored at
-tests/fixtures/cyclonedx/bom-1.6.schema.json (see TOOLBELT.md for the pinned
-hash) — validated by tests/test_cbom.py. This is Phase 0 scaffolding: the
+tests/fixtures/cyclonedx/bom-1.6.schema.json (see docs/engineering/backend/TOOLBELT.md
+for the pinned hash) — validated by tests/test_cbom.py. This is Phase 0 scaffolding: the
 real engine (Phase 1+) will build these from actual detections, not stub
 data.
 """
