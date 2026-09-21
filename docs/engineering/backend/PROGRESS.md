@@ -1914,7 +1914,60 @@ $ curl -sS http://127.0.0.1:8020/api/v1/criticality
 ]
 ```
 
+### M6: PS gap: cloud key discovery (AWS KMS via LocalStack)
+Implemented and verified cloud cryptographic key discovery for AWS KMS (PS clause i),
+with clean degradation when LocalStack is unreachable and honest roadmap transparency.
+
+- `probes/cloud_kms.py` enumerates KMS keys via `boto3` client against LocalStack
+  (`LOCALSTACK_ENDPOINT_URL`, default `http://localhost:4566`), extracting:
+  - `keyId`: ARN or KeyId
+  - `algorithm`: "AES-GCM" for symmetric, "RSA" for RSA specs, "ECDSA" for ECC specs, "HMAC" for HMAC specs
+  - `keySize`: 256 for symmetric, 2048/3072/4096 for RSA, 256/384/521 for ECC
+  - `rotationAgeDays`: days since `CreationDate`
+  - `policyCompliant`: `rotationAgeDays <= 90`
+  - `identityId`: public key SHA-256 fingerprint (`sha256:...`) where public key material
+    is available via `get_public_key()`, falling back to Key ARN
+- `join_cloud_keys_to_findings()` joins discovered keys to static/runtime findings by
+  matching `identityId` or `keyId` against finding symbols, location paths, or code snippets.
+- In-code air-gap destination guard: `validate_probe_destination()` validates the host of
+  `LOCALSTACK_ENDPOINT_URL`, strictly blocking external/non-allowlisted hosts. `"localstack"`
+  added to `DEFAULT_ALLOWED_HOSTS` in `probes/guard.py`.
+- Clean degradation: when LocalStack is unreachable or provider is unsupported, returns `[]`
+  without failing the scan or 500ing the API.
+- Roadmap disclosure: `GET /api/v1/cloud/keys` returns `roadmap` indicating actively
+  supported vs v1.1 roadmap providers:
+  `"[Roadmap] AWS KMS via LocalStack is actively supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."`
+- Real test suite in `backend/tests/test_cloud_kms.py` (5 tests) proves clean degradation,
+  destination guard rejection, real key enumeration (symmetric + asymmetric), public key
+  fingerprinting, finding joining, and API serialization.
+
+### Real request/response evidence for M6 (2026-09-21, live server, port 8020)
+```
+# 1. Unreachable LocalStack clean degradation with roadmap disclosure
+$ curl -sS http://127.0.0.1:8020/api/v1/cloud/keys
+{
+  "keys": [],
+  "roadmap": "[Roadmap] AWS KMS via LocalStack is actively supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."
+}
+
+# 2. Unsupported provider clean degradation
+$ curl -sS "http://127.0.0.1:8020/api/v1/cloud/keys?provider=azure"
+{
+  "keys": [],
+  "roadmap": "[Roadmap] AWS KMS via LocalStack is actively supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."
+}
+
+# 3. Unit & Integration tests for real KMS key records & finding join (tests/test_cloud_kms.py)
+$ uv run pytest tests/test_cloud_kms.py -v
+tests/test_cloud_kms.py::test_cloud_keys_endpoint_degrades_cleanly_when_unreachable PASSED [ 20%]
+tests/test_cloud_kms.py::test_cloud_keys_unsupported_provider_returns_empty PASSED [ 40%]
+tests/test_cloud_kms.py::test_cloud_kms_airgap_destination_guard PASSED  [ 60%]
+tests/test_cloud_kms.py::test_cloud_kms_enumerates_real_key_records_with_boto3_mock PASSED [ 80%]
+tests/test_cloud_kms.py::test_api_endpoint_with_mocked_keys PASSED       [100%]
+5 passed in 0.41s
+```
+
 ### Next
-M6 (AWS KMS via LocalStack), M7 (hardening/load/security). Continuing without a break per the mandate's own loop instruction.
+M7 (hardening/load/security). Continuing without a break per the mandate's own loop instruction.
 
 
