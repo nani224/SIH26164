@@ -1796,9 +1796,125 @@ roadmap note visible (LocalStack not running in this quick check) rather
 than erroring -- M6 will prove the reachable-and-returns-real-keys case
 separately.
 
+### M5: PS gap: business criticality (PS clause iii & clause i)
+Closed the PS clause (iii) compliance gap where `AssetCriticality` was persisted
+in M1 but had zero effect on scoring, and the PS clause (i) gap where asset facing
+existed only within individual records with no aggregate estate view.
+
+- `store.resolve_policy(payload, target_id=...)` translates a target's explicit
+  `AssetCriticality` records into synthetic, higher-priority `ContextWithGlob`
+  entries prepended ahead of the policy's own contexts. This is the existing
+  Context-matching hook point -- no risk formula or weight touched -- so an
+  imported criticality CSV visibly changes a finding's K/E factors and score on
+  the next scan.
+- `scheduler/engine.py`'s `execute_target_scan` passes `target_id` through so
+  scheduled scans and `scan-now` pick this up automatically.
+- `EstateSummary` gained `internalFacingAssets` and `externalFacingAssets`
+  (contract + model + route), providing a first-class estate-wide split derived
+  from the `AssetCriticality` ledger's `facing` field.
+- New test `backend/tests/test_criticality_reranks_findings.py` exercises both
+  end-to-end through the real HTTP API against a real scan (MD5 finding, chosen
+  to avoid the unencrypted-private-key score floor masking the K/E movement).
+- Also fixed a real cross-file test-pollution issue in `test_estate_audit.py`
+  by having the test evict same-day `ScanSnapshotRecord` rows it doesn't own
+  before creating its own 5.
+
+### Real request/response evidence for M5 (2026-09-21, live server, port 8020)
+```
+# 1. Target creation for C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/targets \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Criticality Rerank Target","kind":"path","uri":"C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_","policyId":"policy_default","schedule":"0 0 * * *","enabled":true}'
+{
+  "id": "target_21100874f080",
+  "name": "Criticality Rerank Target",
+  "kind": "path",
+  "uri": "C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_",
+  "policyId": "policy_default",
+  "schedule": "0 0 * * *",
+  "enabled": true,
+  "lastScanId": null,
+  "lastScanAt": null,
+  "createdAt": "2026-09-21T01:53:03.139027Z"
+}
+
+# 2. Baseline scan: default context (internal, medium) -> K=0.6, E=0.6, score=18.0
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/targets/target_21100874f080/scan-now
+{"id":"scan_8c4d1f727e5c","target":"C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_","status":"done"}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/scans/scan_8c4d1f727e5c/findings
+{
+  "id": "finding_cd2c454b3a50",
+  "family": "MD5",
+  "score": 18.0,
+  "band": "medium",
+  "K": 0.6,
+  "E": 0.6,
+  "reason": "MD5 digest in a internal-exposed, medium-criticality context (shelf-life 5y, migration 3y, CRQC horizon 10y)."
+}
+
+# 3. CSV Criticality Import: bulk CMDB import setting target to mission-critical, external
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/criticality/import \
+  -F "file=@criticality.csv"
+{
+  "imported": 1,
+  "records": [
+    {
+      "targetId": "target_21100874f080",
+      "pathPattern": "**",
+      "criticality": "mission-critical",
+      "businessOwner": "payments-team",
+      "dataClassification": "pci",
+      "facing": "external",
+      "source": "import"
+    }
+  ]
+}
+
+# 4. Rescan with AssetCriticality active: K=1.0, E=1.0, score rose 18.0 -> 50.0!
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/targets/target_21100874f080/scan-now
+{"id":"scan_d1872c936d29","target":"C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_","status":"done"}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/scans/scan_d1872c936d29/findings
+{
+  "id": "finding_e06ca08b5b9b",
+  "family": "MD5",
+  "score": 50.0,
+  "band": "high",
+  "K": 1.0,
+  "E": 1.0,
+  "reason": "MD5 digest in a external-exposed, mission-critical-criticality context (shelf-life 5y, migration 3y, CRQC horizon 10y)."
+}
+
+# 5. Estate Summary: first-class facing split reported
+$ curl -sS http://127.0.0.1:8020/api/v1/estate/summary
+{
+  "totalTargets": 1,
+  "totalScans": 3,
+  "totalFindings": 8,
+  "criticalFindings": 2,
+  "pqcReadinessScore": 12.5,
+  "activeAlerts": 0,
+  "internalFacingAssets": 0,
+  "externalFacingAssets": 1
+}
+
+# 6. Criticality Records endpoint
+$ curl -sS http://127.0.0.1:8020/api/v1/criticality
+[
+  {
+    "targetId": "target_21100874f080",
+    "pathPattern": "**",
+    "criticality": "mission-critical",
+    "businessOwner": "payments-team",
+    "dataClassification": "pci",
+    "facing": "external",
+    "source": "import"
+  }
+]
+```
+
 ### Next
-M5 (business criticality PS gap), M6 (AWS KMS via LocalStack), M7
-(hardening/load/security). Continuing without a break per the mandate's
-own loop instruction.
+M6 (AWS KMS via LocalStack), M7 (hardening/load/security). Continuing without a break per the mandate's own loop instruction.
 
 

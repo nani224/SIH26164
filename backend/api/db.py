@@ -541,6 +541,12 @@ def init_db() -> None:
             conn.execute(text("ALTER TABLE findings ADD COLUMN negotiated BOOLEAN"))
             conn.commit()
         with suppress(Exception):
+            conn.execute(text("ALTER TABLE scan_snapshots ADD COLUMN coverage_ratio FLOAT"))
+            conn.commit()
+        with suppress(Exception):
+            conn.execute(text("ALTER TABLE scan_snapshots ADD COLUMN residue_mass FLOAT"))
+            conn.commit()
+        with suppress(Exception):
             conn.execute(
                 text(
                     "CREATE INDEX IF NOT EXISTS idx_findings_rescore "
