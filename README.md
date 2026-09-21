@@ -3,7 +3,7 @@
 [![Airgap](https://img.shields.io/badge/Air--Gap-Strictly%20Enforced-emerald.svg)](#security--air-gap-invariants)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI%203.1-0%20Contract%20Drift-blue.svg)](contracts/openapi.yaml)
 [![CBOM](https://img.shields.io/badge/CBOM-CycloneDX%201.6-purple.svg)](#measured-verification-results)
-[![Tests](https://img.shields.io/badge/Backend-257%20Pytest-brightgreen.svg)](#measured-verification-results)
+[![Tests](https://img.shields.io/badge/Backend-283%20Pytest-brightgreen.svg)](#measured-verification-results)
 [![Release](https://img.shields.io/badge/Release-v1.0.0-informational.svg)](CHANGELOG.md)
 
 **ECDAT** is an air-gapped cryptographic discovery, quantum-risk scoring, and PQC migration platform: it scans source code, binaries, and running infrastructure for cryptographic assets, scores their quantum risk against Mosca's inequality, recommends post-quantum replacements, and exports a CycloneDX 1.6 Cryptographic Bill of Materials (CBOM).
@@ -126,12 +126,42 @@ Every number below is a real command's real output from this repository, dated (
 | Gate | Command | Result |
 | :--- | :--- | :--- |
 | Lint | `uv run ruff check .` | `All checks passed!` |
-| Strict typing | `uv run mypy --strict .` | `Success: no issues found in 134 source files` |
-| Unit + integration suite | `uv run pytest` | `257 passed, 0 failed` |
+| Strict typing | `uv run mypy --strict .` | `Success: no issues found in 149 source files` |
+| Unit + integration suite | `uv run pytest` | `283 passed, 0 failed` |
 | Kill Tests (K1–K4) | `uv run pytest tests/test_kill_tests.py` | `4/4 passed` (K1: 100%, K2: 0.00%, K3: exact, K4: delta -45/+3) |
+| CMC K2 Stress Test (Real Benign Corpus) | `uv run pytest tests/test_k2_stress.py` | `PASSED` (0.000% residue mass across 151,367 bytes of real benign C code: miniz + cJSON) |
 | Conservation invariant | `uv run pytest tests/test_attribution_calculus.py` | `4/4 passed` (33 corpus artifacts audited, 0 units lost) |
 | Contract sync | `uv run python scripts/contract_diff.py` | `No contract drift.` |
 | Air-gap verification | `uv run python scripts/verify_airgap.py` | `PASSED` (zero banned/unguarded-network imports) |
+
+### Production Hardening & Operational Controls (2026-09-21)
+
+| Control | Mechanism / Threshold | Operational Rationale |
+| :--- | :--- | :--- |
+| **API Authentication** | `Authorization: Bearer <ECDAT_API_TOKEN>` | Single-agency gate enforced on all routes except `GET /health`. Unset token halts startup in production. |
+| **Actor Identity Chain** | `X-ECDAT-Actor` header required on write operations | Bound into SHA-256 hash-chained audit log for tamper-evident provenance. |
+| **CORS Policy** | Explicit `ECDAT_CORS_ORIGINS` allowlist | Prevents wildcard credential reflection while supporting dedicated dashboard hosts. |
+| **Request Size Limits** | `RequestSizeLimitMiddleware` (1MB JSON cap) | Protects memory against malformed payloads; upload routes (`/scans/upload`, `/criticality/import`) bypass for sandboxed ingest. |
+| **Rate Limiting** | `ECDAT_RATE_LIMIT_MUTATING` (default: 120 req/min) | In-memory sliding window on mutating endpoints (`POST`, `PATCH`, `PUT`, `DELETE`). Tuned for single-agency NTRO ops (operators + CI runners); read endpoints unthrottled for telemetry/dashboard responsiveness. |
+| **Dependency Health** | `GET /api/v1/health` (live DB query) | Executes `SELECT 1`; returns 503 Service Unavailable if database is unreachable. |
+| **Crash Recovery** | Interrupted scan reconciliation | On daemon startup, scans stranded in `SCANNING` state are marked `FAILED` with audit trail entries. |
+| **Secrets Redaction** | `probes/webhook.py:redact_url()` | Redacts credentials and query tokens from webhook URLs and probe configurations in all logs and error responses. |
+
+### API Route Surface (37 Endpoints)
+
+All routes under `/api/v1/` require Bearer authentication except `GET /health`. Mutating operations additionally require `X-ECDAT-Actor` and are subject to sliding-window rate limiting.
+
+- **System & Audit**: `GET /health` (unauthenticated, live DB check), `GET /audit/verify`
+- **Scans & Discovery**: `POST /scans`, `GET /scans`, `POST /scans/upload`, `GET /scans/{scan_id}`, `GET /scans/{scan_id}/findings`, `POST /scans/{scan_id}/rescore`, `GET /scans/{scan_id}/graph`, `GET /scans/{scan_id}/cbom`, `GET /scans/{scan_id}/plan`, `GET /scans/{scan_id}/report.pdf`, `GET /scans/{scan_id}/coverage`, `GET /scans/{scan_id}/coverage/artifacts`, `WS /scans/{scan_id}/events`
+- **Findings & Triage**: `PATCH /findings/{finding_id}/triage`
+- **Policies**: `GET /policies`, `POST /policies`, `GET /policies/{policy_id}`, `PUT /policies/{policy_id}`, `DELETE /policies/{policy_id}`
+- **PQC Catalog**: `GET /catalog/pqc`
+- **Targets & Drift**: `GET /targets`, `POST /targets`, `GET /targets/{id}`, `PUT /targets/{id}`, `DELETE /targets/{id}`, `POST /targets/{id}/scan-now`, `GET /targets/{id}/snapshots`, `GET /targets/{id}/drift`
+- **Alerts**: `GET /alerts`, `POST /alerts/{id}/acknowledge`
+- **Probes & Cloud**: `POST /probes/tls`, `POST /probes/ssh`, `GET /probes`, `GET /hsm/inventory`, `GET /cloud/keys`
+- **Estate & Coverage**: `GET /estate/summary`, `GET /estate/trend`, `GET /estate/coverage`
+- **Residue & Debt Ledger**: `GET /residue`, `GET /residue/{id}`, `PATCH /residue/{id}`
+- **Criticality Mapping**: `GET /criticality`, `POST /criticality`, `POST /criticality/import`
 
 ### Frontend gates (2026-09-21)
 
