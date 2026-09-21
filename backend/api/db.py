@@ -98,23 +98,38 @@ def session_scope() -> Iterator[Session]:
 
 
 def compute_audit_record_hash(
-    *, action: str, entity_type: str, entity_id: str, detail: dict[str, Any], prev_hash: str
+    *, action: str, entity_type: str, entity_id: str, detail: dict[str, Any], prev_hash: str, actor: str = "system"
 ) -> str:
     detail_str = json.dumps(detail, sort_keys=True)
-    payload = f"{action}|{entity_type}|{entity_id}|{detail_str}|{prev_hash}"
+    payload = f"{actor}|{action}|{entity_type}|{entity_id}|{detail_str}|{prev_hash}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def log_audit(
-    session: Session, *, action: str, entity_type: str, entity_id: str, detail: dict[str, Any] | None = None
+    session: Session,
+    *,
+    action: str,
+    entity_type: str,
+    entity_id: str,
+    detail: dict[str, Any] | None = None,
+    actor: str | None = None,
 ) -> AuditLogRecord:
+    from api.actor import get_current_actor
+
+    current_actor = actor or get_current_actor()
     last_rec = session.exec(select(AuditLogRecord).order_by(col(AuditLogRecord.id).desc())).first()
     prev_hash = last_rec.record_hash if (last_rec and last_rec.record_hash) else "0" * 64
     d = detail or {}
     rec_hash = compute_audit_record_hash(
-        action=action, entity_type=entity_type, entity_id=entity_id, detail=d, prev_hash=prev_hash
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        detail=d,
+        prev_hash=prev_hash,
+        actor=current_actor,
     )
     rec = AuditLogRecord(
+        actor=current_actor,
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,
@@ -151,6 +166,7 @@ def verify_audit_log_integrity(session: Session) -> tuple[bool, str | None]:
             entity_id=rec.entity_id,
             detail=rec.detail or {},
             prev_hash=rec.prev_hash,
+            actor=rec.actor,
         )
         if rec.record_hash != calc_hash:
             return (

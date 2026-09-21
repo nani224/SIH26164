@@ -82,6 +82,7 @@ app.add_middleware(RateLimitMiddleware)
 
 from fastapi import Depends
 from api.auth import verify_bearer_token
+from api.actor import require_actor_on_write
 
 for router in (
     scans.router, findings.router, policies.router,
@@ -89,7 +90,11 @@ for router in (
     hsm.router, audit.router, estate.router,
     coverage.router, residue.router, criticality.router, cloud.router,
 ):
-    app.include_router(router, prefix="/api/v1", dependencies=[Depends(verify_bearer_token)])
+    app.include_router(
+        router,
+        prefix="/api/v1",
+        dependencies=[Depends(verify_bearer_token), Depends(require_actor_on_write)],
+    )
 
 # Unauthenticated public health endpoint
 app.include_router(health.router, prefix="/api/v1")

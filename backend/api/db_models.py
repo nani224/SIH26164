@@ -104,6 +104,7 @@ class AuditLogRecord(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=_utcnow)
+    actor: str = Field(default="system")
     action: str
     entity_type: str
     entity_id: str
