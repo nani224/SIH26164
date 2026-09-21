@@ -61,6 +61,7 @@
     "vitest": "^5.0.1"
   },
   "onlyBuiltDependencies": [
+    "esbuild",
     "msw",
     "@tailwindcss/oxide",
     "unrs-resolver"

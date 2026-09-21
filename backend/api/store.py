@@ -341,7 +341,7 @@ def rescore_scan_findings(
         # carry SQL syntax, so this isn't an injection vector despite the f-string
         # shape bandit's B608 rule flags. `ph`/`scan_id` below are the placeholder
         # token and a real bound parameter, same as the query above.
-        sql = f"""  # nosec B608
+        sql = f"""
         WITH urgency AS (
             SELECT
                 id,
