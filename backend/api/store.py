@@ -525,6 +525,10 @@ def create_snapshot(target_id: str, scan: Scan, findings: list[Finding]) -> Scan
     snapshot_id = f"snap_{uuid.uuid4().hex[:12]}"
     now = datetime.now(UTC)
     stats = scan.stats or ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0)
+    # v1.0 CMC (M4): the scan's coverage certificate is already persisted by
+    # create_scan_from_result() before create_snapshot() ever runs (see
+    # scheduler/engine.py's call order) -- consumed here, never recomputed.
+    cert = get_coverage_certificate(scan.id)
     snapshot = ScanSnapshot(
         id=snapshot_id,
         targetId=target_id,
@@ -533,6 +537,8 @@ def create_snapshot(target_id: str, scan: Scan, findings: list[Finding]) -> Scan
         bands=scan.bands.model_dump(),
         totalFindings=len(findings),
         stats=stats,
+        coverageRatio=cert.coverageRatio if cert is not None else None,
+        residueMass=cert.residueMass if cert is not None else None,
     )
     with db.session_scope() as session:
         session.add(db.snapshot_to_record(snapshot))
@@ -627,11 +633,24 @@ def calculate_drift(target_id: str, from_snapshot_id: str, to_snapshot_id: str) 
     risk_from = sum(f.risk.score for f in from_findings if f.risk)
     net_risk_delta = round(risk_to - risk_from, 2)
 
+    # v1.0 CMC (M4): coverage change alongside finding change -- "3 findings
+    # added, coverage fell 4.2%" is the operator's real signal that something
+    # new and unexplained entered the estate. None if either snapshot predates
+    # coverage tracking (coverageRatio/residueMass were added in v1.0).
+    coverage_delta: float | None = None
+    residue_mass_delta: float | None = None
+    if from_snap.coverageRatio is not None and to_snap.coverageRatio is not None:
+        coverage_delta = round(to_snap.coverageRatio - from_snap.coverageRatio, 4)
+    if from_snap.residueMass is not None and to_snap.residueMass is not None:
+        residue_mass_delta = round(to_snap.residueMass - from_snap.residueMass, 2)
+
     summary = DriftSummary(
         addedCount=len(added),
         resolvedCount=len(resolved),
         changedCount=len(changed),
         netRiskDelta=net_risk_delta,
+        coverageDelta=coverage_delta,
+        residueMassDelta=residue_mass_delta,
     )
 
     return Drift(
@@ -732,6 +751,13 @@ def save_coverage(
     clusters: list[ResidueCluster],
     target_id: str | None = None,
 ) -> None:
+    # The scan_id parameter is the authoritative key -- never trust a
+    # caller-supplied cert.scanId (e.g. an engine-produced certificate
+    # computed before the scan record's real id was assigned). Mismatching
+    # the two would silently persist the certificate under the wrong key,
+    # making get_coverage_certificate(scan_id) return None for a real scan.
+    cert = cert.model_copy(update={"scanId": scan_id})
+
     with db.session_scope() as session:
         # Upsert certificate
         existing_cert = session.get(CoverageCertificateRecord, scan_id)

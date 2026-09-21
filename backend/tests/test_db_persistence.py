@@ -36,7 +36,9 @@ def test_audit_log_records_scan_creation() -> None:
     scan = store.create_scan_from_result(payload, ScanResult(), store.resolve_policy(payload))
     with db.session_scope() as session:
         rows = session.exec(
-            select(AuditLogRecord).where(AuditLogRecord.entity_id == scan.id).order_by(AuditLogRecord.id)
+            select(AuditLogRecord)
+            .where(AuditLogRecord.entity_id == scan.id)
+            .order_by(AuditLogRecord.id)  # type: ignore[arg-type]
         ).all()
     # v1.0 CMC: scan creation now also persists a coverage certificate
     # (M2), which is itself an audited action -- two real rows, not one.

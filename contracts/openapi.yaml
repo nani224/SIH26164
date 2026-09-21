@@ -1384,6 +1384,14 @@ components:
           additionalProperties: { type: integer }
         totalFindings: { type: integer }
         stats: { $ref: "#/components/schemas/ScanStats" }
+        coverageRatio:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: Crypto Mass Conservation coverage ratio at the time of this snapshot (v1.0).
+        residueMass:
+          type: [number, "null"]
+          description: Unexplained residue mass at the time of this snapshot (v1.0).
         coverageRatio: { type: [number, "null"] }
         residueMass: { type: [number, "null"] }
 

@@ -335,6 +335,8 @@ def snapshot_to_record(snapshot: ScanSnapshot) -> ScanSnapshotRecord:
         bands=snapshot.bands,
         total_findings=snapshot.totalFindings,
         stats=snapshot.stats.model_dump(),
+        coverage_ratio=snapshot.coverageRatio,
+        residue_mass=snapshot.residueMass,
     )
 
 
@@ -347,6 +349,8 @@ def record_to_snapshot(rec: ScanSnapshotRecord) -> ScanSnapshot:
         bands=rec.bands,
         totalFindings=rec.total_findings,
         stats=ScanStats.model_validate(rec.stats),
+        coverageRatio=rec.coverage_ratio,
+        residueMass=rec.residue_mass,
     )
 
 
