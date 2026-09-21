@@ -12,6 +12,8 @@ import { CoverageCertificateCard } from '../../components/CoverageCertificateCar
 import { AttestationModal } from '../../components/AttestationModal';
 import { BenchmarkModal } from '../../components/BenchmarkModal';
 import { DemoTourModal } from '../../components/DemoTourModal';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import { classifyAlgorithm } from '../../types/crypto';
 import {
   ShieldAlert,
@@ -54,6 +56,8 @@ export default function OverviewPage() {
   const {
     data: findingsData,
     isLoading: findingsLoading,
+    error: findingsError,
+    refetch: refetchFindings,
   } = useQuery({
     queryKey: ['findings', activeScanId],
     queryFn: () => fetchScanFindings(activeScanId),
@@ -124,6 +128,18 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (isUnauthorizedError(scanError) || isUnauthorizedError(findingsError)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => {
+          refetchScan();
+          refetchFindings();
+        }}
+        context="Screen 2 · Cryptographic Overview Console"
+      />
     );
   }
 

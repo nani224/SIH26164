@@ -6,6 +6,8 @@ import { useAppStore } from '../../lib/store';
 import { fetchScanFindings, fetchScans, rescoreScan } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import { classifyAlgorithm, type CryptoSemanticClass, type RiskBand } from '../../types/crypto';
 import {
   ShieldAlert,
@@ -23,15 +25,27 @@ import {
 
 export default function SpecimenPage() {
   const { activeScanId } = useAppStore();
-  const { data: scans } = useQuery({
+  const { data: scans, error: scansError, refetch: refetchScans } = useQuery({
     queryKey: ['scans'],
     queryFn: fetchScans,
   });
-  const { data: findingsData } = useQuery({
+  const { data: findingsData, error: findingsError, refetch: refetchFindings } = useQuery({
     queryKey: ['findings', activeScanId],
     queryFn: () => fetchScanFindings(activeScanId),
   });
   const findings = findingsData?.items ?? [];
+
+  if (isUnauthorizedError(scansError) || isUnauthorizedError(findingsError)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => {
+          refetchScans();
+          refetchFindings();
+        }}
+        context="Design Specimen Console"
+      />
+    );
+  }
 
   const [crqcZ, setCrqcZ] = useState<number>(10);
   const [selectedFamily, setSelectedFamily] = useState<string>('all');

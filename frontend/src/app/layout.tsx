@@ -5,6 +5,7 @@ import { Providers } from '../components/Providers';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { FindingDrawer } from '../components/FindingDrawer';
 import { CommandPalette } from '../components/CommandPalette';
+import { AuthSettingsControl } from '../components/AuthSettingsControl';
 import { CommandPaletteButton } from '../components/CommandPaletteButton';
 import Link from 'next/link';
 
@@ -201,6 +202,7 @@ export default function RootLayout({
 
               {/* Right controls */}
               <div className="flex items-center gap-2">
+                <AuthSettingsControl />
                 <CommandPaletteButton />
                 <ThemeToggle />
               </div>

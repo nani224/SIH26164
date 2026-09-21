@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { fetchAlerts, acknowledgeAlert, fetchProbes, fetchTargets } from '../../lib/api';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import type { Alert, AlertType, ProbeResult, RiskBand } from '../../types/crypto';
 import {
   Bell,
@@ -36,6 +38,7 @@ export default function AlertsPage() {
   const {
     data: alerts = [],
     isLoading: alertsLoading,
+    error: alertsError,
     refetch: refetchAlerts,
   } = useQuery({
     queryKey: ['alerts'],
@@ -46,6 +49,7 @@ export default function AlertsPage() {
   const {
     data: probes = [],
     isLoading: probesLoading,
+    error: probesError,
     refetch: refetchProbes,
   } = useQuery({
     queryKey: ['probes'],
@@ -53,7 +57,7 @@ export default function AlertsPage() {
     refetchInterval: 30000,
   });
 
-  const { data: targets = [] } = useQuery({
+  const { data: targets = [], error: targetsError } = useQuery({
     queryKey: ['targets'],
     queryFn: fetchTargets,
   });
@@ -136,6 +140,18 @@ export default function AlertsPage() {
   };
 
   const isLoading = alertsLoading || probesLoading;
+
+  if (isUnauthorizedError(alertsError) || isUnauthorizedError(probesError) || isUnauthorizedError(targetsError)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => {
+          refetchAlerts();
+          refetchProbes();
+        }}
+        context="Cryptographic Alerts & Monitoring Console"
+      />
+    );
+  }
 
   if (isLoading && alerts.length === 0) {
     return (

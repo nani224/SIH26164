@@ -3,14 +3,25 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchScans } from '../lib/api';
+import { UnauthorizedState } from '../components/UnauthorizedState';
+import { isUnauthorizedError } from '../lib/auth';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
 export default function HomePage() {
-  const { data: scans } = useQuery({
+  const { data: scans, error: scansError, refetch } = useQuery({
     queryKey: ['scans'],
     queryFn: fetchScans,
   });
   const scan = scans?.[0];
+
+  if (isUnauthorizedError(scansError)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => refetch()}
+        context="Cipher Observatory Home"
+      />
+    );
+  }
 
   return (
     <div className="space-y-8 py-4">

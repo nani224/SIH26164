@@ -13,6 +13,8 @@ import {
   fetchPolicies,
   fetchEstateCoverage,
 } from '../../lib/api';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import type { Target, TargetKind, TargetCreate, TargetPatch, Policy, EstateCoverage, TargetCoverageSummary } from '../../types/crypto';
 import {
   Shield,
@@ -63,6 +65,7 @@ export default function EstatePage() {
   const {
     data: estateSummary,
     isLoading: summaryLoading,
+    error: summaryError,
     refetch: refetchSummary,
   } = useQuery({
     queryKey: ['estateSummary'],
@@ -77,6 +80,7 @@ export default function EstatePage() {
   const {
     data: targets = [],
     isLoading: targetsLoading,
+    error: targetsError,
     refetch: refetchTargets,
   } = useQuery({
     queryKey: ['targets'],
@@ -89,7 +93,7 @@ export default function EstatePage() {
     queryFn: fetchPolicies,
   });
 
-  const { data: estateCoverage } = useQuery<EstateCoverage>({
+  const { data: estateCoverage, error: coverageError } = useQuery<EstateCoverage>({
     queryKey: ['estateCoverage'],
     queryFn: fetchEstateCoverage,
     refetchInterval: 30000,
@@ -254,6 +258,18 @@ export default function EstatePage() {
   };
 
   const isLoading = summaryLoading || targetsLoading;
+
+  if (isUnauthorizedError(summaryError) || isUnauthorizedError(targetsError) || isUnauthorizedError(coverageError)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => {
+          refetchSummary();
+          refetchTargets();
+        }}
+        context="Cryptographic Estate Console"
+      />
+    );
+  }
 
   if (isLoading && targets.length === 0) {
     return (

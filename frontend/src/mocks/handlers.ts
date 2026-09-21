@@ -55,8 +55,84 @@ function computeBand(score: number): RiskBand {
   return 'low';
 }
 
+const EXPECTED_DEV_TOKEN = process.env.NEXT_PUBLIC_ECDAT_API_TOKEN || 'ecdat-dev-insecure-token';
+
+function checkAuth(request: Request): Response | null {
+  const auth = request.headers.get('Authorization') || request.headers.get('authorization');
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return HttpResponse.json(
+      { error: 'HTTPException', message: 'Unauthorized' },
+      { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } }
+    );
+  }
+  const token = auth.replace(/^Bearer\s+/i, '').trim();
+  if (!token || (token !== EXPECTED_DEV_TOKEN && token !== 'test-token')) {
+    return HttpResponse.json(
+      { error: 'HTTPException', message: 'Unauthorized' },
+      { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } }
+    );
+  }
+  return null;
+}
+
+function checkActor(request: Request): Response | null {
+  const actor = request.headers.get('X-ECDAT-Actor') || request.headers.get('x-ecdat-actor');
+  if (!actor || !actor.trim()) {
+    return HttpResponse.json(
+      { error: 'HTTPException', message: 'X-ECDAT-Actor header is required for state-changing requests' },
+      { status: 400 }
+    );
+  }
+  return null;
+}
+
+type Resolver = (info: any) => any;
+
+const authGet = (path: string, resolver: Resolver) =>
+  http.get(path, (info) => {
+    const err = checkAuth(info.request);
+    if (err) return err;
+    return resolver(info);
+  });
+
+const authPost = (path: string, resolver: Resolver) =>
+  http.post(path, (info) => {
+    const authErr = checkAuth(info.request);
+    if (authErr) return authErr;
+    const actorErr = checkActor(info.request);
+    if (actorErr) return actorErr;
+    return resolver(info);
+  });
+
+const authPut = (path: string, resolver: Resolver) =>
+  http.put(path, (info) => {
+    const authErr = checkAuth(info.request);
+    if (authErr) return authErr;
+    const actorErr = checkActor(info.request);
+    if (actorErr) return actorErr;
+    return resolver(info);
+  });
+
+const authPatch = (path: string, resolver: Resolver) =>
+  http.patch(path, (info) => {
+    const authErr = checkAuth(info.request);
+    if (authErr) return authErr;
+    const actorErr = checkActor(info.request);
+    if (actorErr) return actorErr;
+    return resolver(info);
+  });
+
+const authDelete = (path: string, resolver: Resolver) =>
+  http.delete(path, (info) => {
+    const authErr = checkAuth(info.request);
+    if (authErr) return authErr;
+    const actorErr = checkActor(info.request);
+    if (actorErr) return actorErr;
+    return resolver(info);
+  });
+
 export const handlers = [
-  // Health
+  // Health (unauthenticated per contract)
   http.get('/api/v1/health', () => {
     return HttpResponse.json({
       status: 'ok',
@@ -65,12 +141,12 @@ export const handlers = [
   }),
 
   // List scans
-  http.get('/api/v1/scans', () => {
+  authGet('/api/v1/scans', () => {
     return HttpResponse.json(scansStore);
   }),
 
   // Create / Launch scan
-  http.post('/api/v1/scans', async ({ request }) => {
+  authPost('/api/v1/scans', async ({ request }) => {
     let target = 'uploaded-bundle.tar.gz';
     let policyId = 'policy-default-defense';
     let crqcYears = 10;
@@ -124,7 +200,7 @@ export const handlers = [
   }),
 
   // Upload scan archive
-  http.post('/api/v1/scans/upload', async ({ request }) => {
+  authPost('/api/v1/scans/upload', async ({ request }) => {
     let target = 'uploaded-bundle.tar.gz';
     let policyId = 'policy-default-defense';
     let crqcYears = 10;
@@ -170,13 +246,13 @@ export const handlers = [
   }),
 
   // Get scan
-  http.get('/api/v1/scans/:id', ({ params }) => {
+  authGet('/api/v1/scans/:id', ({ params }) => {
     const scan = scansStore.find((s) => s.id === params.id) || scansStore[0];
     return HttpResponse.json(scan);
   }),
 
   // Get findings
-  http.get('/api/v1/scans/:id/findings', ({ request }) => {
+  authGet('/api/v1/scans/:id/findings', ({ request }) => {
     const url = new URL(request.url);
     const band = url.searchParams.get('band');
     const family = url.searchParams.get('family');
@@ -220,7 +296,7 @@ export const handlers = [
   // as the real backend (api/store.py::rescore_scan_findings) -- so the
   // frontend must diff against its own pre-rescore snapshot for "previous"
   // values, never trust a fabricated previousBand/previousScore from here.
-  http.post('/api/v1/scans/:id/rescore', async ({ request }) => {
+  authPost('/api/v1/scans/:id/rescore', async ({ request }) => {
     const body = (await request.json()) as { crqcYears?: number; policyId?: string };
     const z = body.crqcYears ?? 10;
 
@@ -275,18 +351,18 @@ export const handlers = [
   }),
 
   // Get crypto estate hierarchy graph
-  http.get('/api/v1/scans/:id/graph', () => {
+  authGet('/api/v1/scans/:id/graph', () => {
     return HttpResponse.json(mockGraph);
   }),
 
   // Download CycloneDX 1.6 CBOM
-  http.get('/api/v1/scans/:id/cbom', () => {
+  authGet('/api/v1/scans/:id/cbom', () => {
     return HttpResponse.json(mockCbom);
   }),
 
   // Get remediation plan. Matches contracts/openapi.yaml's RemediationPlan
   // exactly: {scanId, generatedAt, items} -- not a bare array.
-  http.get('/api/v1/scans/:id/plan', ({ params }) => {
+  authGet('/api/v1/scans/:id/plan', ({ params }) => {
     return HttpResponse.json({
       scanId: params.id,
       generatedAt: new Date().toISOString(),
@@ -295,23 +371,23 @@ export const handlers = [
   }),
 
   // Policies CRUD
-  http.get('/api/v1/policies', () => {
+  authGet('/api/v1/policies', () => {
     return HttpResponse.json(policiesStore);
   }),
 
-  http.post('/api/v1/policies', async ({ request }) => {
+  authPost('/api/v1/policies', async ({ request }) => {
     const newPolicy = (await request.json()) as Policy;
     policiesStore.push(newPolicy);
     return HttpResponse.json(newPolicy, { status: 201 });
   }),
 
-  http.get('/api/v1/policies/:id', ({ params }) => {
+  authGet('/api/v1/policies/:id', ({ params }) => {
     const policy = policiesStore.find((p) => p.id === params.id);
     if (!policy) return new HttpResponse(null, { status: 404 });
     return HttpResponse.json(policy);
   }),
 
-  http.put('/api/v1/policies/:id', async ({ params, request }) => {
+  authPut('/api/v1/policies/:id', async ({ params, request }) => {
     const updated = (await request.json()) as Policy;
     const idx = policiesStore.findIndex((p) => p.id === params.id);
     if (idx === -1) {
@@ -323,7 +399,7 @@ export const handlers = [
   }),
 
   // Triage finding
-  http.patch('/api/v1/findings/:id/triage', async ({ params, request }) => {
+  authPatch('/api/v1/findings/:id/triage', async ({ params, request }) => {
     const body = (await request.json()) as { status: Finding['triage']['status']; note?: string };
     const idx = findingsStore.findIndex((f) => f.id === params.id);
     if (idx === -1) {
@@ -342,26 +418,26 @@ export const handlers = [
   }),
 
   // Catalog PQC
-  http.get('/api/v1/catalog/pqc', () => {
+  authGet('/api/v1/catalog/pqc', () => {
     return HttpResponse.json(mockPqcCatalog);
   }),
 
   // Estate Summary
-  http.get('/api/v1/estate/summary', () => {
+  authGet('/api/v1/estate/summary', () => {
     return HttpResponse.json(estateSummaryStore);
   }),
 
   // Estate Trend
-  http.get('/api/v1/estate/trend', () => {
+  authGet('/api/v1/estate/trend', () => {
     return HttpResponse.json(mockEstateTrend);
   }),
 
   // Targets CRUD
-  http.get('/api/v1/targets', () => {
+  authGet('/api/v1/targets', () => {
     return HttpResponse.json(targetsStore);
   }),
 
-  http.post('/api/v1/targets', async ({ request }) => {
+  authPost('/api/v1/targets', async ({ request }) => {
     const body = (await request.json()) as TargetCreate;
     const newTarget: Target = {
       id: `target-${Math.random().toString(16).substring(2, 8)}`,
@@ -380,13 +456,13 @@ export const handlers = [
     return HttpResponse.json(newTarget, { status: 201 });
   }),
 
-  http.get('/api/v1/targets/:id', ({ params }) => {
+  authGet('/api/v1/targets/:id', ({ params }) => {
     const target = targetsStore.find((t) => t.id === params.id);
     if (!target) return new HttpResponse(null, { status: 404 });
     return HttpResponse.json(target);
   }),
 
-  http.patch('/api/v1/targets/:id', async ({ params, request }) => {
+  authPatch('/api/v1/targets/:id', async ({ params, request }) => {
     const idx = targetsStore.findIndex((t) => t.id === params.id);
     if (idx === -1) return new HttpResponse(null, { status: 404 });
     const patch = (await request.json()) as TargetPatch;
@@ -400,7 +476,7 @@ export const handlers = [
     return HttpResponse.json(targetsStore[idx]);
   }),
 
-  http.delete('/api/v1/targets/:id', ({ params }) => {
+  authDelete('/api/v1/targets/:id', ({ params }) => {
     const idx = targetsStore.findIndex((t) => t.id === params.id);
     if (idx === -1) return new HttpResponse(null, { status: 404 });
     targetsStore.splice(idx, 1);
@@ -409,7 +485,7 @@ export const handlers = [
   }),
 
   // Target Scan Now
-  http.post('/api/v1/targets/:id/scan-now', ({ params }) => {
+  authPost('/api/v1/targets/:id/scan-now', ({ params }) => {
     const target = targetsStore.find((t) => t.id === params.id);
     if (!target) return new HttpResponse(null, { status: 404 });
 
@@ -447,7 +523,7 @@ export const handlers = [
   }),
 
   // Target Drift
-  http.get('/api/v1/targets/:id/drift', ({ params }) => {
+  authGet('/api/v1/targets/:id/drift', ({ params }) => {
     const targetId = params.id as string;
     const drift = mockDrifts[targetId] || {
       targetId,
@@ -467,7 +543,7 @@ export const handlers = [
   }),
 
   // Alerts
-  http.get('/api/v1/alerts', ({ request }) => {
+  authGet('/api/v1/alerts', ({ request }) => {
     const url = new URL(request.url);
     const targetId = url.searchParams.get('targetId');
     const type = url.searchParams.get('type');
@@ -483,7 +559,7 @@ export const handlers = [
     return HttpResponse.json(result);
   }),
 
-  http.patch('/api/v1/alerts/:id/ack', ({ params }) => {
+  authPatch('/api/v1/alerts/:id/ack', ({ params }) => {
     const alert = alertsStore.find((a) => a.id === params.id);
     if (!alert) return new HttpResponse(null, { status: 404 });
     alert.acknowledged = true;
@@ -492,7 +568,7 @@ export const handlers = [
   }),
 
   // Probes
-  http.get('/api/v1/probes', ({ request }) => {
+  authGet('/api/v1/probes', ({ request }) => {
     const url = new URL(request.url);
     const targetId = url.searchParams.get('targetId');
     if (targetId) {
@@ -502,19 +578,19 @@ export const handlers = [
   }),
 
   // HSM Inventory
-  http.get('/api/v1/hsm/inventory', () => {
+  authGet('/api/v1/hsm/inventory', () => {
     return HttpResponse.json(mockHsmInventory);
   }),
 
   // Audit Verify Chain
-  http.get('/api/v1/audit/verify', () => {
+  authGet('/api/v1/audit/verify', () => {
     return HttpResponse.json(mockAuditVerify);
   }),
 
   // --- v1.0.0 Crypto Mass Conservation (CMC) Endpoints ---
 
   // Coverage Certificate for scan
-  http.get('/api/v1/scans/:id/coverage', ({ params }) => {
+  authGet('/api/v1/scans/:id/coverage', ({ params }) => {
     return HttpResponse.json({
       ...mockCoverageCertificate,
       scanId: String(params.id),
@@ -522,12 +598,12 @@ export const handlers = [
   }),
 
   // Artifact Coverage for scan
-  http.get('/api/v1/scans/:id/coverage/artifacts', () => {
+  authGet('/api/v1/scans/:id/coverage/artifacts', () => {
     return HttpResponse.json(mockArtifactCoverages);
   }),
 
   // Residue Clusters list
-  http.get('/api/v1/residue', ({ request }) => {
+  authGet('/api/v1/residue', ({ request }) => {
     const url = new URL(request.url);
     const state = url.searchParams.get('state');
     const targetId = url.searchParams.get('targetId');
@@ -538,14 +614,14 @@ export const handlers = [
   }),
 
   // Residue Cluster detail
-  http.get('/api/v1/residue/:id', ({ params }) => {
+  authGet('/api/v1/residue/:id', ({ params }) => {
     const cluster = residueClustersStore.find((c) => c.id === params.id);
     if (!cluster) return new HttpResponse(null, { status: 404 });
     return HttpResponse.json(cluster);
   }),
 
   // Residue Cluster patch
-  http.patch('/api/v1/residue/:id', async ({ params, request }) => {
+  authPatch('/api/v1/residue/:id', async ({ params, request }) => {
     const cluster = residueClustersStore.find((c) => c.id === params.id);
     if (!cluster) return new HttpResponse(null, { status: 404 });
 
@@ -576,7 +652,7 @@ export const handlers = [
   }),
 
   // Asset Criticality list
-  http.get('/api/v1/criticality', ({ request }) => {
+  authGet('/api/v1/criticality', ({ request }) => {
     const url = new URL(request.url);
     const targetId = url.searchParams.get('targetId');
     let result = [...assetCriticalitiesStore];
@@ -585,7 +661,7 @@ export const handlers = [
   }),
 
   // Asset Criticality upsert
-  http.put('/api/v1/criticality', async ({ request }) => {
+  authPut('/api/v1/criticality', async ({ request }) => {
     const item = (await request.json()) as AssetCriticality;
     const idx = assetCriticalitiesStore.findIndex(
       (c) => c.targetId === item.targetId && c.pathPattern === item.pathPattern
@@ -599,7 +675,7 @@ export const handlers = [
   }),
 
   // Asset Criticality CSV import
-  http.post('/api/v1/criticality/import', async () => {
+  authPost('/api/v1/criticality/import', async () => {
     return HttpResponse.json({
       imported: 2,
       records: assetCriticalitiesStore,
@@ -607,12 +683,12 @@ export const handlers = [
   }),
 
   // Cloud KMS Keys
-  http.get('/api/v1/cloud/keys', () => {
+  authGet('/api/v1/cloud/keys', () => {
     return HttpResponse.json(mockCloudKeysResponse);
   }),
 
   // Estate Coverage
-  http.get('/api/v1/estate/coverage', () => {
+  authGet('/api/v1/estate/coverage', () => {
     return HttpResponse.json(mockEstateCoverage);
   }),
 ];

@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
-import { createScan } from '../../lib/api';
+import { createScan, fetchPolicies } from '../../lib/api';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import {
   Upload,
   FileArchive,
@@ -37,6 +39,11 @@ export default function ScanLauncherPage() {
   const [scanStage, setScanStage] = useState<'idle' | 'ingesting' | 'scanning' | 'scoring' | 'done'>('idle');
   const [counters, setCounters] = useState({ files: 0, bytes: 0, findings: 0 });
 
+  const { error: policiesError, refetch: refetchPolicies } = useQuery({
+    queryKey: ['policies'],
+    queryFn: fetchPolicies,
+  });
+
   const createScanMutation = useMutation({
     mutationFn: (data: { path: string; policyId: string; crqcYears: number } | FormData) => createScan(data),
     onSuccess: (newScan) => {
@@ -58,6 +65,15 @@ export default function ScanLauncherPage() {
       setScanStage('idle');
     },
   });
+
+  if (isUnauthorizedError(policiesError)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => refetchPolicies()}
+        context="Screen 1 · Cryptographic Scan Launcher"
+      />
+    );
+  }
 
   const startScan = () => {
     setIsScanning(true);
@@ -219,15 +235,25 @@ export default function ScanLauncherPage() {
                 )}
               </button>
               {createScanMutation.isError && (
-                <div
-                  role="alert"
-                  className="mt-3 p-3 rounded border border-[var(--band-critical)] bg-[var(--crypto-shor-bg)] text-[var(--band-critical)] text-[11px] flex items-start gap-2"
-                >
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                  <span>
-                    SCAN REJECTED: {createScanMutation.error instanceof Error ? createScanMutation.error.message : 'Unknown error'}
-                  </span>
-                </div>
+                isUnauthorizedError(createScanMutation.error) ? (
+                  <div className="mt-3">
+                    <UnauthorizedState
+                      inline
+                      onRetry={startScan}
+                      context="Scan Submission Rejected"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    role="alert"
+                    className="mt-3 p-3 rounded border border-[var(--band-critical)] bg-[var(--crypto-shor-bg)] text-[var(--band-critical)] text-[11px] flex items-start gap-2"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>
+                      SCAN REJECTED: {createScanMutation.error instanceof Error ? createScanMutation.error.message : 'Unknown error'}
+                    </span>
+                  </div>
+                )
               )}
             </div>
           </div>

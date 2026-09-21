@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { fetchEstateTrend } from '../../lib/api';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import type { EstateTrendPoint } from '../../types/crypto';
 import {
   TrendingDown,
@@ -27,6 +29,7 @@ export default function TrendPage() {
   const {
     data: trendData,
     isLoading,
+    error,
     refetch,
   } = useQuery({
     queryKey: ['estateTrend', selectedDays],
@@ -116,6 +119,15 @@ export default function TrendPage() {
       return `${acc} ${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.yCrit.toFixed(1)}`;
     }, '');
   }, [pointsWithCoords]);
+
+  if (isUnauthorizedError(error)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => refetch()}
+        context="Cryptographic Trend Console"
+      />
+    );
+  }
 
   if (isLoading && points.length === 0) {
     return (
