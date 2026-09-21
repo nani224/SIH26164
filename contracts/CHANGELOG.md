@@ -1,5 +1,12 @@
 # Contract Changelog
 
+## 1.0.1-auth — 2026-09-21
+
+Production hardening: Bearer authentication requirement:
+- **Security**: Added `bearerAuth` (`HTTPBearer`) security scheme applied globally across all API routes except `GET /api/v1/health`.
+- **Headers**: All requests outside `/health` now require `Authorization: Bearer <token>`.
+- **Note for Frontend**: The frontend track (H2) must attach the configured bearer token to all API requests.
+
 ## 1.0.0-cmc — 2026-09-21
 
 Major contract update for ECDAT v1.0 Crypto Mass Conservation (CMC) Engine & Track A1:

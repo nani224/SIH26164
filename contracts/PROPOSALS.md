@@ -54,3 +54,10 @@ This file tracks RFCs and change proposals from the frontend (`Antigravity`) to 
     "progressPercent": 100
   }
   ```
+
+---
+
+### [ACCEPTED] RFC-005: Shared Bearer Token Authentication (v1.0.1)
+- **Status**: ACCEPTED & MERGED in contracts/openapi.yaml (v1.0.1).
+- **Justification**: Production hardening audit requirement. Gated API access via shared bearer token (`ECDAT_API_TOKEN`).
+- **Frontend Action Required**: Frontend track (H2) must attach `Authorization: Bearer <token>` to all API requests made by the frontend client (via environment variable or config), excluding `GET /api/v1/health`.

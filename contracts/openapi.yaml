@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ECDAT API
-  version: "1.0.0"
+  version: "1.0.1"
   description: >
     Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) API contract.
     Phase 0: this contract is implemented by an in-memory stub (see
@@ -12,9 +12,13 @@ servers:
   - url: /api/v1
     description: Relative to backend host; full generated paths (used by contract_diff) are under /api/v1.
 
+security:
+  - bearerAuth: []
+
 paths:
   /api/v1/health:
     get:
+      security: []
       operationId: health
       summary: Liveness/readiness check
       tags: [system]
@@ -1689,4 +1693,10 @@ components:
         targets:
           type: array
           items: { $ref: "#/components/schemas/TargetCoverageSummary" }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Single shared bearer token configured via ECDAT_API_TOKEN.
 
