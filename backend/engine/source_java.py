@@ -30,6 +30,7 @@ Two things the query alone can't express, handled here in Python:
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +38,7 @@ import tree_sitter
 import tree_sitter_java
 
 from api.models import CryptoFunction, Family, FindingKind, FindingSource, Surface
-from engine.models import Detection
+from engine.models import Detection, Span
 
 _QUERY_PATH = Path(__file__).parent / "queries" / "java_crypto.scm"
 
@@ -152,7 +153,9 @@ def detect_file(path: Path) -> list[Detection]:
     return detect_code(source, str(path))
 
 
-def detect_code(source: bytes, path: str = "<source>") -> list[Detection]:
+def detect_code(source: bytes, path: str = "<source>", artifact_hash: str | None = None) -> list[Detection]:
+    if artifact_hash is None:
+        artifact_hash = hashlib.sha256(source).hexdigest()
     tree = _PARSER.parse(source)
     matches = tree_sitter.QueryCursor(_QUERY).matches(tree.root_node)
     ordered = sorted(matches, key=lambda m: _match_start(m[1]))
@@ -162,9 +165,9 @@ def detect_code(source: bytes, path: str = "<source>") -> list[Detection]:
 
     for _pattern_index, captures in ordered:
         if captures.get("call.node"):
-            _handle_call(path, captures, pending, detections)
+            _handle_call(path, captures, pending, detections, artifact_hash)
         elif captures.get("new.node"):
-            detection = _classify_new(path, captures)
+            detection = _classify_new(path, captures, artifact_hash)
             if detection is not None:
                 detections.append(detection)
 
@@ -184,6 +187,7 @@ def _handle_call(
     captures: dict[str, list[tree_sitter.Node]],
     pending: dict[str, Detection],
     detections: list[Detection],
+    artifact_hash: str,
 ) -> None:
     call_node = captures["call.node"][0]
     obj_node = captures["call.object"][0]
@@ -192,7 +196,7 @@ def _handle_call(
     obj, method = _text(obj_node), _text(name_node)
 
     if method == "getInstance" and obj in _GET_INSTANCE_CLASSES:
-        detection = _classify_get_instance(path, obj, args_node, call_node)
+        detection = _classify_get_instance(path, obj, args_node, call_node, artifact_hash)
         if detection is None:
             return
         if obj in _LINKABLE_CLASSES:
@@ -224,14 +228,21 @@ def _assigned_variable_name(call_node: tree_sitter.Node) -> str | None:
 
 
 def _classify_get_instance(
-    path: str, class_name: str, args_node: tree_sitter.Node, call_node: tree_sitter.Node
+    path: str, class_name: str, args_node: tree_sitter.Node, call_node: tree_sitter.Node, artifact_hash: str
 ) -> Detection | None:
     transformation = _first_string_literal_text(args_node)
     if transformation is None:
         return None
     line = call_node.start_point[0] + 1
     snippet = _text(call_node)[:200]
-    common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST)
+    span = Span(
+        artifact_hash=artifact_hash,
+        kind="ast",
+        start=call_node.start_byte,
+        end=call_node.end_byte,
+        producing_rule=f"java_ast.{class_name}.getInstance",
+    )
+    common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST, spans=[span])
     symbol = f"{class_name}.getInstance"
 
     if class_name == "Cipher":
@@ -335,14 +346,21 @@ def _classify_get_instance(
     return None
 
 
-def _classify_new(path: str, captures: dict[str, list[tree_sitter.Node]]) -> Detection | None:
+def _classify_new(path: str, captures: dict[str, list[tree_sitter.Node]], artifact_hash: str) -> Detection | None:
     new_node = captures["new.node"][0]
     type_node = captures["new.type"][0]
     args_node = captures["new.args"][0]
     type_name = _text(type_node)
     line = new_node.start_point[0] + 1
     snippet = _text(new_node)[:200]
-    common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST)
+    span = Span(
+        artifact_hash=artifact_hash,
+        kind="ast",
+        start=new_node.start_byte,
+        end=new_node.end_byte,
+        producing_rule=f"java_ast.new_{type_name}",
+    )
+    common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST, spans=[span])
 
     if type_name == "SecretKeySpec":
         args = [c for c in args_node.named_children]

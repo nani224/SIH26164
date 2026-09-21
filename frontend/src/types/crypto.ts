@@ -16,6 +16,47 @@ export type GraphNode = Schemas['GraphNode'];
 export type GraphEdge = Schemas['GraphEdge'];
 export type PqcCatalogItem = Schemas['PqcCatalogEntry'];
 
+// v0.3.0 Continuous Operation Schemas
+export type Target = Schemas['Target'];
+export type TargetKind = Schemas['TargetKind'];
+export type TargetCreate = Schemas['TargetCreate'];
+export type TargetPatch = Schemas['TargetPatch'];
+export type EstateSummary = Schemas['EstateSummary'];
+export type EstateTrend = Schemas['EstateTrend'];
+export type EstateTrendPoint = Schemas['EstateTrendPoint'];
+export type ScanSnapshot = Schemas['ScanSnapshot'];
+export type Drift = Schemas['Drift'];
+export type DriftChangedItem = Schemas['DriftChangedItem'];
+export type DriftSummary = Schemas['DriftSummary'];
+export type Alert = Schemas['Alert'];
+export type AlertType = Schemas['AlertType'];
+export type ProbeResult = Omit<Schemas['ProbeResult'], 'negotiated' | 'supported'> & {
+  negotiated: Record<string, any>;
+  supported: Record<string, any>[];
+};
+export type ProbeProtocol = Schemas['ProbeProtocol'];
+export type HsmInventory = Schemas['HsmInventory'];
+export type HsmSlot = Schemas['HsmSlot'];
+export type HsmKey = Schemas['HsmKey'];
+export type AuditVerifyResponse = Schemas['AuditVerifyResponse'];
+
+// v1.0.0 Crypto Mass Conservation (CMC) Schemas
+export type CoverageCertificate = Schemas['CoverageCertificate'];
+export type ArtifactCoverage = Schemas['ArtifactCoverage'];
+export type ResidueCluster = Schemas['ResidueCluster'];
+export type ResidueClusterState = Schemas['ResidueClusterState'];
+export type ResidueClusterPatch = Schemas['ResidueClusterPatch'];
+export type ResidueOccurrence = Schemas['ResidueOccurrence'];
+export type AssetCriticality = Schemas['AssetCriticality'];
+export type AssetFacing = Schemas['AssetFacing'];
+export type CriticalitySource = Schemas['CriticalitySource'];
+export type Criticality = Schemas['Criticality'];
+export type CriticalityImportResponse = Schemas['CriticalityImportResponse'];
+export type CloudKeyRecord = Schemas['CloudKeyRecord'];
+export type CloudKeysResponse = Schemas['CloudKeysResponse'];
+export type TargetCoverageSummary = Schemas['TargetCoverageSummary'];
+export type EstateCoverage = Schemas['EstateCoverage'];
+
 /**
  * Strict Cryptographic Semantic Classes (Prompt 1, Section 7)
  * Identical across every chart, badge, node, and border.

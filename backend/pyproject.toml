@@ -16,6 +16,12 @@ dependencies = [
     "tree-sitter-go>=0.25.0",
     "tree-sitter-java>=0.23.5",
     "tree-sitter-c>=0.24.2",
+    "apscheduler>=3.10.0",
+    "sslyze>=6.3.0",
+    "ssh-audit>=3.3.0",
+    "python-pkcs11>=0.7.0",
+    "pefile>=2024.8.26",
+    "lief>=1.0.0",
 ]
 
 [dependency-groups]
@@ -57,4 +63,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["engine", "api", "scripts", "bench"]
+packages = ["engine", "api", "scripts", "bench", "scheduler", "probes"]

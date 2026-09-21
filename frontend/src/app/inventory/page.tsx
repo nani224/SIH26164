@@ -8,6 +8,8 @@ import { fetchScanFindings } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { CbomExportButton } from '../../components/CbomExportButton';
+import { CriticalityModal } from '../../components/CriticalityModal';
+import { CloudKeysModal } from '../../components/CloudKeysModal';
 import { classifyAlgorithm } from '../../types/crypto';
 import {
   ListFilter,
@@ -19,11 +21,14 @@ import {
   Cpu,
   Cloud,
   HelpCircle,
+  Shield,
 } from 'lucide-react';
 
 export default function InventoryPage() {
   const { activeScanId, openDrawer } = useAppStore();
 
+  const [isCriticalityModalOpen, setIsCriticalityModalOpen] = useState(false);
+  const [isCloudKeysModalOpen, setIsCloudKeysModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBand, setSelectedBand] = useState<string>('all');
   const [selectedFamily, setSelectedFamily] = useState<string>('all');
@@ -111,7 +116,23 @@ export default function InventoryPage() {
             Virtualized 60 fps catalog. Live API queries via TanStack Query. Hardware and Cloud KMS appear with [Proposed] tag.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            id="open-criticality-btn"
+            onClick={() => setIsCriticalityModalOpen(true)}
+            className="px-3 py-1.5 rounded text-xs font-semibold bg-[var(--surface-raised)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--crypto-shor-border)] transition-colors flex items-center gap-1.5"
+          >
+            <Shield className="w-3.5 h-3.5 text-[var(--crypto-shor)]" />
+            <span>Business Criticality</span>
+          </button>
+          <button
+            id="open-cloud-keys-btn"
+            onClick={() => setIsCloudKeysModalOpen(true)}
+            className="px-3 py-1.5 rounded text-xs font-semibold bg-[var(--surface-raised)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--crypto-pqc-border)] transition-colors flex items-center gap-1.5"
+          >
+            <Cloud className="w-3.5 h-3.5 text-[var(--crypto-pqc)]" />
+            <span>Cloud KMS Keys</span>
+          </button>
           <CbomExportButton scanId={activeScanId} />
         </div>
       </div>
@@ -214,7 +235,7 @@ export default function InventoryPage() {
       </div>
 
       {isLoading ? (
-        <div className="p-12 text-center border border-[var(--border-subtle)] rounded-lg bg-[var(--surface-card)]">
+        <div className="p-12 text-center border border-[var(--border-subtle)] rounded-lg bg-[var(--surface-card)] animate-pulse">
           <RefreshCw className="w-5 h-5 animate-spin text-[var(--crypto-pqc)] mx-auto mb-2" />
           <span className="text-xs text-[var(--text-muted)]">LOADING DISCOVERED ASSET INVENTORY...</span>
         </div>
@@ -289,6 +310,17 @@ export default function InventoryPage() {
                           label={f.family ?? undefined}
                           size="sm"
                         />
+                        {f.negotiated !== undefined && f.negotiated !== null && (
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider border ${
+                              f.negotiated
+                                ? 'bg-[var(--crypto-pqc-bg)] text-[var(--crypto-pqc)] border-[var(--crypto-pqc-border)]'
+                                : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+                            }`}
+                          >
+                            {f.negotiated ? 'NEGOTIATED' : 'SUPPORTED'}
+                          </span>
+                        )}
                         {isProposed && (
                           <span
                             title="[Proposed: Hardware security module & cloud discovery pending backend implementation]"
@@ -340,6 +372,18 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
+
+      {/* PS-Gap Modals: Business Criticality & Cloud KMS Discovery */}
+      <CriticalityModal
+        isOpen={isCriticalityModalOpen}
+        onClose={() => setIsCriticalityModalOpen(false)}
+        findings={virtualRows}
+        onApplyCriticality={() => refetch()}
+      />
+      <CloudKeysModal
+        isOpen={isCloudKeysModalOpen}
+        onClose={() => setIsCloudKeysModalOpen(false)}
+      />
     </div>
   );
 }

@@ -76,7 +76,7 @@ order, every time, no exceptions:
 5. **Never edit the labels to make that run's number look better.**
    If a "false positive" turns out to be a labelling-convention question
    rather than a detector defect (this happened once — see
-   `docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md`),
+   `docs/decisions/backend/009-corpus-growth-and-aes-attribution.md`),
    the resolution is to document the root cause and fix the *convention*
    for the *next* file, never to retroactively edit an already-scored
    file's labels. Inspecting a miss and then relabelling to match is
@@ -87,7 +87,7 @@ above on the file that motivated it — i.e., you read a real file, notice
 the detector has no rule for a pattern it uses, and add that rule *before*
 that file is labelled or scored. This happened three times in M7 (Go
 `crypto/dsa` sign/verify, Java `SecretKeyFactory`/PBKDF2) — see
-`docs/decisions/backend/019-m7-corpus-growth-and-aes-attribution.md` for
+`docs/decisions/backend/009-corpus-growth-and-aes-attribution.md` for
 the exact reasoning and why it's different from reacting to a run's
 output.
 
@@ -115,7 +115,7 @@ truth=56 detected=48 tp=46
 Real_world (HOLD): 14 real, unseen, permissively-licensed files, 4
 languages, 56 labelled usages. Precision 0.9583 (above the CI floor of
 0.95; the 2 "false positives" are a labelling-convention finding, not a
-code defect — see ADR 019). Recall 0.8214 (46/56) — down from the prior
+code defect — see ADR 009). Recall 0.8214 (46/56) — down from the prior
 session's 0.875 purely because the corpus grew faster than detector
 coverage; every usage found before this session is still found. Grew from
 25/2-language (pre-M1) -> 32/9-file/4-language (M6, 2026-09-19) ->
@@ -134,7 +134,7 @@ the build (exit 1) if either corpus drops below 0.95. It was proven to
 actually do this on GitHub's real infrastructure, not just locally: M8b
 deliberately broke precision on a throwaway branch and confirmed a real
 `failure` conclusion on the `backend-ci` job (PR #12, closed unmerged,
-change reverted) — see `backend/PROGRESS.md`'s 2026-09-20 M8 entry for
+change reverted) — see `docs/engineering/backend/PROGRESS.md`'s 2026-09-20 M8 entry for
 the full real command/log output of both the local break and the GitHub
 Actions failure.
 
@@ -150,7 +150,7 @@ list; the categories are:
    generalizable rule. 1 instance.
 2. **Local-variable dataflow for `.verify()`/`.sign()`** — the receiver's
    type comes from a runtime-computed local variable, not a typed
-   parameter (ADR 016 only resolves the parameter case). 1 pyjwt instance.
+   parameter (ADR 007 only resolves the parameter case). 1 pyjwt instance.
 3. **Generic `cipher.Stream`/`cipher.BlockMode` interface (Go)** — the
    concrete cipher (`aes.NewCipher`) is constructed several calls before
    the actual `XORKeyStream`/`CryptBlocks` operation, behind a generic

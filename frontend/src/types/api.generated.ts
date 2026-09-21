@@ -261,6 +261,385 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all monitored scan targets */
+        get: operations["listTargets"];
+        put?: never;
+        /** Register a new scan target */
+        post: operations["createTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/targets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get target by id */
+        get: operations["getTarget"];
+        put?: never;
+        post?: never;
+        /** Delete target */
+        delete: operations["deleteTarget"];
+        options?: never;
+        head?: never;
+        /** Update target configuration */
+        patch: operations["patchTarget"];
+        trace?: never;
+    };
+    "/api/v1/targets/{id}/scan-now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger an immediate scan for a target */
+        post: operations["scanTargetNow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/targets/{id}/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List snapshots for a target */
+        get: operations["listTargetSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/targets/{id}/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Calculate cryptographic drift between two snapshots of a target */
+        get: operations["getTargetDrift"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all active and historical alerts */
+        get: operations["listAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Acknowledge an alert */
+        patch: operations["acknowledgeAlert"];
+        trace?: never;
+    };
+    "/api/v1/probes/tls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Probe an endpoint for TLS cryptographic configuration */
+        post: operations["probeTls"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probes/ssh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Probe an endpoint for SSH cryptographic configuration */
+        post: operations["probeSsh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List historical probe results */
+        get: operations["listProbeResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hsm/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Enumerate PKCS#11 / SoftHSM2 cryptographic keys and slots */
+        get: operations["getHsmInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/estate/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** High-level cryptographic estate posture and PQC readiness summary */
+        get: operations["getEstateSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/estate/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Historical estate risk trend over time */
+        get: operations["getEstateTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verify the cryptographic SHA-256 hash integrity of the audit log chain */
+        get: operations["verifyAuditChain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scans/{scan_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get crypto mass conservation coverage certificate for a scan */
+        get: operations["getScanCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scans/{scan_id}/coverage/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get per-artifact crypto mass conservation coverage for a scan */
+        get: operations["getScanArtifactCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/residue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List crypto debt residue clusters across scans and targets */
+        get: operations["listResidueClusters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/residue/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get details of a specific crypto debt residue cluster */
+        get: operations["getResidueCluster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Transition state of a residue cluster (open -> promoted | excluded | accepted) */
+        patch: operations["patchResidueCluster"];
+        trace?: never;
+    };
+    "/api/v1/criticality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List asset business criticalities and ownership mappings */
+        get: operations["listAssetCriticalities"];
+        /** Set or update asset business criticality mapping */
+        put: operations["setAssetCriticality"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/criticality/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import asset business criticalities from CSV (CMDB bulk load) */
+        post: operations["importAssetCriticalityCsv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cloud/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover cryptographic keys from cloud providers (AWS KMS via LocalStack) */
+        get: operations["listCloudKeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/estate/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get aggregated crypto coverage and debt trends across the estate */
+        get: operations["getEstateCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -272,7 +651,7 @@ export interface components {
         /** @enum {string} */
         FindingKind: "algorithm" | "certificate" | "key" | "protocol" | "library";
         /** @enum {string} */
-        Surface: "source" | "binary" | "certificate" | "config" | "image" | "manifest";
+        Surface: "source" | "binary" | "certificate" | "config" | "image" | "manifest" | "hardware-hsm";
         /** @enum {string} */
         Family: "RSA" | "DSA" | "DH" | "ECDH" | "ECDSA" | "Ed25519" | "X25519" | "AES" | "ChaCha20" | "3DES" | "DES" | "RC4" | "Blowfish" | "MD5" | "SHA-1" | "SHA-2" | "SHA-3" | "HMAC" | "ML-KEM" | "ML-DSA" | "SLH-DSA";
         /** @enum {string} */
@@ -403,6 +782,7 @@ export interface components {
             risk?: components["schemas"]["Risk"] | null;
             recommendation?: components["schemas"]["Recommendation"] | null;
             triage: components["schemas"]["Triage"];
+            negotiated?: boolean | null;
         };
         FindingPage: {
             items: components["schemas"]["Finding"][];
@@ -602,6 +982,241 @@ export interface components {
             findingCount?: number;
             scanId?: string;
             message?: string;
+        };
+        /** @enum {string} */
+        TargetKind: "repo" | "path" | "endpoint";
+        Target: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["TargetKind"];
+            uri: string;
+            policyId: string;
+            schedule: string;
+            enabled: boolean;
+            lastScanId?: string | null;
+            /** Format: date-time */
+            lastScanAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        TargetCreate: {
+            name: string;
+            kind: components["schemas"]["TargetKind"];
+            uri: string;
+            policyId: string;
+            schedule: string;
+            /** @default true */
+            enabled: boolean;
+        };
+        TargetPatch: {
+            name?: string | null;
+            policyId?: string | null;
+            schedule?: string | null;
+            enabled?: boolean | null;
+        };
+        ScanSnapshot: {
+            id: string;
+            targetId: string;
+            scanId: string;
+            /** Format: date-time */
+            takenAt: string;
+            bands: {
+                [key: string]: number;
+            };
+            totalFindings: number;
+            stats: components["schemas"]["ScanStats"];
+            /** @description Crypto Mass Conservation coverage ratio at the time of this snapshot (v1.0). */
+            coverageRatio?: number | null;
+            /** @description Unexplained residue mass at the time of this snapshot (v1.0). */
+            residueMass?: number | null;
+        };
+        DriftChangedItem: {
+            finding: components["schemas"]["Finding"];
+            fromBand: components["schemas"]["RiskBand"];
+            toBand: components["schemas"]["RiskBand"];
+        };
+        DriftSummary: {
+            addedCount: number;
+            resolvedCount: number;
+            changedCount: number;
+            netRiskDelta: number;
+            coverageDelta?: number | null;
+            residueMassDelta?: number | null;
+        };
+        Drift: {
+            targetId: string;
+            fromSnapshotId: string;
+            toSnapshotId: string;
+            added: components["schemas"]["Finding"][];
+            resolved: components["schemas"]["Finding"][];
+            changed: components["schemas"]["DriftChangedItem"][];
+            summary: components["schemas"]["DriftSummary"];
+        };
+        /** @enum {string} */
+        AlertType: "new-critical" | "cert-expiring" | "drift" | "probe-downgrade" | "residue-rise";
+        Alert: {
+            id: string;
+            type: components["schemas"]["AlertType"];
+            targetId: string;
+            findingId?: string | null;
+            severity: components["schemas"]["RiskBand"];
+            message: string;
+            /** Format: date-time */
+            createdAt: string;
+            acknowledged: boolean;
+        };
+        /** @enum {string} */
+        ProbeProtocol: "tls" | "ssh";
+        ProbeRequest: {
+            targetId: string;
+            host: string;
+            port: number;
+        };
+        ProbeResult: {
+            id: string;
+            targetId: string;
+            host: string;
+            port: number;
+            protocol: components["schemas"]["ProbeProtocol"];
+            negotiated: Record<string, never>;
+            supported: Record<string, never>[];
+            /** Format: date-time */
+            probedAt: string;
+        };
+        HsmKey: {
+            type: string;
+            size: number;
+            label: string;
+        };
+        HsmSlot: {
+            slot: number;
+            label: string;
+            keys: components["schemas"]["HsmKey"][];
+        };
+        HsmInventory: {
+            slots: components["schemas"]["HsmSlot"][];
+        };
+        EstateSummary: {
+            totalTargets: number;
+            totalScans: number;
+            totalFindings: number;
+            criticalFindings: number;
+            pqcReadinessScore: number;
+            activeAlerts: number;
+            /** @description Count of explicit AssetCriticality records with facing=internal (v1.0, PS clause i's internal/external split). */
+            internalFacingAssets: number;
+            /** @description Count of explicit AssetCriticality records with facing=external. */
+            externalFacingAssets: number;
+        };
+        EstateTrendPoint: {
+            date: string;
+            avgRiskScore: number;
+            criticalCount: number;
+            totalFindings: number;
+        };
+        EstateTrend: {
+            days: number;
+            points: components["schemas"]["EstateTrendPoint"][];
+        };
+        AuditVerifyResponse: {
+            /** @enum {string} */
+            status: "valid" | "tampered";
+            recordCount: number;
+            headHash: string;
+            details?: string | null;
+        };
+        CoverageCertificate: {
+            scanId: string;
+            artifactCount: number;
+            totalMass: number;
+            attributedMass: number;
+            excludedMass: number;
+            residueMass: number;
+            coverageRatio: number;
+            residueClusterCount: number;
+            /** Format: date-time */
+            computedAt: string;
+        };
+        ArtifactCoverage: {
+            artifactHash: string;
+            path: string;
+            totalMass: number;
+            attributed: number;
+            excluded: number;
+            residue: number;
+            coverageRatio: number;
+        };
+        ResidueOccurrence: {
+            artifactHash: string;
+            path: string;
+            range: number[];
+        };
+        /** @enum {string} */
+        ResidueClusterState: "open" | "promoted" | "excluded" | "accepted";
+        ResidueCluster: {
+            id: string;
+            contentHash: string;
+            signalTypes: string[];
+            magnitude: number;
+            occurrences: components["schemas"]["ResidueOccurrence"][];
+            state: components["schemas"]["ResidueClusterState"];
+            justification?: string | null;
+            owner?: string | null;
+            /** Format: date-time */
+            firstSeen: string;
+            /** Format: date-time */
+            lastSeen: string;
+        };
+        ResidueClusterPatch: {
+            state: components["schemas"]["ResidueClusterState"];
+            justification?: string | null;
+            owner?: string | null;
+        };
+        /** @enum {string} */
+        AssetFacing: "internal" | "external";
+        /** @enum {string} */
+        CriticalitySource: "manual" | "import";
+        AssetCriticality: {
+            targetId: string;
+            pathPattern: string;
+            criticality: components["schemas"]["Criticality"];
+            businessOwner: string;
+            dataClassification: string;
+            facing: components["schemas"]["AssetFacing"];
+            source: components["schemas"]["CriticalitySource"];
+        };
+        CriticalityImportResponse: {
+            imported: number;
+            records: components["schemas"]["AssetCriticality"][];
+        };
+        CloudKeyRecord: {
+            provider: string;
+            keyId: string;
+            algorithm: string;
+            keySize: number;
+            rotationAgeDays: number;
+            policyCompliant: boolean;
+            identityId?: string | null;
+        };
+        CloudKeysResponse: {
+            keys: components["schemas"]["CloudKeyRecord"][];
+            roadmap: string;
+        };
+        TargetCoverageSummary: {
+            targetId: string;
+            targetName: string;
+            coverageRatio: number;
+            residueMass: number;
+            totalMass: number;
+        };
+        EstateCoverage: {
+            overallCoverageRatio: number;
+            totalMass: number;
+            attributedMass: number;
+            excludedMass: number;
+            residueMass: number;
+            totalClusters: number;
+            targets: components["schemas"]["TargetCoverageSummary"][];
         };
     };
     responses: {
@@ -1041,6 +1656,634 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PqcCatalogEntry"][];
+                };
+            };
+        };
+    };
+    listTargets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Target"][];
+                };
+            };
+        };
+    };
+    createTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetCreate"];
+            };
+        };
+        responses: {
+            /** @description Target created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Target"];
+                };
+            };
+        };
+    };
+    getTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Target"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Target deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok?: boolean;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    patchTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Target"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    scanTargetNow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Scan created and executed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scan"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listTargetSnapshots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanSnapshot"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getTargetDrift: {
+        parameters: {
+            query: {
+                /** @description Baseline snapshot ID */
+                from: string;
+                /** @description Target snapshot ID */
+                to: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Drift"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAlerts: {
+        parameters: {
+            query?: {
+                acknowledged?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Alert"][];
+                };
+            };
+        };
+    };
+    acknowledgeAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Alert"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    probeTls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProbeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbeResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    probeSsh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProbeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbeResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    listProbeResults: {
+        parameters: {
+            query?: {
+                targetId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbeResult"][];
+                };
+            };
+        };
+    };
+    getHsmInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HsmInventory"];
+                };
+            };
+        };
+    };
+    getEstateSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstateSummary"];
+                };
+            };
+        };
+    };
+    getEstateTrend: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstateTrend"];
+                };
+            };
+        };
+    };
+    verifyAuditChain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditVerifyResponse"];
+                };
+            };
+        };
+    };
+    getScanCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: components["parameters"]["ScanId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageCertificate"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getScanArtifactCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: components["parameters"]["ScanId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactCoverage"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listResidueClusters: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["ResidueClusterState"];
+                targetId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResidueCluster"][];
+                };
+            };
+        };
+    };
+    getResidueCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResidueCluster"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    patchResidueCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResidueClusterPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResidueCluster"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAssetCriticalities: {
+        parameters: {
+            query?: {
+                targetId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetCriticality"][];
+                };
+            };
+        };
+    };
+    setAssetCriticality: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetCriticality"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetCriticality"];
+                };
+            };
+        };
+    };
+    importAssetCriticalityCsv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriticalityImportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    listCloudKeys: {
+        parameters: {
+            query?: {
+                provider?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloudKeysResponse"];
+                };
+            };
+        };
+    };
+    getEstateCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstateCoverage"];
                 };
             };
         };

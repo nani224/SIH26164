@@ -235,3 +235,103 @@ def test_rescore_10000_findings_performance(client: TestClient, seeded_10k_scan:
     bands = body["bands"]
     total_in_bands = sum(bands.values())
     assert total_in_bands == 10000
+
+
+def test_get_findings_10000_findings_performance(client: TestClient) -> None:
+    """G4 perf pass regression: a real server measured ~700-780ms p50/p95 for
+    the default (unfiltered) GET /findings on a 10k-finding scan, because
+    list_findings() always materializes every finding into a full Pydantic
+    object before filter_findings()/paginate() ever run -- regardless of the
+    requested page size. Fixed via store.list_findings_page()'s SQL-level
+    LIMIT/OFFSET fast path (api/routes/scans.py's get_findings, used whenever
+    no band/family/surface/source/minConfidence/needsReview/q/sort filter is
+    present). Brief-derived budget: p95 < 150ms; asserts the single-call
+    latency here since TestClient has no separate p50/p95 concept, with slack
+    for CI-container jitter.
+
+    Seeds its own scan_id/finding-id space (distinct from seeded_10k_scan's
+    "scan_perf_10k") so it can't collide with that fixture's rows in the
+    shared session-scoped test DB."""
+    from api.db import session_scope
+
+    scan_id = "scan_perf_10k_findings"
+    now = datetime.now(UTC)
+    records = [
+        FindingRecord(
+            id=f"finding_perf_findings_{i:05d}",
+            scan_id=scan_id,
+            kind="algorithm",
+            surface="source",
+            family="RSA" if i < 2000 else "AES",
+            display_name="RSA-2048" if i < 2000 else "AES-128",
+            key_size=None,
+            mode=None,
+            curve=None,
+            function="encrypt",
+            location_path=f"src/subsystem_{i % 50}/crypto.py",
+            location_line=i + 1,
+            location_offset=None,
+            location_layer=None,
+            symbol=f"CRYPTO_SYM_{i}",
+            snippet="crypto_call()",
+            source="ast",
+            confidence=0.95,
+            risk_score=48.6,
+            risk_band="high",
+            risk_v=1.0,
+            risk_f=0.9,
+            risk_u=0.75,
+            risk_e=0.9,
+            risk_k=0.8,
+            risk_x=10.0,
+            risk_y=5.0,
+            risk_z=10.0,
+            risk_mosca_margin=5.0,
+            risk_reason="G4c perf regression test seed",
+            risk_classically_broken=False,
+            risk_hndl=False,
+            risk_needs_review=False,
+            recommendation=None,
+            triage_status="open",
+            triage_note=None,
+        )
+        for i in range(10000)
+    ]
+    with session_scope() as session:
+        session.merge(
+            ScanRecord(
+                id=scan_id,
+                status="done",
+                target="/test/g4c-perf-findings",
+                policy_id="default",
+                crqc_years=10,
+                started_at=now,
+                finished_at=now,
+                bands={},
+            )
+        )
+        session.add_all(records)
+        session.commit()
+
+    client.get(f"/api/v1/scans/{scan_id}")  # warm up
+
+    start = time.perf_counter()
+    resp = client.get(f"/api/v1/scans/{scan_id}/findings")
+    elapsed_ms = (time.perf_counter() - start) * 1000
+
+    assert resp.status_code == 200
+    body: dict[str, Any] = resp.json()
+    assert body["total"] == 10000
+    assert len(body["items"]) == 50  # default limit
+    assert body["cursor"] == "50"
+
+    print(f"\n[PERF RESULT] GET /findings (10,000-finding scan, default page): {elapsed_ms:.2f} ms")
+    assert elapsed_ms < 150.0, f"GET /findings took {elapsed_ms:.2f}ms, exceeding 150ms budget!"
+
+    # Filtered path still correct (falls back to the slower full-scan path,
+    # not covered by the 150ms budget above, but must return right results).
+    filtered = client.get(f"/api/v1/scans/{scan_id}/findings", params={"family": "RSA", "limit": 5})
+    assert filtered.status_code == 200
+    filtered_body: dict[str, Any] = filtered.json()
+    assert filtered_body["total"] == 2000
+    assert all(item["family"] == "RSA" for item in filtered_body["items"])

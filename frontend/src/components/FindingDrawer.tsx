@@ -107,6 +107,17 @@ export function FindingDrawer() {
                   needsReview={risk.needsReview}
                 />
                 <RiskBandBadge band={risk.band} score={risk.score} />
+                {finding.negotiated !== undefined && finding.negotiated !== null && (
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                      finding.negotiated
+                        ? 'bg-[var(--crypto-pqc-bg)] text-[var(--crypto-pqc)] border-[var(--crypto-pqc-border)]'
+                        : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+                    }`}
+                  >
+                    {finding.negotiated ? 'NEGOTIATED' : 'SUPPORTED'}
+                  </span>
+                )}
               </div>
               <h2 className="text-lg font-mono font-bold text-[var(--text-primary)]">
                 {finding.displayName} in {finding.location.path}

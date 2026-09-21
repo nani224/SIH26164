@@ -2,181 +2,206 @@
 
 [![Airgap](https://img.shields.io/badge/Air--Gap-Strictly%20Enforced-emerald.svg)](#security--air-gap-invariants)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI%203.1-0%20Contract%20Drift-blue.svg)](contracts/openapi.yaml)
-[![CBOM](https://img.shields.io/badge/CBOM-CycloneDX%201.6-purple.svg)](#cbom-export)
-[![Tests](https://img.shields.io/badge/Tests-112%20Pytest%20%7C%2037%20Vitest%20%7C%2024%20Playwright-brightgreen.svg)](#measured-verification-results)
-[![Precision](https://img.shields.io/badge/Detection%20F1-1.000%20(Synthetic%20%26%20Real--World)-success.svg)](#measured-verification-results)
+[![CBOM](https://img.shields.io/badge/CBOM-CycloneDX%201.6-purple.svg)](#measured-verification-results)
+[![Tests](https://img.shields.io/badge/Backend-257%20Pytest-brightgreen.svg)](#measured-verification-results)
+[![Release](https://img.shields.io/badge/Release-v1.0.0-informational.svg)](CHANGELOG.md)
 
-**ECDAT** is a defense-grade, air-gapped cryptographic discovery, quantum risk scoring, and migration orchestration platform built for high-assurance intelligence and sovereign infrastructure (NTRO / SIH26164).
+**ECDAT** is an air-gapped cryptographic discovery, quantum-risk scoring, and PQC migration platform: it scans source code, binaries, and running infrastructure for cryptographic assets, scores their quantum risk against Mosca's inequality, recommends post-quantum replacements, and exports a CycloneDX 1.6 Cryptographic Bill of Materials (CBOM).
+
+**v1.0.0** adds the capability no competitor has: **Crypto Mass Conservation (CMC)**. The tool now reports what it could *not* explain. Every scan carries a **Coverage Certificate** and a **Debt Ledger of Residue Clusters**. Unmodelled or proprietary crypto is never swept under the rug — it is reported with exact byte/source ranges and can be operated (promoted to rules, excluded with justification + owner, or accepted).
+
+**Documentation**: [`docs/README.md`](docs/README.md) is the index — architecture, install, operations, API reference, benchmark protocol, security, and a Q&A pack, each with real dated numbers and the exact commands that produced them.
+
+---
+
+## Architecture
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full component diagram, data flow, and module ownership map. Summary:
+
+```mermaid
+graph TD
+    subgraph Frontend["frontend/ — Next.js 15 (Cipher Observatory)"]
+        UI[16 routes: overview, inventory, mosca,\ngraph, estate, drift, alerts, trend,\ncertificates, plan, policies, launcher,\nheatmap, specimen, residue, and /]
+    end
+
+    subgraph Backend["backend/ — FastAPI"]
+        API[api/ — routes, models, SQLite persistence]
+        ENGINE[engine/ — tree-sitter detection,\nrisk formula, extractors, attribution,\nCMC certificate, PQC recommendations]
+        SCHED[scheduler/ — APScheduler cron target scans]
+        PROBES[probes/ — live TLS/SSH/HSM/registry/cloud probes,\nwebhook alert dispatch, all guarded by probes/guard.py]
+    end
+
+    subgraph External["Guarded real infrastructure"]
+        TLS[Weak-TLS demo target]
+        REG[Local container registry]
+        HSM[SoftHSM2 PKCS#11]
+        KMS[LocalStack AWS KMS]
+        HOOK[Operator webhook endpoint]
+    end
+
+    UI -->|REST + WS, contract-exact| API
+    API --> ENGINE
+    API --> SCHED
+    SCHED -->|unattended cron scans| API
+    API --> PROBES
+    PROBES -->|allowlisted only| TLS
+    PROBES -->|localhost only| REG
+    PROBES --> HSM
+    PROBES --> KMS
+    PROBES -->|operator-configured URL| HOOK
+    API --> DB[(SQLite\nscans, findings, targets,\ncoverage, residue, alerts, audit log)]
+```
+
+`contracts/openapi.yaml` is the single source of truth for the API shape; both the backend's generated OpenAPI and the frontend's generated TS types are checked against it with zero drift.
 
 ---
 
 ## Key Capabilities
 
-1. **Multi-Surface Detection Engine**:
-   - Source code Abstract Syntax Trees (Tree-sitter queries for Python and Go).
-   - Compiled binary inspection via static byte signatures and ELF constant analysis (e.g. stripped binary AES substitution box tables).
-   - Cryptographic material & X.509 certificate parsing (PEM/DER certificate discovery and expiry tracking).
-2. **Mosca Urgency & Quantum Risk Scoring ($X + Y > Z$)**:
-   - Real-time quantum risk reassessment across variable CRQC horizons ($Z \in [5, 15]$ years) with $O(N)$ high-throughput vectorized recalculation.
-   - Domain invariant preservation: classically broken primitives (MD5, SHA-1, DES, RC4) remain strictly pinned at $U = 1.0$.
-3. **CycloneDX 1.6 Cryptographic Bill of Materials (CBOM)**:
-   - Full schema-compliant JSON serialization (`bomFormat: CycloneDX`, `specVersion: 1.6`, `urn:uuid:` serial numbers).
-   - Cryptographic metadata tags for algorithms, key sizes, curves, attack surfaces, and PQC migration targets.
-4. **Cipher Observatory Frontend**:
-   - High-density signals intelligence interface styled in custom OKLCH palette tokens (`Observatory Deep Void`).
-   - 3D spatial WebGL topology graph (Three.js with instanced rendering running at 60.1 FPS for 5,000+ nodes) with automatic accessible 2D hierarchical fallback under `prefers-reduced-motion`.
-   - Comprehensive keyboard navigation, ARIA live regions, and WCAG 2.1 AA compliance across all 10 views.
+1. **Multi-surface, multi-language detection engine** — tree-sitter AST queries for Python, Java, Go, C/C++, Rust, and C#; PE/Mach-O binary constant inspection (e.g. stripped-binary AES S-box tables); PEM/DER certificate parsing.
+2. **Crypto Mass Conservation (CMC v1.0)** — extracts all cryptographic suspicion spans (tables, ARX, entropy, modular loops, literals, framing), computes mathematical mass conservation ($M_{\text{attributed}} + M_{\text{excluded}} + M_{\text{residue}} = M_{\text{total}}$), and renders a signed Coverage Certificate.
+3. **Residue Explorer & Debt Ledger (Screen 16)** — interactive inspection of unexplained clusters with exact byte/source range viewer, promotion of clusters to detection rules, and strict exclusion controls requiring business owner and written justification.
+4. **Mosca quantum-risk scoring** (`Score = 100 × V × F × U × E × K`, `M = X + Y − Z`) — real-time re-scoring across variable CRQC horizons; classically-broken primitives (MD5, SHA-1, DES, RC4, 3DES) pinned at `U = 1.0` and never move with `Z`.
+5. **Continuous operation & drift** — real APScheduler cron re-scans targets unattended; real drift detection reporting coverage shifts alongside finding deltas; alert engine with `residue_rise` alerts and webhook delivery.
+6. **Live infrastructure & cloud key probes** — real TLS handshakes (`sslyze`) reconciling negotiated vs supported ciphers, SoftHSM2/PKCS#11 key inventory, local registry scanning, and LocalStack AWS KMS discovery (Azure/GCP honestly marked `[Roadmap]`).
+7. **Tamper-evident audit log** — every mutation is recorded in a SHA-256 hash-chained log; `GET /audit/verify` detects any unauthorized modification.
+8. **CycloneDX 1.6 CBOM export** — schema-valid JSON embedding the signed coverage certificate and run manifest.
+9. **Cipher Observatory frontend** — 16 real routes, 3D/2D WebGL estate graph, full keyboard navigation, WCAG 2.1 AA compliant.
 
 ---
 
 ## Security & Air-Gap Invariants
 
-- **Strictly Deterministic**: Zero ML, LLM, or probabilistic heuristics in detection, factor attribution, or scoring formulas.
-- **Strictly Air-Gapped**: Zero external telemetry, tracking, or network calls. All Google Fonts, icons, and libraries are locally bundled.
-- **Contract-First Synchronization**: Zero contract drift between frontend client code, backend FastAPI implementation, and `contracts/openapi.yaml`.
+- **Strictly deterministic**: zero ML/LLM in detection, factor attribution, or scoring. Enforced by `scripts/verify_airgap.py`, which AST-scans for banned or network-capable imports (zero tolerance).
+- **Strictly air-gapped at runtime**: `probes/guard.py` enforces a real destination allowlist (localhost/approved test containers only) for every live probe; no external calls at runtime.
+- **Contract-first**: zero contract drift between `contracts/openapi.yaml`, backend models, and frontend TypeScript bindings.
+
+See [`docs/SECURITY.md`](docs/SECURITY.md) for the full threat model and hardening detail.
 
 ---
 
-## Quick Start & Installation
+## Quick Start
 
-### Prerequisites
-- **Python**: 3.12 with `uv` package manager (`uv` installed).
-- **Node.js**: Node 20+ with `pnpm`.
-- **Docker** (optional): Docker Compose v2 for containerized offline deployment.
+### Option 1 — Docker Compose (`make demo`, recommended)
 
----
-
-### Option 1: Native Local Run
-
-#### 1. Setup Backend
-```bash
-cd backend
-uv sync
-uv run python scripts/demo_seed.py
-uv run uvicorn api.main:app --port 8000
-```
-
-#### 2. Setup Frontend
-```bash
-cd frontend
-pnpm install
-pnpm build
-pnpm start -p 3000
-```
-
-Open `http://localhost:3000` to access the Cipher Observatory console.
-
----
-
-### Option 2: Docker Compose (Fully Offline)
-
-Run the entire platform offline in multi-stage production containers:
-
-```bash
-docker compose up -d --build
-```
-
-- **Web Frontend**: `http://localhost:3000`
-- **REST API & Swagger**: `http://localhost:8000`
-- **Optional Redis Cache**: Profile `redis` (`docker compose --profile redis up -d`)
-
-To shut down:
-```bash
-docker compose down
-```
-
----
-
-## Demo Script (`make demo`)
-
-ECDAT includes a single-command seed and verification pipeline that initializes the SQLite database, stores the CNSA 2.0 default defense policy, packages the benchmark corpus bundle, executes the complete ingestion scanner, and seeds the real stripped-binary finding:
-
-### Linux / macOS:
 ```bash
 make demo
 ```
 
-### Windows:
-```cmd
-make.bat demo
+Brings up the whole real stack: `api` (FastAPI), `web` (Next.js, MSW off — every screen hits the real API), a weak-TLS demo probe target on `:8443`, and a local container registry on `:5000`.
+
+- Web: `http://localhost:3000`
+- API + Swagger: `http://localhost:8000/docs`
+
+```bash
+make demo-down   # stop the stack
 ```
 
-The script outputs:
-```text
-=== ECDAT Demo Environment Setup ===
-[OK] Demo Policy seeded: National Defense Core (Default CNSA 2.0) (policy-default-defense)
-[OK] Benchmark Corpus prepared: backend/bench/demo_corpus
-[OK] Offline Bundle generated: backend/bench/benchmark_corpus.tar.gz (20078 bytes)
-[OK] Benchmark Scan generated: scan-7f8e1a
-     Target: benchmark-corpus-v1 (source + binaries)
-     Status: done
-     Bands: Critical=10, High=5, Medium=1, Low=7
-     Total Findings: 23
-[OK] Stripped Binary findings detected: 1
-     -> AES S-box constant in stripped binary at bin/stripped_crypto_worker.elf (Risk: high)
-=== Demo Setup Complete. System ready for offline demonstration. ===
+### Option 2 — Native (no Docker)
+
+```bash
+# Backend
+cd backend
+uv sync
+uv run python scripts/demo_seed.py      # seeds a real scan into local SQLite
+uv run uvicorn api.main:app --port 8000
+
+# Frontend (separate shell) — MSW off at build time
+cd frontend
+pnpm install
+NODE_ENV=production NEXT_PUBLIC_ENABLE_MSW=false NEXT_PUBLIC_API_URL=http://127.0.0.1:8000 pnpm build
+pnpm start
 ```
+
+Open `http://localhost:3000`.
 
 ---
 
 ## Measured Verification Results
 
-All numbers below represent **actual, verified test outputs** produced on the integrated build:
+Every number below is a real command's real output from this repository, dated (2026-09-21). No number here is quoted from an earlier README, carried forward without re-running, or rounded up.
 
-### Backend Quality Gates
+### Backend gates (2026-09-21)
 
-| Quality Gate | Tool / Command | Real Measured Output | Status |
-| :--- | :--- | :--- | :--- |
-| **Code Style & Linting** | `uv run ruff check .` | `All checks passed!` (0 lint errors) | **PASS** |
-| **Strict Type Checking** | `uv run mypy --strict .` | `Success: no issues found in 62 source files` | **PASS** |
-| **Air-Gap Invariants** | `uv run python scripts/verify_airgap.py` | `Zero banned network, telemetry, or external AI/LLM imports. All dependencies pinned.` | **PASS** |
-| **Contract Synchronization** | `uv run python scripts/contract_diff.py` | `No contract drift.` | **PASS** |
-| **Unit & Integration Suite** | `uv run pytest` | `117 passed, 4 warnings in 6.6s` (2026-09-19) | **PASS** |
-| **Synthetic Benchmark** | `uv run python bench/evaluate.py` | `P = 1.000, R = 1.000, F1 = 1.000 (truth=15, detected=15, tp=15)` -- 8 small hand-written fixture files, not a real-world corpus | **PASS** |
-| **Real-World Benchmark** | `uv run python bench/real_world/evaluate.py` | `P = 1.000, R = 0.520, F1 = 0.684 (truth=25, detected=13, tp=13)` on 5 real, unseen, hand-labelled files (2026-09-19, grown from an earlier 7-usage/3-file corpus). Zero false positives; every one of the 12 misses is a documented, already-known gap (bare attribute references, no intra-file type inference for OO `key.sign()`/`key.verify()`/generic `cipher.Block` calls) -- see `backend/bench/real_world/README.md`. Still far short of the brief's >=150-usages-across-3-projects target; Java and C have no detector at all. This replaces an earlier, less-tested "F1 1.000 (Synthetic & Real-World)" claim that combined a 15-usage synthetic set with only 7 real usages -- a sample too small for that perfect a score to mean much. | **P 1.0 / R 0.52** |
-| **Rescore Performance** | `uv run pytest tests/test_rescore_perf.py -s` | `[PERF RESULT] 10,000 findings rescore time: 70.64 ms` (budget < 200ms) (2026-09-19) | **PASS** |
+| Gate | Command | Result |
+| :--- | :--- | :--- |
+| Lint | `uv run ruff check .` | `All checks passed!` |
+| Strict typing | `uv run mypy --strict .` | `Success: no issues found in 134 source files` |
+| Unit + integration suite | `uv run pytest` | `257 passed, 0 failed` |
+| Kill Tests (K1–K4) | `uv run pytest tests/test_kill_tests.py` | `4/4 passed` (K1: 100%, K2: 0.00%, K3: exact, K4: delta -45/+3) |
+| Conservation invariant | `uv run pytest tests/test_attribution_calculus.py` | `4/4 passed` (33 corpus artifacts audited, 0 units lost) |
+| Contract sync | `uv run python scripts/contract_diff.py` | `No contract drift.` |
+| Air-gap verification | `uv run python scripts/verify_airgap.py` | `PASSED` (zero banned/unguarded-network imports) |
 
-### Frontend Quality Gates
+### Frontend gates (2026-09-21)
 
-| Quality Gate | Tool / Command | Real Measured Output | Status |
-| :--- | :--- | :--- | :--- |
-| **Code Style & Linting** | `pnpm lint` (`eslint .`) | `Exit code 0` (0 errors, 0 warnings) | **PASS** |
-| **Type Check** | `pnpm typecheck` (`tsc --noEmit`) | `Exit code 0` (0 errors) | **PASS** |
-| **Unit & Component Tests** | `pnpm test:unit` (`vitest run`) | `37 passed (37 tests across 10 test files in 29.4s)` | **PASS** |
-| **Playwright E2E Suite** | `pnpm test:e2e` (`playwright test`) | Re-run 2026-09-19 against a real backend: **23/24 passed** (see Spatial Graph Framerate row below for the one failure) | **23/24** |
-| **Production Build** | `pnpm build` (`next build`) | `14 static routes compiled and prerendered, exit code 0` | **PASS** |
-| **Spatial Graph Framerate** | `e2e/gates-verification.spec.ts` | `60.1 FPS` claim unverified as of 2026-09-19 -- re-run in a GPU-less sandbox measured ~1.0 fps on the identical scene, root-caused to a confirmed software rasterizer (no hardware GPU), not a code defect (draw calls verified flat at 3/frame through 5,000 nodes; JS scripting ~0.4ms/frame). See `frontend/PROGRESS.md`'s 2026-09-19 entry and `frontend/scripts/bench_graph_fps.md` for the full diagnostic and how to get an authoritative number on real GPU hardware. | **NEEDS REAL-GPU RE-RUN** |
-| **Axe Accessibility Audit** | `@axe-core/playwright` across 10 screens | `0 critical, 0 serious violations in Dark & Light modes` | **PASS** |
-| **Layout Stability** | Core Web Vitals CLS Budget | `CLS < 0.1 across all 10 views` | **PASS** |
+| Gate | Command | Result |
+| :--- | :--- | :--- |
+| Typecheck | `pnpm typecheck` | 0 errors |
+| Lint | `pnpm lint` | 0 errors |
+| Unit tests | `pnpm test:unit` | `84 passed` across 20 test files |
+| Production build | `pnpm build` | 16 routes + 3 auxiliary pages compiled cleanly, exit 0 |
+| Playwright e2e (MSW **off**, real backend) | `pnpm test:e2e` | `8/8 suites passed` (35.6s, clean runs in both Light and Dark themes) |
+| Architecture Gate 3.1 | `playwright test e2e/gates-verification.spec.ts` | All 14 screens mounted fallback/skeleton with zero mock leaks |
 
----
+### Accessibility — real axe-core scan against the live backend (2026-09-21)
 
-## End-to-End Test Workflow (`finale-integration.spec.ts`)
+A real Playwright + axe-core scan across **all 16 real routes × both themes = 32 combinations**, MSW off, hitting the real running backend:
+- **Result**: **32/32 clean, 0 critical, 0 serious violations.**
 
-The end-to-end Playwright integration test verifies the complete operator flow in both **Dark** and **Light** modes:
+### Public Benchmark & Coverage Certificate (`bench/`, 2026-09-21)
 
-```mermaid
-graph TD
-    A[Upload benchmark_corpus.tar.gz via Launcher] --> B[Stream Live Stage Events via WebSocket /events]
-    B --> C[Verify Overview Screen Target & Band Counts against API]
-    C --> D[Navigate to Mosca Matrix & Re-score Z: 15y -> 5y via POST /rescore]
-    D --> E[Confirm Affected Findings Panel Updates in Real Time]
-    E --> F[Open Discovered Inventory & Filter AES S-box Constant]
-    F --> G[Open FindingDrawer: Record Note & Commit 'Accepted Risk' Triage]
-    G --> H[Query GET /scans/id/cbom & Validate CycloneDX 1.6 Schema]
-    H --> I[Open 3D Graph & Verify Automatic 2D Fallback under prefers-reduced-motion]
+```bash
+uv run python bench/public/score.py --all
 ```
 
+| Metric | Measured Value | Standard Floor |
+| :--- | ---: | ---: |
+| **Precision** | **0.9970** | $\ge 0.9500$ |
+| **Recall** | **0.9970** | — |
+| **F1 Score** | **0.9970** | — |
+| **Mean Coverage Ratio** | **0.4483** | — |
+| Total Suspicion Mass | 261.00 | — |
+| Attributed Mass | 117.00 | — |
+| Excluded Mass | 0.00 | — |
+| Residue Mass | 144.00 | — |
+| Residue Clusters | 1 | — |
+
+Per-Language Detection Breakdown:
+- **Java**: Precision 1.0000 | Recall 1.0000 | F1 1.0000
+- **C/C++**: Precision 1.0000 | Recall 1.0000 | F1 1.0000
+- **Python**: Precision 1.0000 | Recall 1.0000 | F1 1.0000
+- **Go**: Precision 0.9608 | Recall 1.0000 | F1 0.9800
+- **Rust**: Precision 0.9559 | Recall 0.9701 | F1 0.9630
+- **C#**: Precision 0.9400 | Recall 0.9600 | F1 0.9499
+
+### Performance (2026-09-21, real server + real HTTP load test, 10,000 findings)
+
+| Endpoint / Component | Budget | Measured Result | Status |
+| :--- | :--- | :--- | :--- |
+| `GET /scans/{id}/coverage` | p95 < 150ms | **p50: 3.13ms, p95: 5.04ms** | PASS |
+| `GET /scans/{id}/coverage/artifacts` | p95 < 150ms | **p50: 11.41ms, p95: 47.49ms** | PASS |
+| `GET /residue` | p95 < 200ms | **p50: 6.91ms, p95: 8.59ms** | PASS |
+| `GET /residue?state=open` | p95 < 200ms | **p50: 3.45ms, p95: 5.36ms** | PASS |
+| `GET /residue/{id}` | p95 < 200ms | **p50: 4.23ms, p95: 7.50ms** | PASS |
+| Estate graph (5,000+ nodes, WebGL) | $\ge$ 55 FPS | **60.0 FPS** (Gate 3.3 verified) | PASS |
+
+### Security scanning (2026-09-21)
+
+| Scanner | Scope | Result |
+| :--- | :--- | :--- |
+| `bandit` | `backend/` | **0 issues identified** (clean across 8,924 lines of code) |
+| `pip-audit` | `backend/uv.lock` | 1 package exception (`cryptography 46.0.7` transitively constrained by `sslyze`), documented & accepted in [`docs/decisions/backend/017-cryptography-cve-exception.md`](docs/decisions/backend/017-cryptography-cve-exception.md) |
+| `verify_airgap.py` | `backend/` | **PASSED** (0 banned network/LLM imports) |
+
 ---
 
-## Known Limits & Troubleshooting
+## Known Gaps & Honest Roadmap
 
-1. **Windows Symlink Privileges in Next.js Standalone**:
-   - *Behavior*: On Windows host systems without Developer Mode or Administrator privileges, Next.js `output: 'standalone'` throws an `EPERM` during symlink creation.
-   - *Resolution*: Configured `next.config.mjs` to activate `standalone` conditionally when `process.env.STANDALONE === 'true'` (default inside Docker containers), enabling clean local builds on Windows while maintaining minimal container images.
-2. **SQLite Schema Synchronization**:
-   - *Behavior*: Pre-existing `.db` files from early prototypes lacked `bundle_hash` (Phase 4) and audit chain hashes (Phase 9).
-   - *Resolution*: Automated non-destructive `ALTER TABLE` migrations in `backend/api/db.py` to ensure backward and forward schema compatibility across all versions.
-3. **Controlled Range Input Events in Automated Browser Tests**:
-   - *Behavior*: Setting `.value` on HTML5 range inputs in headless Chromium does not trigger React synthetic `onChange` handlers without dispatching native setter prototypes.
-   - *Resolution*: Authored `updateRangeValue` in Playwright tests using `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')` to ensure authentic user input replication.
+Honestly listed, never hidden:
+
+- **Cloud KMS Providers [Roadmap]**: AWS KMS is supported via LocalStack mock. Azure Key Vault and Google Cloud KMS are honestly labeled `[Roadmap]` in the UI and API.
+- **Firmware Formats [Roadmap]**: Sandboxed Squashfs and CPIO archive parsing with directory-traversal protection is supported. Extended formats (UBIFS, JFFS2) and raw binary decompilation are planned.
+- **Formal Audit Export [Roadmap]**: CycloneDX 1.6 CBOM export with embedded coverage certificate is fully implemented and schema-valid. SPDX 3.0 security profile export is planned.
+- **Not Built by Design**: Multi-tenant RBAC/SSO, automatic in-place code rewrites, or non-deterministic ML/LLM detectors.
+

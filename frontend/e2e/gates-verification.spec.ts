@@ -18,6 +18,11 @@ test.describe('ECDAT Architecture Verification Gates', () => {
       { id: 'SCR-08', path: '/certificates', expectedText: /failed to query certificate telemetry|failed to load/i },
       { id: 'SCR-09', path: '/plan', expectedText: /failed to load migration plan|failed to load/i },
       { id: 'SCR-10', path: '/policies', expectedText: /failed to synchronize policy parameters|failed to load/i },
+      { id: 'SCR-11', path: '/estate', expectedText: /estate|monitored|failed|retry/i },
+      { id: 'SCR-12', path: '/trend', expectedText: /trend|trajectory|failed|retry/i },
+      { id: 'SCR-13', path: '/drift', expectedText: /drift|comparison|failed|retry/i },
+      { id: 'SCR-14', path: '/alerts', expectedText: /alerts|telemetry|failed|retry/i },
+      { id: 'SCR-16', path: '/residue', expectedText: /residue|debt|cluster|failed|retry/i },
     ];
 
     const results: Record<string, string> = {};
@@ -116,17 +121,23 @@ test.describe('ECDAT Architecture Verification Gates', () => {
 
     await page.goto('/graph');
     await page.waitForSelector('canvas', { timeout: 15000 });
+    await page.waitForTimeout(500);
 
     // Measure FPS over 60 frames inside the WebGL canvas animation loop
     const fpsResult = await page.evaluate(async () => {
       return new Promise<{ fps: number; frameCount: number; durationMs: number }>((resolve) => {
         let frames = 0;
-        let startTime = performance.now();
+        let startTime: number | null = null;
 
         function countFrame() {
-          frames++;
+          if (startTime === null) {
+            startTime = performance.now();
+          } else {
+            frames++;
+          }
+
           if (frames >= 60) {
-            const durationMs = performance.now() - startTime;
+            const durationMs = performance.now() - (startTime ?? performance.now());
             const fps = Math.round((frames / (durationMs / 1000)) * 10) / 10;
             resolve({ fps, frameCount: frames, durationMs });
           } else {

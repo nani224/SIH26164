@@ -106,12 +106,42 @@ export default function RootLayout({
               </div>
 
               {/* Center navigation */}
-              <nav className="hidden lg:flex items-center gap-1 font-mono text-xs">
+              <nav className="hidden lg:flex items-center gap-1 font-mono text-xs" aria-label="Main Navigation">
                 <Link
                   href="/overview"
                   className="px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-raised)] transition-all"
                 >
                   Overview
+                </Link>
+                <Link
+                  href="/estate"
+                  className="px-2.5 py-1 rounded text-[var(--crypto-pqc)] font-semibold hover:bg-[var(--surface-raised)] transition-all"
+                >
+                  Estate
+                </Link>
+                <Link
+                  href="/residue"
+                  className="px-2.5 py-1 rounded text-[var(--coverage-residue)] font-semibold hover:bg-[var(--surface-raised)] transition-all"
+                >
+                  Residue
+                </Link>
+                <Link
+                  href="/trend"
+                  className="px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-raised)] transition-all"
+                >
+                  Trend
+                </Link>
+                <Link
+                  href="/drift"
+                  className="px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-raised)] transition-all"
+                >
+                  Drift
+                </Link>
+                <Link
+                  href="/alerts"
+                  className="px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-raised)] transition-all"
+                >
+                  Alerts
                 </Link>
                 <Link
                   href="/launcher"
