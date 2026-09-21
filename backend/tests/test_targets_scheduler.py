@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -259,6 +260,89 @@ def test_drift_detection(client: TestClient) -> None:
     assert drift["summary"]["addedCount"] == 1
     assert drift["summary"]["resolvedCount"] == 1
     assert drift["summary"]["changedCount"] == 1
+
+
+def test_drift_reports_falling_coverage_when_unexplained_crypto_appears(client: TestClient) -> None:
+    """v1.0 CMC M4: a repo change that adds unexplained crypto (residue,
+    not a real Finding) must show up as falling coverage in drift --
+    "3 findings added, coverage fell" is the operator's real signal that
+    something new and unexplained entered the estate, proven against the
+    real HTTP drift endpoint, not just the store function directly."""
+    from api.models import CoverageCertificate
+    from engine.models import ScanResult
+
+    target = store.create_target(
+        TargetCreate(
+            name="Coverage Drift Target",
+            kind=TargetKind.PATH,
+            uri="/dummy/coverage-path",
+            policyId="default",
+            schedule="0 0 * * *",
+            enabled=True,
+        )
+    )
+    policy = store.resolve_policy(ScanCreate(path="/dummy/coverage-path"))
+    empty_stats = ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0)
+
+    # Scan 1: fully explained, no residue.
+    result1 = ScanResult(findings=[], stats=empty_stats)
+    result1.coverage_certificate = CoverageCertificate(  # type: ignore[attr-defined]
+        scanId="placeholder",
+        artifactCount=10,
+        totalMass=100.0,
+        attributedMass=100.0,
+        excludedMass=0.0,
+        residueMass=0.0,
+        coverageRatio=1.0,
+        residueClusterCount=0,
+        computedAt=datetime.now(UTC),
+    )
+    scan1 = store.create_scan_from_result(
+        payload=ScanCreate(path="/dummy/coverage-path"),
+        result=result1,
+        policy=policy,
+        target_override=target.name,
+    )
+    snap1 = store.create_snapshot(target.id, scan1, [])
+    assert snap1.coverageRatio == 1.0
+    assert snap1.residueMass == 0.0
+
+    # Scan 2: a real code change introduced high-entropy/unexplained
+    # crypto-suspicion evidence the engine couldn't attribute to a
+    # concrete Finding -- coverage genuinely falls.
+    result2 = ScanResult(findings=[], stats=empty_stats)
+    result2.coverage_certificate = CoverageCertificate(  # type: ignore[attr-defined]
+        scanId="placeholder",
+        artifactCount=10,
+        totalMass=100.0,
+        attributedMass=75.8,
+        excludedMass=0.0,
+        residueMass=24.2,
+        coverageRatio=0.758,
+        residueClusterCount=1,
+        computedAt=datetime.now(UTC),
+    )
+    scan2 = store.create_scan_from_result(
+        payload=ScanCreate(path="/dummy/coverage-path"),
+        result=result2,
+        policy=policy,
+        target_override=target.name,
+    )
+    snap2 = store.create_snapshot(target.id, scan2, [])
+    assert snap2.coverageRatio == 0.758
+    assert snap2.residueMass == 24.2
+
+    resp = client.get(f"/api/v1/targets/{target.id}/drift?from={snap1.id}&to={snap2.id}")
+    assert resp.status_code == 200
+    drift = resp.json()
+    summary = drift["summary"]
+
+    # The real signal: coverage fell, residue mass rose -- unexplained
+    # crypto appeared even though no new Finding was added this time.
+    assert summary["coverageDelta"] == pytest.approx(0.758 - 1.0, abs=1e-4)
+    assert summary["coverageDelta"] < 0
+    assert summary["residueMassDelta"] == pytest.approx(24.2, abs=1e-4)
+    assert summary["residueMassDelta"] > 0
 
 
 def test_scheduler_in_process_execution() -> None:

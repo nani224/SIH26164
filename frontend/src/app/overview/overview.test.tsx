@@ -28,10 +28,24 @@ describe('SCR-02: Overview Component', () => {
     });
   });
 
+  it('renders coverage certificate with mass conservation breakdown and residue CTA', async () => {
+    renderWithClient(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/Crypto Mass Coverage/i)).toBeInTheDocument();
+      expect(screen.getByTestId('coverage-ratio-metric')).toHaveTextContent('93.5%');
+      expect(screen.getByText(/Crypto Mass Conservation Bar/i)).toBeInTheDocument();
+      expect(screen.getByText(/8,850/i)).toBeInTheDocument(); // Attributed
+      expect(screen.getByText(/650/i)).toBeInTheDocument(); // Residue
+      expect(screen.getByText(/7 unexplained crypto residue clusters detected in this scan/i)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Review Residue Ledger/i })).toHaveAttribute('href', '/residue');
+    });
+  });
+
   it('passes accessibility audits on overview screen', async () => {
     const { container } = renderWithClient(<OverviewPage />);
     await waitFor(() => {
       expect(screen.getByText(/SCREEN 2 · CRYPTOGRAPHIC OVERVIEW CONSOLE/i)).toBeInTheDocument();
+      expect(screen.getByText(/Crypto Mass Coverage/i)).toBeInTheDocument();
     });
 
     const results = await axe.run(container, {

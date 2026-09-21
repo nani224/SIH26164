@@ -15,6 +15,12 @@ import {
   mockProbes,
   mockHsmInventory,
   mockAuditVerify,
+  mockCoverageCertificate,
+  mockArtifactCoverages,
+  mockResidueClusters,
+  mockAssetCriticalities,
+  mockCloudKeysResponse,
+  mockEstateCoverage,
 } from './data';
 import type {
   Finding,
@@ -26,6 +32,11 @@ import type {
   TargetPatch,
   EstateSummary,
   Alert,
+  CoverageCertificate,
+  ArtifactCoverage,
+  ResidueCluster,
+  ResidueClusterPatch,
+  AssetCriticality,
 } from '../types/crypto';
 
 let findingsStore = [...mockFindings];
@@ -34,6 +45,8 @@ let policiesStore = [...mockPolicies];
 let targetsStore = [...mockTargets];
 let estateSummaryStore = { ...mockEstateSummary };
 let alertsStore = [...mockAlerts];
+let residueClustersStore = [...mockResidueClusters];
+let assetCriticalitiesStore = [...mockAssetCriticalities];
 
 function computeBand(score: number): RiskBand {
   if (score >= 60) return 'critical';
@@ -496,5 +509,110 @@ export const handlers = [
   // Audit Verify Chain
   http.get('/api/v1/audit/verify', () => {
     return HttpResponse.json(mockAuditVerify);
+  }),
+
+  // --- v1.0.0 Crypto Mass Conservation (CMC) Endpoints ---
+
+  // Coverage Certificate for scan
+  http.get('/api/v1/scans/:id/coverage', ({ params }) => {
+    return HttpResponse.json({
+      ...mockCoverageCertificate,
+      scanId: String(params.id),
+    });
+  }),
+
+  // Artifact Coverage for scan
+  http.get('/api/v1/scans/:id/coverage/artifacts', () => {
+    return HttpResponse.json(mockArtifactCoverages);
+  }),
+
+  // Residue Clusters list
+  http.get('/api/v1/residue', ({ request }) => {
+    const url = new URL(request.url);
+    const state = url.searchParams.get('state');
+    const targetId = url.searchParams.get('targetId');
+
+    let result = [...residueClustersStore];
+    if (state) result = result.filter((c) => c.state === state);
+    return HttpResponse.json(result);
+  }),
+
+  // Residue Cluster detail
+  http.get('/api/v1/residue/:id', ({ params }) => {
+    const cluster = residueClustersStore.find((c) => c.id === params.id);
+    if (!cluster) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(cluster);
+  }),
+
+  // Residue Cluster patch
+  http.patch('/api/v1/residue/:id', async ({ params, request }) => {
+    const cluster = residueClustersStore.find((c) => c.id === params.id);
+    if (!cluster) return new HttpResponse(null, { status: 404 });
+
+    const patch = (await request.json()) as ResidueClusterPatch;
+
+    if (patch.state === 'excluded') {
+      if (!patch.justification?.trim() || !patch.owner?.trim()) {
+        return HttpResponse.json(
+          { error: 'BadRequest', message: 'Exclusion requires a non-empty justification and owner' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (cluster.state === 'promoted' && patch.state !== 'promoted') {
+      return HttpResponse.json(
+        { error: 'BadRequest', message: 'Invalid transition: cannot transition a cluster once promoted' },
+        { status: 400 }
+      );
+    }
+
+    cluster.state = patch.state;
+    if (patch.justification !== undefined) cluster.justification = patch.justification;
+    if (patch.owner !== undefined) cluster.owner = patch.owner;
+    cluster.lastSeen = new Date().toISOString();
+
+    return HttpResponse.json(cluster);
+  }),
+
+  // Asset Criticality list
+  http.get('/api/v1/criticality', ({ request }) => {
+    const url = new URL(request.url);
+    const targetId = url.searchParams.get('targetId');
+    let result = [...assetCriticalitiesStore];
+    if (targetId) result = result.filter((c) => c.targetId === targetId);
+    return HttpResponse.json(result);
+  }),
+
+  // Asset Criticality upsert
+  http.put('/api/v1/criticality', async ({ request }) => {
+    const item = (await request.json()) as AssetCriticality;
+    const idx = assetCriticalitiesStore.findIndex(
+      (c) => c.targetId === item.targetId && c.pathPattern === item.pathPattern
+    );
+    if (idx >= 0) {
+      assetCriticalitiesStore[idx] = item;
+    } else {
+      assetCriticalitiesStore.push(item);
+    }
+    return HttpResponse.json(item);
+  }),
+
+  // Asset Criticality CSV import
+  http.post('/api/v1/criticality/import', async () => {
+    return HttpResponse.json({
+      imported: 2,
+      records: assetCriticalitiesStore,
+    });
+  }),
+
+  // Cloud KMS Keys
+  http.get('/api/v1/cloud/keys', () => {
+    return HttpResponse.json(mockCloudKeysResponse);
+  }),
+
+  // Estate Coverage
+  http.get('/api/v1/estate/coverage', () => {
+    return HttpResponse.json(mockEstateCoverage);
   }),
 ];

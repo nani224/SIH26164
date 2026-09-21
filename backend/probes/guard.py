@@ -19,6 +19,7 @@ DEFAULT_ALLOWED_HOSTS: frozenset[str] = frozenset(
         "test-target-legacy-tls",
         "test-target-modern-tls",
         "test-target-legacy-ssh",
+        "localstack",
     }
 )
 

@@ -24,6 +24,7 @@ import {
   Clock,
   Sparkles,
   ChevronRight,
+  ShieldAlert,
 } from 'lucide-react';
 
 function DriftContent() {
@@ -183,7 +184,7 @@ function DriftContent() {
       </header>
 
       {/* Drift Summary Bento Cards */}
-      <section aria-label="Drift Summary Metrics" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <section aria-label="Drift Summary Metrics" className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Added Findings */}
         <div
           onClick={() => setActiveTab('added')}
@@ -297,7 +298,67 @@ function DriftContent() {
             )}
           </div>
         </div>
+
+        {/* Coverage & Residue Delta */}
+        <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-4 rounded-lg flex flex-col justify-between hover:border-[var(--border-prominent)] transition-colors">
+          <div className="flex items-center justify-between text-[var(--text-muted)]">
+            <span className="text-[11px] uppercase tracking-wider">Coverage Shift</span>
+            <ShieldAlert className="w-4 h-4 text-[var(--coverage-residue)]" />
+          </div>
+          <div className="my-2 flex items-baseline gap-2">
+            <span
+              className={`text-2xl sm:text-3xl font-bold ${
+                (summary.coverageDelta ?? 0) < 0
+                  ? 'text-[var(--coverage-residue)]'
+                  : 'text-[var(--coverage-attributed)]'
+              }`}
+            >
+              {summary.coverageDelta !== undefined && summary.coverageDelta !== null
+                ? `${summary.coverageDelta > 0 ? '+' : ''}${(summary.coverageDelta * 100).toFixed(1)}%`
+                : '0.0%'}
+            </span>
+            <span className="text-xs text-[var(--text-muted)]">coverage</span>
+          </div>
+          <div className="text-[10px] text-[var(--text-secondary)]">
+            {summary.residueMassDelta !== undefined && summary.residueMassDelta !== null && summary.residueMassDelta > 0 ? (
+              <span className="text-[var(--coverage-residue)] font-semibold">
+                +{summary.residueMassDelta.toFixed(1)} unexplained residue
+              </span>
+            ) : (
+              <span className="text-[var(--coverage-attributed)]">Residue mass stable</span>
+            )}
+          </div>
+        </div>
       </section>
+
+      {/* Coverage Incompleteness & Residue Rise Traceability Banner */}
+      {summary.coverageDelta !== undefined && summary.coverageDelta !== null && summary.coverageDelta < 0 && (
+        <div
+          data-testid="drift-coverage-alert"
+          className="p-4 rounded-lg bg-[var(--coverage-residue-bg)] border border-[var(--coverage-residue-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+        >
+          <div className="flex items-start sm:items-center gap-2.5">
+            <ShieldAlert className="w-5 h-5 text-[var(--coverage-residue)] flex-shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold text-[var(--coverage-residue)] block sm:inline mr-2">
+                Coverage Incompleteness Warning:
+              </span>
+              <span className="text-[var(--text-primary)]">
+                Coverage dropped by {Math.abs(summary.coverageDelta * 100).toFixed(1)}% between snapshots due to{' '}
+                {summary.residueMassDelta ? `+${summary.residueMassDelta.toFixed(1)} units of ` : ''}new unexplained cryptographic residue clusters.
+              </span>
+            </div>
+          </div>
+          <Link
+            id="drift-to-residue-link"
+            href={`/residue?targetId=${activeTargetId}`}
+            className="px-3 py-1.5 rounded bg-[var(--coverage-residue)] text-white font-bold flex items-center justify-center gap-1.5 hover:opacity-90 flex-shrink-0 shadow-sm"
+          >
+            <span>Review New Residue</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* Filter Tabs & Search Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--surface-card)] border border-[var(--border-subtle)] p-3 rounded-lg">

@@ -1,0 +1,10 @@
+{
+  "hash_abc_123": {
+    "cluster_id": "hash_abc_123",
+    "state": "excluded",
+    "owner": "alice",
+    "justification": "Benign table",
+    "rule_file": null,
+    "fixture_file": null
+  }
+}

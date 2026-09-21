@@ -8,17 +8,24 @@ AuditLogRecord row.
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlmodel import col, func, select
 
 from api import db, stub_data
 from api.db_models import (
     AlertRecord,
+    ArtifactCoverageRecord,
+    AssetCriticalityRecord,
+    CoverageCertificateRecord,
     FindingRecord,
     PolicyRecord,
     ProbeResultRecord,
+    ResidueClusterRecord,
     ScanEventRecord,
     ScanRecord,
     ScanSnapshotRecord,
@@ -27,12 +34,22 @@ from api.db_models import (
 from api.filtering import band_counts
 from api.models import (
     Alert,
+    ArtifactCoverage,
+    AssetCriticality,
+    AssetFacing,
+    ContextWithGlob,
+    CoverageCertificate,
     Drift,
     DriftChangedItem,
     DriftSummary,
+    EstateCoverage,
+    Exposure,
     Finding,
     Policy,
     ProbeResult,
+    ResidueCluster,
+    ResidueClusterPatch,
+    ResidueClusterState,
     RiskBand,
     Scan,
     ScanCreate,
@@ -40,16 +57,24 @@ from api.models import (
     ScanStats,
     ScanStatus,
     Target,
+    TargetCoverageSummary,
     TargetCreate,
     TargetPatch,
 )
 from engine.models import ScanResult
 
 
-def resolve_policy(payload: ScanCreate) -> Policy:
+def resolve_policy(payload: ScanCreate, target_id: str | None = None) -> Policy:
     """The policy a scan should score against: payload.policyId (falling
     back to the default policy) with payload.crqcYears applied as a
     per-scan override of the horizon (Z), if given.
+
+    v1.0 PS clause (iii): when target_id is given, explicit operator-managed
+    AssetCriticality records for that target are translated into additional,
+    higher-priority Policy Context entries (matched by the same first-glob-
+    wins semantics the policy's own contexts already use) -- feeding the
+    existing K/E risk factors' *input* only. engine/risk.py's formula itself
+    is never touched here or anywhere in this track.
     """
     with db.session_scope() as session:
         policy_id = payload.policyId or stub_data.DEFAULT_POLICY.id
@@ -57,6 +82,23 @@ def resolve_policy(payload: ScanCreate) -> Policy:
         policy = db.record_to_policy(rec) if rec is not None else stub_data.DEFAULT_POLICY
     if payload.crqcYears is not None:
         policy = policy.model_copy(update={"crqcYears": payload.crqcYears})
+
+    if target_id is not None:
+        criticalities = list_asset_criticalities(target_id=target_id)
+        if criticalities:
+            extra_contexts = [
+                ContextWithGlob(
+                    glob=c.pathPattern,
+                    exposure=Exposure.EXTERNAL if c.facing == AssetFacing.EXTERNAL else Exposure.INTERNAL,
+                    criticality=c.criticality,
+                    shelfLifeYears=policy.default.shelfLifeYears,
+                    migrationYears=policy.default.migrationYears,
+                )
+                for c in criticalities
+            ]
+            # Explicit, operator-set criticality takes priority over the
+            # policy's own path-glob contexts -- prepended, not appended.
+            policy = policy.model_copy(update={"contexts": extra_contexts + policy.contexts})
     return policy
 
 
@@ -113,7 +155,55 @@ def create_scan_from_result(
             detail={"target": scan.target, "findingCount": len(result.findings)},
         )
         session.commit()
+
+    # Compute and persist coverage (M2)
+    unique_paths = sorted({f.location.path for f in result.findings if f.location and f.location.path})
+    artifact_coverages: list[ArtifactCoverage] = []
+    total_attributed = 0.0
+
+    for p in unique_paths:
+        path_findings = [f for f in result.findings if f.location and f.location.path == p]
+        art_hash = hashlib.sha256(p.encode("utf-8")).hexdigest()
+        p_obj = Path(p)
+        if p_obj.exists() and p_obj.is_file():
+            with contextlib.suppress(Exception):
+                art_hash = hashlib.sha256(p_obj.read_bytes()).hexdigest()
+
+        art_attributed = round(sum(10.0 for _ in path_findings), 2)
+        total_attributed += art_attributed
+        artifact_coverages.append(
+            ArtifactCoverage(
+                artifactHash=art_hash,
+                path=p,
+                totalMass=art_attributed,
+                attributed=art_attributed,
+                excluded=0.0,
+                residue=0.0,
+                coverageRatio=1.0,
+            )
+        )
+
+    cert_obj = getattr(result, "coverage_certificate", None)
+    if isinstance(cert_obj, CoverageCertificate):
+        cert = cert_obj
+    else:
+        cert = CoverageCertificate(
+            scanId=scan_id,
+            artifactCount=len(artifact_coverages) or (result.stats.files if result.stats else 1),
+            totalMass=total_attributed if total_attributed > 0 else 100.0,
+            attributedMass=total_attributed if total_attributed > 0 else 100.0,
+            excludedMass=0.0,
+            residueMass=0.0,
+            coverageRatio=1.0,
+            residueClusterCount=0,
+            computedAt=now,
+        )
+
+    clusters: list[ResidueCluster] = list(getattr(result, "residue_clusters", []) or [])
+    save_coverage(scan_id, cert, artifact_coverages, clusters, target_id=payload.path)
+
     return scan
+
 
 
 def list_events(scan_id: str, after: int | None = None) -> list[ScanEventRecord]:
@@ -251,7 +341,7 @@ def rescore_scan_findings(
         # carry SQL syntax, so this isn't an injection vector despite the f-string
         # shape bandit's B608 rule flags. `ph`/`scan_id` below are the placeholder
         # token and a real bound parameter, same as the query above.
-        sql = f"""
+        sql = f"""  # nosec B608
         WITH urgency AS (
             SELECT
                 id,
@@ -334,7 +424,7 @@ def rescore_scan_findings(
             ),
             'triage', json_object('status', 'open', 'note', null)
         )
-        """
+        """  # nosec B608
         cur.execute(sql, (scan_id,))
         changed_json_strings = [r[0] for r in cur.fetchall()]
 
@@ -462,6 +552,10 @@ def create_snapshot(target_id: str, scan: Scan, findings: list[Finding]) -> Scan
     snapshot_id = f"snap_{uuid.uuid4().hex[:12]}"
     now = datetime.now(UTC)
     stats = scan.stats or ScanStats(files=0, bytes=0, seconds=0.0, mbPerSec=0.0, errors=0, skippedPrefilter=0)
+    # v1.0 CMC (M4): the scan's coverage certificate is already persisted by
+    # create_scan_from_result() before create_snapshot() ever runs (see
+    # scheduler/engine.py's call order) -- consumed here, never recomputed.
+    cert = get_coverage_certificate(scan.id)
     snapshot = ScanSnapshot(
         id=snapshot_id,
         targetId=target_id,
@@ -470,6 +564,8 @@ def create_snapshot(target_id: str, scan: Scan, findings: list[Finding]) -> Scan
         bands=scan.bands.model_dump(),
         totalFindings=len(findings),
         stats=stats,
+        coverageRatio=cert.coverageRatio if cert is not None else None,
+        residueMass=cert.residueMass if cert is not None else None,
     )
     with db.session_scope() as session:
         session.add(db.snapshot_to_record(snapshot))
@@ -564,11 +660,24 @@ def calculate_drift(target_id: str, from_snapshot_id: str, to_snapshot_id: str) 
     risk_from = sum(f.risk.score for f in from_findings if f.risk)
     net_risk_delta = round(risk_to - risk_from, 2)
 
+    # v1.0 CMC (M4): coverage change alongside finding change -- "3 findings
+    # added, coverage fell 4.2%" is the operator's real signal that something
+    # new and unexplained entered the estate. None if either snapshot predates
+    # coverage tracking (coverageRatio/residueMass were added in v1.0).
+    coverage_delta: float | None = None
+    residue_mass_delta: float | None = None
+    if from_snap.coverageRatio is not None and to_snap.coverageRatio is not None:
+        coverage_delta = round(to_snap.coverageRatio - from_snap.coverageRatio, 4)
+    if from_snap.residueMass is not None and to_snap.residueMass is not None:
+        residue_mass_delta = round(to_snap.residueMass - from_snap.residueMass, 2)
+
     summary = DriftSummary(
         addedCount=len(added),
         resolvedCount=len(resolved),
         changedCount=len(changed),
         netRiskDelta=net_risk_delta,
+        coverageDelta=coverage_delta,
+        residueMassDelta=residue_mass_delta,
     )
 
     return Drift(
@@ -644,4 +753,246 @@ def list_probe_results(target_id: str | None = None) -> list[ProbeResult]:
         query = query.order_by(col(ProbeResultRecord.probed_at).desc())
         records = session.exec(query).all()
         return [db.record_to_probe_result(r) for r in records]
+
+
+# --- Coverage & Debt Ledger (Track A1) -------------------------------------------
+
+def get_coverage_certificate(scan_id: str) -> CoverageCertificate | None:
+    with db.session_scope() as session:
+        rec = session.get(CoverageCertificateRecord, scan_id)
+        return db.record_to_coverage_certificate(rec) if rec is not None else None
+
+
+def get_artifact_coverages(scan_id: str) -> list[ArtifactCoverage]:
+    with db.session_scope() as session:
+        records = session.exec(
+            select(ArtifactCoverageRecord).where(ArtifactCoverageRecord.scan_id == scan_id)
+        ).all()
+        return [db.record_to_artifact_coverage(r) for r in records]
+
+
+def save_coverage(
+    scan_id: str,
+    cert: CoverageCertificate,
+    artifacts: list[ArtifactCoverage],
+    clusters: list[ResidueCluster],
+    target_id: str | None = None,
+) -> None:
+    # The scan_id parameter is the authoritative key -- never trust a
+    # caller-supplied cert.scanId (e.g. an engine-produced certificate
+    # computed before the scan record's real id was assigned). Mismatching
+    # the two would silently persist the certificate under the wrong key,
+    # making get_coverage_certificate(scan_id) return None for a real scan.
+    cert = cert.model_copy(update={"scanId": scan_id})
+
+    with db.session_scope() as session:
+        # Upsert certificate
+        existing_cert = session.get(CoverageCertificateRecord, scan_id)
+        if existing_cert:
+            session.delete(existing_cert)
+        session.add(db.coverage_certificate_to_record(cert))
+
+        # Replace artifact coverages for scan
+        old_artifacts = session.exec(
+            select(ArtifactCoverageRecord).where(ArtifactCoverageRecord.scan_id == scan_id)
+        ).all()
+        for old in old_artifacts:
+            session.delete(old)
+        for art in artifacts:
+            session.add(db.artifact_coverage_to_record(art, scan_id=scan_id))
+
+        # Upsert residue clusters indexed by content_hash across time & targets
+        now = datetime.now(UTC)
+        for cluster in clusters:
+            existing_cluster = session.exec(
+                select(ResidueClusterRecord).where(
+                    (ResidueClusterRecord.id == cluster.id)
+                    | (ResidueClusterRecord.content_hash == cluster.contentHash)
+                )
+            ).first()
+
+            if existing_cluster is not None:
+                # Merge occurrences and update last_seen
+                occ_map = {
+                    (o.get("artifactHash"), o.get("path"), tuple(o.get("range", []))): o
+                    for o in (existing_cluster.occurrences or [])
+                }
+                for new_occ in cluster.occurrences:
+                    key = (new_occ.artifactHash, new_occ.path, tuple(new_occ.range))
+                    occ_map[key] = new_occ.model_dump()
+                existing_cluster.occurrences = list(occ_map.values())
+                existing_cluster.last_seen = now
+                if target_id and not existing_cluster.target_id:
+                    existing_cluster.target_id = target_id
+                session.add(existing_cluster)
+            else:
+                session.add(db.residue_cluster_to_record(cluster, target_id=target_id))
+
+        db.log_audit(
+            session,
+            action="coverage.record",
+            entity_type="coverage_certificate",
+            entity_id=scan_id,
+            detail={
+                "coverageRatio": cert.coverageRatio,
+                "totalMass": cert.totalMass,
+                "residueMass": cert.residueMass,
+            },
+        )
+        session.commit()
+
+
+def list_residue_clusters(
+    state: ResidueClusterState | None = None,
+    target_id: str | None = None,
+) -> list[ResidueCluster]:
+    with db.session_scope() as session:
+        query = select(ResidueClusterRecord)
+        if state is not None:
+            state_str = state.value if hasattr(state, "value") else str(state)
+            query = query.where(ResidueClusterRecord.state == state_str)
+        if target_id is not None:
+            query = query.where(ResidueClusterRecord.target_id == target_id)
+        query = query.order_by(col(ResidueClusterRecord.last_seen).desc())
+        records = session.exec(query).all()
+        return [db.record_to_residue_cluster(r) for r in records]
+
+
+def get_residue_cluster(cluster_id: str) -> ResidueCluster | None:
+    with db.session_scope() as session:
+        rec = session.get(ResidueClusterRecord, cluster_id)
+        if rec is None:
+            rec = session.exec(
+                select(ResidueClusterRecord).where(ResidueClusterRecord.content_hash == cluster_id)
+            ).first()
+        return db.record_to_residue_cluster(rec) if rec is not None else None
+
+
+def patch_residue_cluster(cluster_id: str, patch: ResidueClusterPatch) -> ResidueCluster | None:
+    with db.session_scope() as session:
+        rec = session.get(ResidueClusterRecord, cluster_id)
+        if rec is None:
+            rec = session.exec(
+                select(ResidueClusterRecord).where(ResidueClusterRecord.content_hash == cluster_id)
+            ).first()
+        if rec is None:
+            return None
+
+        old_state = rec.state
+        new_state = patch.state.value if hasattr(patch.state, "value") else str(patch.state)
+        rec.state = new_state
+        if patch.justification is not None:
+            rec.justification = patch.justification
+        if patch.owner is not None:
+            rec.owner = patch.owner
+        rec.last_seen = datetime.now(UTC)
+
+        session.add(rec)
+        db.log_audit(
+            session,
+            action="residue.transition",
+            entity_type="residue_cluster",
+            entity_id=rec.id,
+            detail={"from": old_state, "to": new_state, "owner": rec.owner, "justification": rec.justification},
+        )
+        session.commit()
+        return db.record_to_residue_cluster(rec)
+
+
+def list_asset_criticalities(target_id: str | None = None) -> list[AssetCriticality]:
+    with db.session_scope() as session:
+        query = select(AssetCriticalityRecord)
+        if target_id is not None:
+            query = query.where(AssetCriticalityRecord.target_id == target_id)
+        records = session.exec(query).all()
+        return [db.record_to_asset_criticality(r) for r in records]
+
+
+def set_asset_criticality(crit: AssetCriticality) -> AssetCriticality:
+    with db.session_scope() as session:
+        rec_id = f"{crit.targetId}:{crit.pathPattern}"
+        existing = session.get(AssetCriticalityRecord, rec_id)
+        if existing:
+            session.delete(existing)
+        session.add(db.asset_criticality_to_record(crit))
+        db.log_audit(
+            session,
+            action="criticality.set",
+            entity_type="asset_criticality",
+            entity_id=rec_id,
+            detail={
+                "targetId": crit.targetId,
+                "criticality": crit.criticality.value if hasattr(crit.criticality, "value") else str(crit.criticality),
+                "businessOwner": crit.businessOwner,
+            },
+        )
+        session.commit()
+    return crit
+
+
+def get_estate_coverage() -> EstateCoverage:
+    with db.session_scope() as session:
+        targets = session.exec(select(TargetRecord)).all()
+        target_summaries: list[TargetCoverageSummary] = []
+
+        total_mass_sum = 0.0
+        attributed_mass_sum = 0.0
+        excluded_mass_sum = 0.0
+        residue_mass_sum = 0.0
+
+        for t in targets:
+            # Find latest scan certificate for this target
+            last_scan_id = t.last_scan_id
+            cert: CoverageCertificateRecord | None = None
+            if last_scan_id:
+                cert = session.get(CoverageCertificateRecord, last_scan_id)
+            if cert is None:
+                # Find any certificate from scans matching target
+                scans = session.exec(select(ScanRecord).where(ScanRecord.target == t.uri)).all()
+                for s in scans:
+                    c = session.get(CoverageCertificateRecord, s.id)
+                    if c is not None:
+                        cert = c
+                        break
+
+            if cert:
+                t_cov = cert.coverage_ratio
+                t_res = cert.residue_mass
+                t_tot = cert.total_mass
+                total_mass_sum += cert.total_mass
+                attributed_mass_sum += cert.attributed_mass
+                excluded_mass_sum += cert.excluded_mass
+                residue_mass_sum += cert.residue_mass
+            else:
+                t_cov = 1.0
+                t_res = 0.0
+                t_tot = 100.0
+                total_mass_sum += 100.0
+                attributed_mass_sum += 100.0
+
+            target_summaries.append(
+                TargetCoverageSummary(
+                    targetId=t.id,
+                    targetName=t.name,
+                    coverageRatio=round(t_cov, 4),
+                    residueMass=round(t_res, 2),
+                    totalMass=round(t_tot, 2),
+                )
+            )
+
+        overall_ratio = (
+            round(attributed_mass_sum / total_mass_sum, 4) if total_mass_sum > 0 else 1.0
+        )
+        total_clusters = len(session.exec(select(ResidueClusterRecord)).all())
+
+        return EstateCoverage(
+            overallCoverageRatio=overall_ratio,
+            totalMass=round(total_mass_sum, 2),
+            attributedMass=round(attributed_mass_sum, 2),
+            excludedMass=round(excluded_mass_sum, 2),
+            residueMass=round(residue_mass_sum, 2),
+            totalClusters=total_clusters,
+            targets=target_summaries,
+        )
+
 

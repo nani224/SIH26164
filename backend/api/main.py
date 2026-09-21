@@ -18,7 +18,23 @@ from fastapi.responses import JSONResponse
 
 from api import db
 from api.rate_limiter import RateLimitMiddleware
-from api.routes import alerts, audit, catalog, estate, findings, health, hsm, policies, probes, scans, targets
+from api.routes import (
+    alerts,
+    audit,
+    catalog,
+    cloud,
+    coverage,
+    criticality,
+    estate,
+    findings,
+    health,
+    hsm,
+    policies,
+    probes,
+    residue,
+    scans,
+    targets,
+)
 
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
 log = structlog.get_logger("ecdat.api")
@@ -32,7 +48,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         start_scheduler()
     except Exception as exc:
         log.warning("scheduler_startup_failed", error=str(exc))
-    log.info("ecdat_api_startup", phase="v0.3")
+    log.info("ecdat_api_startup", phase="v1.0")
     try:
         yield
     finally:
@@ -45,8 +61,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="ECDAT API",
-    version="0.3.0",
-    description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — v0.3 Continuous Operation.",
+    version="1.0.0",
+    description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — v1.0 Crypto Mass Conservation (CMC).",
     lifespan=lifespan,
 )
 
@@ -63,8 +79,10 @@ for router in (
     health.router, scans.router, findings.router, policies.router,
     catalog.router, targets.router, probes.router, alerts.router,
     hsm.router, audit.router, estate.router,
+    coverage.router, residue.router, criticality.router, cloud.router,
 ):
     app.include_router(router, prefix="/api/v1")
+
 
 
 @app.exception_handler(HTTPException)

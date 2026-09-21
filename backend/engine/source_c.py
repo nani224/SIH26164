@@ -48,6 +48,7 @@ independent of this module and untouched by it.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,7 +58,7 @@ import tree_sitter
 import tree_sitter_c
 
 from api.models import CryptoFunction, Family, FindingKind, FindingSource, Surface
-from engine.models import Detection
+from engine.models import Detection, Span
 
 _QUERY_PATH = Path(__file__).parent / "queries" / "c_crypto.scm"
 
@@ -140,7 +141,9 @@ def detect_file(path: Path) -> list[Detection]:
     return detect_code(source, str(path))
 
 
-def detect_code(source: bytes, path: str = "<source>") -> list[Detection]:
+def detect_code(source: bytes, path: str = "<source>", artifact_hash: str | None = None) -> list[Detection]:
+    if artifact_hash is None:
+        artifact_hash = hashlib.sha256(source).hexdigest()
     tree = _PARSER.parse(source)
     matches = tree_sitter.QueryCursor(_QUERY).matches(tree.root_node)
     ordered = sorted(matches, key=lambda m: _match_start(m[1]))
@@ -160,7 +163,16 @@ def detect_code(source: bytes, path: str = "<source>") -> list[Detection]:
         args = _positional_args(args_node)
         line = call_node.start_point[0] + 1
         snippet = _text(call_node)[:200]
-        common: dict[str, Any] = dict(path=path, line=line, snippet=snippet, source=FindingSource.AST)
+        span = Span(
+            artifact_hash=artifact_hash,
+            kind="ast",
+            start=call_node.start_byte,
+            end=call_node.end_byte,
+            producing_rule=f"c_ast.{fn}",
+        )
+        common: dict[str, Any] = dict(
+            path=path, line=line, snippet=snippet, source=FindingSource.AST, spans=[span]
+        )
 
         if fn == "EVP_CIPHER_fetch":
             _track_cipher_fetch(call_node, args, cipher_vars, common, detections)

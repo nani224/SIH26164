@@ -28,12 +28,13 @@ This file tracks RFCs and change proposals from the frontend (`Antigravity`) to 
 
 ---
 
-### [DECLINED] RFC-003: Cloud KMS & Sovereign Enclave Key Discovery Surface
-- **Finding Surface**: `cloud-kms`
-- **Status**: DECLINED — Prohibited by Section 1 Stack Constraints and Section 2 Air-Gap Conformance: zero outbound telemetry/HTTP traffic and explicit prohibition of Cloud KMS / paid external cloud services.
-- **Requested By**: Screen 4 (Inventory)
-- **Justification**: Visibility into sovereign cloud cryptographic assets (AWS KMS, Azure Key Vault, Google Cloud HSM enclaves).
-- **Proposed Schema**: Extend `surface` enum in `components['schemas']['Finding']` with `"cloud-kms"`.
+### [ACCEPTED] RFC-003: Cloud KMS & Sovereign Enclave Key Discovery Surface
+- **Finding Surface**: `cloud-kms` / `GET /api/v1/cloud/keys`
+- **Status**: ACCEPTED — Resolved in v1.0 via self-hosted LocalStack AWS KMS (`backend/probes/cloud_kms.py`), satisfying PS clause (i) while adhering to zero-cost and air-gap constraints (no external outbound HTTP, local mock/container only). Other cloud providers documented honestly under [Roadmap].
+- **Requested By**: Screen 4 (Inventory) & PS clause (i)
+- **Justification**: Visibility into sovereign cloud cryptographic assets and key rotation lifecycle.
+- **Proposed Schema**: `GET /api/v1/cloud/keys` returning `CloudKeysResponse` with `CloudKeyRecord` and roadmap transparency.
+
 
 ---
 

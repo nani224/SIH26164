@@ -16,13 +16,14 @@ underlying hash) since there's no call to read arguments from.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import tree_sitter
 import tree_sitter_go
 
 from api.models import CryptoFunction, Family, FindingKind, FindingSource, Surface
-from engine.models import Detection
+from engine.models import Detection, Span
 
 _QUERY_PATH = Path(__file__).parent / "queries" / "go_crypto.scm"
 
@@ -30,43 +31,51 @@ _LANGUAGE = tree_sitter.Language(tree_sitter_go.language())
 _PARSER = tree_sitter.Parser(_LANGUAGE)
 _QUERY = tree_sitter.Query(_LANGUAGE, _QUERY_PATH.read_text())
 
+# Pkg/fn pairs whose underlying cryptographic family is a hash -- used
+# both to map calls directly and to identify the hash constructor passed
+# to hmac.New(hashFunc, key).
 _HASH_PACKAGES: dict[str, Family] = {
     "md5": Family.MD5,
     "sha1": Family.SHA_1,
-    "sha224": Family.SHA_2,
     "sha256": Family.SHA_2,
-    "sha384": Family.SHA_2,
     "sha512": Family.SHA_2,
     "sha3": Family.SHA_3,
 }
 
-# (kind, family, function, display_name, symbol, confidence) for a pkg.fn
-# pair -- independent of whether it's called or referenced as a bare
-# value. Real calls layer on argument-derived extras afterward.
-_PkgFnInfo = tuple[FindingKind, Family, CryptoFunction, str, str, float]
 
-
-def _resolve_pkg_fn(pkg: str, fn: str) -> _PkgFnInfo | None:
-    if pkg in _HASH_PACKAGES and fn in ("New", "Sum", "Sum256", "Sum512", "New256", "New512"):
+def _resolve_pkg_fn(
+    pkg: str, fn: str
+) -> tuple[FindingKind, Family, CryptoFunction, str, str, float] | None:
+    if pkg in _HASH_PACKAGES and fn == "New":
         family = _HASH_PACKAGES[pkg]
         return (
             FindingKind.ALGORITHM, family, CryptoFunction.DIGEST,
-            f"{pkg}.{fn} digest", f"{pkg}.{fn}", 0.92,
+            f"{pkg}.New digest", f"{pkg}.New", 0.9,
+        )
+    if pkg == "md5" and fn == "Sum":
+        return (
+            FindingKind.ALGORITHM, Family.MD5, CryptoFunction.DIGEST,
+            "md5.Sum digest", "md5.Sum", 0.9,
+        )
+    if pkg == "sha1" and fn == "Sum":
+        return (
+            FindingKind.ALGORITHM, Family.SHA_1, CryptoFunction.DIGEST,
+            "sha1.Sum digest", "sha1.Sum", 0.9,
+        )
+    if pkg == "sha256" and fn in ("Sum256", "Sum224"):
+        return (
+            FindingKind.ALGORITHM, Family.SHA_2, CryptoFunction.DIGEST,
+            f"sha256.{fn} digest", f"sha256.{fn}", 0.9,
+        )
+    if pkg == "sha512" and fn in ("Sum512", "Sum384", "Sum512_224", "Sum512_256"):
+        return (
+            FindingKind.ALGORITHM, Family.SHA_2, CryptoFunction.DIGEST,
+            f"sha512.{fn} digest", f"sha512.{fn}", 0.9,
         )
     if pkg == "rsa" and fn == "GenerateKey":
         return (
             FindingKind.ALGORITHM, Family.RSA, CryptoFunction.KEYGEN,
-            "RSA key generation", "rsa.GenerateKey", 0.95,
-        )
-    if pkg == "ecdsa" and fn == "GenerateKey":
-        return (
-            FindingKind.ALGORITHM, Family.ECDSA, CryptoFunction.KEYGEN,
-            "ECDSA key generation", "ecdsa.GenerateKey", 0.92,
-        )
-    if pkg == "ed25519" and fn == "GenerateKey":
-        return (
-            FindingKind.ALGORITHM, Family.ED25519, CryptoFunction.KEYGEN,
-            "Ed25519 key generation", "ed25519.GenerateKey", 0.95,
+            "RSA key generation", "rsa.GenerateKey", 0.92,
         )
     if pkg == "rsa" and fn in ("SignPKCS1v15", "SignPSS"):
         return (
@@ -78,6 +87,21 @@ def _resolve_pkg_fn(pkg: str, fn: str) -> _PkgFnInfo | None:
             FindingKind.ALGORITHM, Family.RSA, CryptoFunction.VERIFY,
             "RSA signature verification", f"rsa.{fn}", 0.9,
         )
+    if pkg == "rsa" and fn in ("EncryptOAEP", "EncryptPKCS1v15"):
+        return (
+            FindingKind.ALGORITHM, Family.RSA, CryptoFunction.ENCRYPT,
+            "RSA encryption", f"rsa.{fn}", 0.9,
+        )
+    if pkg == "rsa" and fn in ("DecryptOAEP", "DecryptPKCS1v15"):
+        return (
+            FindingKind.ALGORITHM, Family.RSA, CryptoFunction.DECRYPT,
+            "RSA decryption", f"rsa.{fn}", 0.9,
+        )
+    if pkg == "ecdsa" and fn == "GenerateKey":
+        return (
+            FindingKind.ALGORITHM, Family.ECDSA, CryptoFunction.KEYGEN,
+            "ECDSA key generation", "ecdsa.GenerateKey", 0.9,
+        )
     if pkg == "ecdsa" and fn in ("Sign", "SignASN1"):
         return (
             FindingKind.ALGORITHM, Family.ECDSA, CryptoFunction.SIGN,
@@ -87,6 +111,11 @@ def _resolve_pkg_fn(pkg: str, fn: str) -> _PkgFnInfo | None:
         return (
             FindingKind.ALGORITHM, Family.ECDSA, CryptoFunction.VERIFY,
             "ECDSA signature verification", f"ecdsa.{fn}", 0.9,
+        )
+    if pkg == "ed25519" and fn == "GenerateKey":
+        return (
+            FindingKind.ALGORITHM, Family.ED25519, CryptoFunction.KEYGEN,
+            "Ed25519 key generation", "ed25519.GenerateKey", 0.95,
         )
     if pkg == "ed25519" and fn == "Sign":
         return (
@@ -147,15 +176,17 @@ def detect_file(path: Path) -> list[Detection]:
     return detect_code(source, str(path))
 
 
-def detect_code(source: bytes, path: str = "<source>") -> list[Detection]:
+def detect_code(source: bytes, path: str = "<source>", artifact_hash: str | None = None) -> list[Detection]:
+    if artifact_hash is None:
+        artifact_hash = hashlib.sha256(source).hexdigest()
     tree = _PARSER.parse(source)
     matches = tree_sitter.QueryCursor(_QUERY).matches(tree.root_node)
     detections: list[Detection] = []
     for _pattern_index, captures in matches:
         if captures.get("call.node"):
-            detection = _classify_call(path, captures)
+            detection = _classify_call(path, captures, artifact_hash)
         elif captures.get("attr.node"):
-            detection = _classify_bare_reference(path, captures)
+            detection = _classify_bare_reference(path, captures, artifact_hash)
         else:
             detection = None
         if detection is not None:
@@ -163,7 +194,9 @@ def detect_code(source: bytes, path: str = "<source>") -> list[Detection]:
     return detections
 
 
-def _classify_call(path: str, captures: dict[str, list[tree_sitter.Node]]) -> Detection | None:
+def _classify_call(
+    path: str, captures: dict[str, list[tree_sitter.Node]], artifact_hash: str
+) -> Detection | None:
     call_nodes = captures.get("call.node")
     args_nodes = captures.get("call.args")
     pkg_nodes = captures.get("call.pkg")
@@ -181,10 +214,19 @@ def _classify_call(path: str, captures: dict[str, list[tree_sitter.Node]]) -> De
 
     line = call_node.start_point[0] + 1
     snippet = _text(call_node)[:200]
+    span = Span(
+        artifact_hash=artifact_hash,
+        kind="ast",
+        start=call_node.start_byte,
+        end=call_node.end_byte,
+        producing_rule=f"go_ast.{symbol}",
+        coarse=False,
+    )
     detection = Detection(
         kind=kind, surface=Surface.SOURCE, family=family, function=function,
         display_name=display_name, symbol=symbol, confidence=confidence,
         path=path, line=line, snippet=snippet, source=FindingSource.AST,
+        spans=[span],
     )
 
     if pkg == "rsa" and fn == "GenerateKey":
@@ -232,7 +274,9 @@ def _is_hmac_new_hash_argument(node: tree_sitter.Node) -> bool:
     return bool(positional) and positional[0] == node
 
 
-def _classify_bare_reference(path: str, captures: dict[str, list[tree_sitter.Node]]) -> Detection | None:
+def _classify_bare_reference(
+    path: str, captures: dict[str, list[tree_sitter.Node]], artifact_hash: str
+) -> Detection | None:
     attr_nodes = captures.get("attr.node")
     pkg_nodes = captures.get("attr.pkg")
     fn_nodes = captures.get("attr.fn")
@@ -259,9 +303,18 @@ def _classify_bare_reference(path: str, captures: dict[str, list[tree_sitter.Nod
 
     line = attr_node.start_point[0] + 1
     snippet = _text(attr_node)[:200]
+    span = Span(
+        artifact_hash=artifact_hash,
+        kind="ast",
+        start=attr_node.start_byte,
+        end=attr_node.end_byte,
+        producing_rule=f"go_ast.{symbol}_ref",
+        coarse=False,
+    )
     return Detection(
         kind=kind, surface=Surface.SOURCE, family=family, function=function,
         display_name=f"{display_name} (reference)", symbol=symbol,
         confidence=round(confidence - 0.05, 2),
         path=path, line=line, snippet=snippet, source=FindingSource.AST,
+        spans=[span],
     )

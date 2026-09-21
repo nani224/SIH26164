@@ -40,6 +40,23 @@ export type HsmSlot = Schemas['HsmSlot'];
 export type HsmKey = Schemas['HsmKey'];
 export type AuditVerifyResponse = Schemas['AuditVerifyResponse'];
 
+// v1.0.0 Crypto Mass Conservation (CMC) Schemas
+export type CoverageCertificate = Schemas['CoverageCertificate'];
+export type ArtifactCoverage = Schemas['ArtifactCoverage'];
+export type ResidueCluster = Schemas['ResidueCluster'];
+export type ResidueClusterState = Schemas['ResidueClusterState'];
+export type ResidueClusterPatch = Schemas['ResidueClusterPatch'];
+export type ResidueOccurrence = Schemas['ResidueOccurrence'];
+export type AssetCriticality = Schemas['AssetCriticality'];
+export type AssetFacing = Schemas['AssetFacing'];
+export type CriticalitySource = Schemas['CriticalitySource'];
+export type Criticality = Schemas['Criticality'];
+export type CriticalityImportResponse = Schemas['CriticalityImportResponse'];
+export type CloudKeyRecord = Schemas['CloudKeyRecord'];
+export type CloudKeysResponse = Schemas['CloudKeysResponse'];
+export type TargetCoverageSummary = Schemas['TargetCoverageSummary'];
+export type EstateCoverage = Schemas['EstateCoverage'];
+
 /**
  * Strict Cryptographic Semantic Classes (Prompt 1, Section 7)
  * Identical across every chart, badge, node, and border.

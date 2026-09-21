@@ -32,6 +32,7 @@ export function ThemeToggle() {
 
   return (
     <button
+      id="theme-toggle-btn"
       onClick={toggle}
       className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono border border-[var(--border-subtle)] bg-[var(--surface-raised)] hover:bg-[var(--surface-card-hover)] text-[var(--text-secondary)] transition-colors focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]"
       title={`Switch to ${isDark ? 'Light (Cipher Clean Room)' : 'Dark (Observatory Deep Void)'}`}
