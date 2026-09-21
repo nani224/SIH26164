@@ -315,8 +315,11 @@ class RemediationPlan(BaseModel):
 
 
 class HealthStatus(BaseModel):
-    status: Literal["ok"]
+    status: Literal["ok", "unavailable"]
     version: str
+    engine_version: str = "v1.0-cmc"
+    rule_set_version: str = "v1.0.1"
+    database: str = "connected"
     time: datetime
 
 
