@@ -42,6 +42,9 @@ log = structlog.get_logger("ecdat.api")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    from api.auth import get_expected_token
+    # Fail startup loudly if ECDAT_API_TOKEN is unset in production
+    get_expected_token()
     db.init_db()
     try:
         from scheduler.engine import shutdown_scheduler, start_scheduler
@@ -61,7 +64,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="ECDAT API",
-    version="1.0.0",
+    version="1.0.1",
     description="Enterprise Cryptographic Discovery & Analysis Tool (SIH26164) — v1.0 Crypto Mass Conservation (CMC).",
     lifespan=lifespan,
 )
@@ -75,13 +78,19 @@ app.add_middleware(
 )
 app.add_middleware(RateLimitMiddleware)
 
+from fastapi import Depends
+from api.auth import verify_bearer_token
+
 for router in (
-    health.router, scans.router, findings.router, policies.router,
+    scans.router, findings.router, policies.router,
     catalog.router, targets.router, probes.router, alerts.router,
     hsm.router, audit.router, estate.router,
     coverage.router, residue.router, criticality.router, cloud.router,
 ):
-    app.include_router(router, prefix="/api/v1")
+    app.include_router(router, prefix="/api/v1", dependencies=[Depends(verify_bearer_token)])
+
+# Unauthenticated public health endpoint
+app.include_router(health.router, prefix="/api/v1")
 
 
 

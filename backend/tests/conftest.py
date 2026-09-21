@@ -10,12 +10,30 @@ os.environ.setdefault("DATABASE_URL", "sqlite://")
 # Test-only: lets tests isolate rate-limit buckets per test via
 # X-Test-Client-Id (see api/rate_limiter.py) -- never set in production.
 os.environ.setdefault("ECDAT_RATE_LIMIT_TRUST_TEST_HEADER", "1")
+os.environ.setdefault("ECDAT_API_TOKEN", "ecdat-test-token-secret")
+os.environ.setdefault("ECDAT_DEV_MODE", "1")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from api import db  # noqa: E402
 from api.main import app  # noqa: E402
+
+# Ensure TestClient defaults to sending valid auth token and actor in tests unless explicitly overridden
+_orig_testclient_init = TestClient.__init__
+
+
+def _patched_testclient_init(self: TestClient, *args: object, **kwargs: object) -> None:
+    headers = dict(kwargs.get("headers") or {})  # type: ignore[arg-type]
+    if "Authorization" not in headers and "authorization" not in headers:
+        headers["Authorization"] = "Bearer ecdat-test-token-secret"
+    if "X-ECDAT-Actor" not in headers and "x-ecdat-actor" not in headers:
+        headers["X-ECDAT-Actor"] = "test-operator"
+    kwargs["headers"] = headers
+    _orig_testclient_init(self, *args, **kwargs)  # type: ignore[arg-type]
+
+
+TestClient.__init__ = _patched_testclient_init  # type: ignore[method-assign]
 
 
 @pytest.fixture(scope="session", autouse=True)
