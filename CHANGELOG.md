@@ -30,10 +30,41 @@ reranking, cloud KMS key discovery (LocalStack), and cryptographic estate covera
 - **M7: Hardening & Performance**:
   - Benchmark on 10k findings + coverage: p95 for coverage queries < 46ms (budget: 150ms);
     p95 for residue queries < 7ms (budget: 200ms).
-  - Security scans: `bandit` (0 high severity; 7 low non-blocking try-except-pass; 1 parameterized SQL CTE triage),
-    `pip-audit` (0 known vulnerabilities), `gitleaks` (9 verified false positives across test/mock signatures),
-    `trivy` (4 findings in `uv.lock` on `cryptography 46.0.7`, documented in ADR 017).
-  - Rate-limiter verification: confirmed no test bypass flags in compose files.
+  - Security scans: `bandit` (0 issues identified), `pip-audit` (1 package exception in ADR 017).
+
+### Track CC/Engine — Residue Extractors, Attribution Calculus, Kill Tests & Benchmark
+
+- **M1-M2: Rule-Independent Extractors**: Implemented 6 extractor classes (`tables`, `arx`, `entropy`,
+  `bigint`, `framing`, `literals`) with zero imports from detection rules, detecting unmodelled crypto.
+- **M3: Attribution Calculus & Conservation Invariant**: Mathematically verified
+  $M_{\text{attributed}} + M_{\text{excluded}} + M_{\text{residue}} = M_{\text{total}}$ on all 33 corpus artifacts with zero units lost.
+- **M4: Coverage Certificate & CBOM Embedding**: CycloneDX 1.6 CBOM export with embedded coverage certificate
+  and SHA-256 run manifest, validated against strict JSON schema.
+- **M5: Kill Tests K1–K4**:
+  - **K1 Sensitivity**: 100.0% of known false negatives surfaced as residue (floor $\ge 90\%$).
+  - **K2 Specificity**: 0.00% residue mass on benign artifacts (floor $\le 5.0\%$).
+  - **K3 Non-Vacuity**: Disabling AES, SHA-256, and MD5 rules returned exact masses to residue; restoring returned exact baseline.
+  - **K4 Directional Validity**: Closing 3 residue clusters dropped residue by 45.00 units and increased recall by 3 findings.
+- **M6: Debt-Closure Loop**: `ecdat debt` CLI commands (`list`, `show`, `promote`, `exclude`, `accept`).
+  End-to-end promotion proved exact 32.0 mass transfer.
+- **M7: Detection Parity Across 6 Languages**: Expanded corpus to 339 usages across Java, C/C++, Python, Go, Rust, and C#.
+  Added PE/Mach-O binary parsing and sandboxed Squashfs/CPIO firmware extraction with hostile-input hardening.
+- **M8: Public Benchmark Suite**: Standalone `score.py` scoring tool, `PROTOCOL.md`, `RESULTS.md`, and `make benchmark`.
+
+### Track A2/UI — Coverage Certificate, Residue Explorer & Proof Surfaces
+
+- **M1: Coverage Certificate on Overview**: Integrated mass conservation bar (attributed / excluded / residue),
+  ratio metric, 5-scan trend sparkline, and prominent residue review CTA banner.
+- **M2-M3: Residue Explorer & Debt Workflow (Screen 16)**: Built `/residue` with cluster table, occurrence
+  drawer, split Hex/Source range viewer, and modals for Promoting to Rule, Excluding (enforcing justification + owner),
+  and Accepting residue.
+- **M4: Coverage in Drift, Estate & Alerts**: Added coverage column to `/estate`, Coverage Shift card to `/drift`,
+  and first-class `residue_rise` alerts to `/alerts`. 2-click traceability estate $\rightarrow$ drift $\rightarrow$ cluster.
+- **M5: PS-Gap Surfaces**: Business Criticality modal with CSV upload, validation error preview, and live risk re-ranking preview;
+  Cloud Keys modal with real LocalStack AWS KMS keys and honest `[Roadmap]` labeling for Azure and GCP.
+- **M6: Proof Surfaces & Demo Tour v3**: Attestation modal with CBOM SHA-256 digest and verify action;
+  Benchmark modal with transparent language breakdowns; 8-step, under-7-minute guided tour traversing the full story.
+- **Verification Gates**: 84 unit tests passing; 8 Playwright E2E suites passing; 0 critical/serious axe violations across all 16 screens in both Light and Dark themes.
 
 ## v0.3.0-sih-finale — 2026-09-20
 

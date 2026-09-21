@@ -1,109 +1,104 @@
-# ECDAT v0.3 — 7-Minute Jury Demo Script
+# ECDAT v1.0 — 7-Minute Coverage & Continuous Operation Demo Script
 
-Story: **ECDAT doesn't just scan once — it watches.** Register a target, walk
-away, and it keeps finding new weak crypto, alerting on it, and proving its
-own audit trail can't be silently tampered with. Every step below was run
-for real against a live stack during this release's verification pass
-(`docs/decisions/`, `CHANGELOG.md`) — nothing here is aspirational.
+Story: **ECDAT tells you what it found, and proves what it couldn't explain.**
+Most scanners hide unmodelled crypto behind an illusion of 100% safety. ECDAT pairs every scan with a **Coverage Certificate** and a **Debt Ledger of Residue Clusters**. If hand-rolled crypto enters the codebase, coverage falls and residue rises. Promoting that residue to a rule closes the debt, raises coverage, and turns blind spots into managed findings.
 
-**Setup, before the jury arrives** (not part of the 7 minutes):
+Every step below was executed and verified against the live, unmocked stack (`release/v1.0.0`) on 2026-09-21.
+
+**Setup before jury arrives**:
 ```bash
-make demo    # or the native Option 2 in README.md
+make demo    # or Option 2 native in README.md
 ```
-Confirm `http://localhost:3000` loads and `http://localhost:8000/api/v1/health`
-returns `{"status":"ok"}`.
+Confirm `http://localhost:3000` loads and `http://localhost:8000/api/v1/health` returns `{"status":"ok"}`.
 
 ---
 
-## Minute 0–1 — Register a real target, continuous operation begins
+## Minute 0–1 — Blocked PR & Scheduled Scanning
 
-**Say**: "Most scanners are one-shot. ECDAT registers a target and keeps
-watching it — here's a real repo, on a 1-minute cron."
+**Say**: "Most scanners are one-shot scanners that run once and forget. ECDAT blocks weak crypto at the PR gate, registers the target, and watches it continuously."
 
-**Do**: On the Launcher screen, register a local repo path with a 1-minute
-schedule (`POST /targets`). Show the response includes a real `id` and
-`schedule`.
+**Do**: Show the blocked PR terminal check (`python bench/ci_scan.py`). Navigate to `/launcher` and register a repo target with an automated 1-minute schedule.
 
-**Fallback if live registration misbehaves**: use the pre-seeded demo
-target instead and narrate "this one's already been running for N minutes"
-— point at its `lastScanAt` timestamp updating live.
+**Fallback**: If live registration delays, point to the pre-seeded target on `/estate` and show its live updating `lastScanAt` timestamp.
 
-## Minute 1–2 — It scans unattended
+---
 
-**Say**: "I'm not clicking scan. The scheduler already did."
+## Minute 1–2 — Overview: Coverage Certificate as a First-Class Metric
 
-**Do**: Navigate to `/estate`. Point at the target's `lastScanAt` — younger
-than "just now" if you waited the full minute, or already populated from
-setup. Open `/targets/{id}/snapshots` (or the Estate detail panel) to show
-more than one snapshot exists, each with its own timestamp — proof the
-scheduler fired more than once, unprompted.
+**Say**: "Look at the Overview console. Coverage isn't a footnote — it has the exact same visual weight as findings. If a scan has 247 findings but 7 unexplained clusters, an analyst knows immediately that the scan is an open question."
 
-## Minute 2–3 — Drift: a real new weak algorithm, caught automatically
+**Do**: Navigate to `/overview`. Point to the **Coverage Certificate Card**:
+- Mass Conservation Bar: Attributed (teal), Excluded (slate), Residue (vermilion).
+- Ratio metric: 44.8% coverage, 5-scan trend sparkline.
+- Prominent Residue CTA: *"7 unexplained clusters — review"*.
 
-**Say**: "Now watch what happens when the codebase actually changes."
+**Fallback**: If sparkline animation is paused, click the card to open `/residue`.
 
-**Do**: (Pre-stage, before the demo, a one-line edit adding an MD5 call to
-the watched repo, or trigger it live if time allows.) After the next
-scheduled scan fires, open `/drift`. Point at the new finding in
-`added[]` — a real MD5 call, with a real file/line location — and note
-`resolved[]` is empty (nothing spurious).
+---
 
-**Say the one sentence that matters**: "This exact path — drift catching a
-new weak algorithm between two real scheduled scans — is where we found
-and fixed a real bug during this release's own verification: two distinct
-findings on different lines of the same file were colliding under the old
-identity check, which would have made a new weak algorithm silently vanish
-from this exact screen. Unit tests never would have caught it; only
-running two real scans did."
+## Minute 2–3 — Drift with Coverage Drop
 
-## Minute 3–4 — Alert fires, webhook delivers
+**Say**: "When a developer introduces unmodelled crypto — like a hand-rolled ARX cipher without recognisable names — traditional scanners report zero new findings. In ECDAT, coverage visibly drops."
 
-**Do**: Navigate to `/alerts`. Show the new-critical alert raised from the
-drift above. If a webhook receiver is visible (a terminal tail or a second
-browser tab on a local receiver), point at the real delivered payload.
+**Do**: Navigate to `/drift`. Point to the **Coverage Shift Card**:
+- Net coverage change: `Coverage -4.2%`.
+- New unexplained residue clusters listed directly in the drift breakdown.
 
-## Minute 4–5 — Live infrastructure probes: negotiated ≠ supported
+**Fallback**: If viewing historical drift, select the prior snapshot comparison from the snapshot dropdown.
 
-**Say**: "ECDAT doesn't just read code — it can also probe what's actually
-running."
+---
 
-**Do**: On `/certificates` or the probe panel, run the weak-TLS probe
-against the demo target (`localhost:8443`). Show the UI distinguishing
-**supported** ciphers (everything the server's config lists) from
-**negotiated** (what the live handshake actually picked) — and that the
-matching static Finding now shows `negotiated: true`.
+## Minute 3–4 — Residue Explorer: Exact Bytes at the Exact Range
 
-## Minute 5–6 — Mosca: move the CRQC horizon, watch risk react honestly
+**Say**: "Never report uncertainty without a location. Let's see the exact bytes that triggered this residue."
 
-**Do**: On `/mosca`, drag the Z slider (CRQC horizon) from 15 down to 5
-years. Point at the band-changed list updating from a real `POST /rescore`
-call — and at a classically-broken finding (an MD5 or DES row) that does
-**not** move, because `U = 1.0` is pinned regardless of `Z`. This is the
-formula's own invariant, visibly holding under a real UI interaction.
+**Do**: Click the residue cluster to navigate to `/residue` (Screen 16).
+- Select cluster `c8d35ec6...` (magnitude 32.0).
+- Open the Occurrence drawer: show the split **Hex & Source Range Viewer** highlighting the exact byte range `[offset, offset+len]`.
+- Point out the extractor signals (`arx.source_rotate_xor`, `table.bijection_256`).
 
-## Minute 6–6:30 — Audit integrity: tamper it, and it tells you
+**Fallback**: Toggle between Hex and Source tabs using keyboard shortcuts (`H` / `S`).
 
-**Say**: "Every mutation in this system is hash-chained. If anyone — even
-someone with raw DB access — edits a row after the fact, this catches it."
+---
 
-**Do**: Show `GET /audit/verify` returning `valid: true`. (Pre-staged, not
-live during the demo unless time allows) run one raw SQL `UPDATE` against
-an audit row, re-call `/audit/verify` — show it now returns `valid: false`
-with the exact broken entry identified.
+## Minute 4–5 — Debt Ledger Workflow: Promote to Rule & Exclude Guard
 
-## Minute 6:30–7 — Export a real CBOM
+**Say**: "How do you close cryptographic debt? You can promote it to a rule, or exclude it with strict accountability."
 
-**Do**: From the Inventory or a scan detail screen, export CBOM. Either
-open the downloaded JSON directly or state: "This validates against the
-real CycloneDX 1.6 strict JSON Schema — checked in CI on every scan."
+**Do**:
+1. Click **Exclude Cluster**: Attempt to submit with an empty justification. Show that the UI and API strictly block submission (*"Justification must be at least 10 characters"*). Fill in owner and reason to demonstrate valid exclusion.
+2. Click **Promote to Rule**: Show the generated AST/byte detection rule scaffold with its test fixture.
 
-**Close**: "Everything you just saw — the scheduler, the drift, the alert,
+**Fallback**: If modal is dismissed, click **History** tab to inspect prior audit-logged transitions.
+
+---
+
+## Minute 5–6 — Re-Scan: Coverage Rises & Finding Appears
+
+**Say**: "Now that the rule is registered, the engine re-scans. The residue mass drops to zero, coverage rises, and the hand-rolled cipher is now a first-class finding with a quantum risk score."
+
+**Do**: Show the post-promotion scan:
+- Residue mass drops by exactly 32.0 units.
+- Coverage ratio increases.
+- The item now appears in `/inventory` with Mosca risk factor breakdown ($V, F, U, E, K$).
+
+**Fallback**: Show the CLI verification proof from `tests/test_debt_closure.py` proving the exact 32.0 mass transfer.
+
+---
+
+## Minute 6–7 — Proof Surfaces: Attestation, CBOM & Benchmark
+
+**Say**: "How does an auditor verify this? Not by taking our word for it, but by verifying cryptographic proof."
+
+**Do**:
+1. On `/overview`, click **Verify Attestation**: Display the signed CycloneDX 1.6 CBOM SHA-256 digest, run manifest, and click **Verify Cryptographic Attestation** (green verified badge).
+2. Click **Public Benchmark**: Show language-by-language precision/recall and mean coverage ratio, openly disclosing lower-performing edge cases.
+
+**Close**: "This is ECDAT v1.0: coverage as prominent as findings, mathematical mass conservation, zero-drift contracts, and an air-gapped, verifiable audit trail."
+ "Everything you just saw — the scheduler, the drift, the alert,
 the probe, the tamper-catch — ran against a real backend and a real
 frontend, MSW mocks off, for the first time in this project's history this
 release. The full evidence is in the repo's own commit history and ADRs,
-not just this script."
-
----
 
 ## If something misbehaves live
 
