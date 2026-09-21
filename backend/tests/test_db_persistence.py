@@ -36,10 +36,13 @@ def test_audit_log_records_scan_creation() -> None:
     scan = store.create_scan_from_result(payload, ScanResult(), store.resolve_policy(payload))
     with db.session_scope() as session:
         rows = session.exec(
-            select(AuditLogRecord).where(AuditLogRecord.entity_id == scan.id)
+            select(AuditLogRecord).where(AuditLogRecord.entity_id == scan.id).order_by(AuditLogRecord.id)
         ).all()
-    assert len(rows) == 1
+    # v1.0 CMC: scan creation now also persists a coverage certificate
+    # (M2), which is itself an audited action -- two real rows, not one.
+    assert len(rows) == 2
     assert rows[0].action == "scan.create"
+    assert rows[1].action == "coverage.record"
 
 
 def test_audit_log_records_triage_patch() -> None:
