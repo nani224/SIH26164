@@ -1392,8 +1392,6 @@ components:
         residueMass:
           type: [number, "null"]
           description: Unexplained residue mass at the time of this snapshot (v1.0).
-        coverageRatio: { type: [number, "null"] }
-        residueMass: { type: [number, "null"] }
 
     DriftChangedItem:
       type: object
