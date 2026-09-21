@@ -14,6 +14,12 @@ import type {
   ProbeResult,
   HsmInventory,
   AuditVerifyResponse,
+  CoverageCertificate,
+  ArtifactCoverage,
+  ResidueCluster,
+  AssetCriticality,
+  CloudKeysResponse,
+  EstateCoverage,
 } from '../types/crypto';
 
 export const mockScans: Scan[] = [
@@ -946,6 +952,8 @@ export const mockEstateSummary: EstateSummary = {
   criticalFindings: 14,
   pqcReadinessScore: 68.5,
   activeAlerts: 3,
+  internalFacingAssets: 120,
+  externalFacingAssets: 64,
 };
 
 export const mockEstateTrend: EstateTrend = {
@@ -984,6 +992,8 @@ export const mockDrifts: Record<string, Drift> = {
       resolvedCount: 1,
       changedCount: 1,
       netRiskDelta: -12.4,
+      coverageDelta: -0.042,
+      residueMassDelta: 45.0,
     },
   },
 };
@@ -1017,6 +1027,16 @@ export const mockAlerts: Alert[] = [
     severity: 'critical',
     message: 'Active probe detected cipher suite downgrade to TLS_RSA_WITH_AES_128_CBC_SHA',
     createdAt: '2026-09-19T22:45:00Z',
+    acknowledged: false,
+  },
+  {
+    id: 'alt-005',
+    type: 'residue-rise',
+    targetId: 'target-001',
+    findingId: null,
+    severity: 'high',
+    message: 'Unexplained cryptographic residue rose by +45.0 units in Core Payment Gateway (coverage dropped -4.2%)',
+    createdAt: '2026-09-20T07:18:00Z',
     acknowledged: false,
   },
   {
@@ -1102,5 +1122,181 @@ export const mockAuditVerify: AuditVerifyResponse = {
   recordCount: 1248,
   headHash: '7f9a8b1c2d3e4f5061728394a5b6c7d8e9f0123456789abcdef0123456789abc',
   details: 'Cryptographic SHA-256 hash chain intact across 1248 log entries. Zero tampering detected.',
+};
+
+// --- v1.0.0 Crypto Mass Conservation (CMC) Mock Data ---
+
+export const mockCoverageCertificate: CoverageCertificate = {
+  scanId: 'scan-7f8e1a',
+  artifactCount: 1420,
+  totalMass: 10000.0,
+  attributedMass: 8850.0,
+  excludedMass: 500.0,
+  residueMass: 650.0,
+  coverageRatio: 0.935, // 93.5%
+  residueClusterCount: 7,
+  computedAt: '2026-09-20T05:35:00Z',
+};
+
+export const mockArtifactCoverages: ArtifactCoverage[] = [
+  {
+    artifactHash: 'art-hash-001',
+    path: 'src/crypto/handshake.c',
+    totalMass: 450.0,
+    attributed: 420.0,
+    excluded: 0.0,
+    residue: 30.0,
+    coverageRatio: 0.933,
+  },
+  {
+    artifactHash: 'art-hash-002',
+    path: 'lib/legacy/des_cipher.c',
+    totalMass: 800.0,
+    attributed: 600.0,
+    excluded: 50.0,
+    residue: 150.0,
+    coverageRatio: 0.812,
+  },
+  {
+    artifactHash: 'art-hash-003',
+    path: 'vendor/openssl/evp_pbe.c',
+    totalMass: 1200.0,
+    attributed: 1200.0,
+    excluded: 0.0,
+    residue: 0.0,
+    coverageRatio: 1.0,
+  },
+];
+
+export const mockResidueClusters: ResidueCluster[] = [
+  {
+    id: 'cluster-res-001',
+    contentHash: 'sha256:4a7d8e9f0123456789abcdef0123456789abcdef0123456789abcdef01234567',
+    signalTypes: ['constant_pool', 'entropy'],
+    magnitude: 145.2,
+    occurrences: [
+      {
+        artifactHash: 'art-hash-001',
+        path: 'src/crypto/handshake.c',
+        range: [120, 185],
+      },
+      {
+        artifactHash: 'art-hash-002',
+        path: 'lib/legacy/des_cipher.c',
+        range: [340, 410],
+      },
+    ],
+    state: 'open',
+    justification: null,
+    owner: null,
+    firstSeen: '2026-09-18T10:00:00Z',
+    lastSeen: '2026-09-20T05:35:00Z',
+  },
+  {
+    id: 'cluster-res-002',
+    contentHash: 'sha256:5b8e9f0123456789abcdef0123456789abcdef0123456789abcdef01234568',
+    signalTypes: ['tables', 'arx'],
+    magnitude: 98.4,
+    occurrences: [
+      {
+        artifactHash: 'art-hash-002',
+        path: 'lib/legacy/des_cipher.c',
+        range: [500, 580],
+      },
+    ],
+    state: 'open',
+    justification: null,
+    owner: null,
+    firstSeen: '2026-09-19T14:30:00Z',
+    lastSeen: '2026-09-20T05:35:00Z',
+  },
+  {
+    id: 'cluster-res-003',
+    contentHash: 'sha256:6c9f0123456789abcdef0123456789abcdef0123456789abcdef01234569',
+    signalTypes: ['constant_pool'],
+    magnitude: 62.0,
+    occurrences: [
+      {
+        artifactHash: 'art-hash-004',
+        path: 'third_party/asn1_parser.c',
+        range: [80, 140],
+      },
+    ],
+    state: 'accepted',
+    justification: 'Vendor proprietary ASN.1 constant table, confirmed non-cryptographic.',
+    owner: 'secops@defense.mil',
+    firstSeen: '2026-09-15T09:00:00Z',
+    lastSeen: '2026-09-20T05:35:00Z',
+  },
+];
+
+export const mockAssetCriticalities: AssetCriticality[] = [
+  {
+    targetId: 'target-001',
+    pathPattern: 'src/crypto/**',
+    criticality: 'mission-critical',
+    businessOwner: 'Cryptographic Architecture Group',
+    dataClassification: 'RESTRICTED-DEFENSE',
+    facing: 'internal',
+    source: 'manual',
+  },
+  {
+    targetId: 'target-001',
+    pathPattern: 'src/gateway/**',
+    criticality: 'high',
+    businessOwner: 'External Boundary Operations',
+    dataClassification: 'CONFIDENTIAL',
+    facing: 'external',
+    source: 'import',
+  },
+];
+
+export const mockCloudKeysResponse: CloudKeysResponse = {
+  keys: [
+    {
+      provider: 'aws-kms',
+      keyId: 'arn:aws:kms:us-east-1:123456789012:key/b19c3f4a-5678-90ab-cdef-1234567890ab',
+      algorithm: 'AES-GCM',
+      keySize: 256,
+      rotationAgeDays: 412,
+      policyCompliant: false,
+      identityId: 'sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
+    },
+    {
+      provider: 'aws-kms',
+      keyId: 'arn:aws:kms:us-east-1:123456789012:key/c20d4e5b-6789-01bc-def1-2345678901bc',
+      algorithm: 'RSA_4096',
+      keySize: 4096,
+      rotationAgeDays: 120,
+      policyCompliant: true,
+      identityId: 'sha256:8a94c27680020d64ca3ed29259b2e76efd3e5c20b4e788395bee1112237ea17a',
+    },
+  ],
+  roadmap: '[Roadmap] AWS KMS via LocalStack is actively supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1.',
+};
+
+export const mockEstateCoverage: EstateCoverage = {
+  overallCoverageRatio: 0.948,
+  totalMass: 48000.0,
+  attributedMass: 44200.0,
+  excludedMass: 1300.0,
+  residueMass: 2500.0,
+  totalClusters: 18,
+  targets: [
+    {
+      targetId: 'target-001',
+      targetName: 'defense-mesh-router',
+      coverageRatio: 0.935,
+      residueMass: 650.0,
+      totalMass: 10000.0,
+    },
+    {
+      targetId: 'target-002',
+      targetName: 'core-payment-switch',
+      coverageRatio: 0.962,
+      residueMass: 380.0,
+      totalMass: 15000.0,
+    },
+  ],
 };
 

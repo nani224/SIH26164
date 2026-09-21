@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
@@ -8,6 +8,10 @@ import { fetchScan, fetchScanFindings } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { CbomExportButton } from '../../components/CbomExportButton';
+import { CoverageCertificateCard } from '../../components/CoverageCertificateCard';
+import { AttestationModal } from '../../components/AttestationModal';
+import { BenchmarkModal } from '../../components/BenchmarkModal';
+import { DemoTourModal } from '../../components/DemoTourModal';
 import { classifyAlgorithm } from '../../types/crypto';
 import {
   ShieldAlert,
@@ -23,12 +27,19 @@ import {
   Clock,
   ExternalLink,
   RefreshCw,
+  Compass,
+  Award,
+  ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OverviewPage() {
   const router = useRouter();
   const { activeScanId, openDrawer } = useAppStore();
+
+  const [isAttestationOpen, setIsAttestationOpen] = useState(false);
+  const [isBenchmarkOpen, setIsBenchmarkOpen] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   const {
     data: scan,
@@ -154,7 +165,31 @@ export default function OverviewPage() {
             Scan ID: {scan.id} · Completed in {scan.stats?.seconds ?? 0}s · Policy: {scan.policyId}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            id="open-tour-btn"
+            onClick={() => setIsTourOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--surface-raised)] border border-[var(--crypto-pqc-border)] text-[var(--crypto-pqc)] hover:bg-[var(--surface-card-hover)] font-mono text-xs font-bold transition-colors"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span>DEMO TOUR</span>
+          </button>
+          <button
+            id="open-attestation-btn"
+            onClick={() => setIsAttestationOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border-prominent)] text-[var(--text-primary)] hover:bg-[var(--surface-card-hover)] font-mono text-xs font-bold transition-colors"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[var(--coverage-attributed)]" />
+            <span>VERIFY ATTESTATION</span>
+          </button>
+          <button
+            id="open-benchmark-btn"
+            onClick={() => setIsBenchmarkOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border-prominent)] text-[var(--text-primary)] hover:bg-[var(--surface-card-hover)] font-mono text-xs transition-colors"
+          >
+            <Award className="w-3.5 h-3.5 text-[var(--crypto-shor)]" />
+            <span>BENCHMARK</span>
+          </button>
           <CbomExportButton scanId={scan.id} />
           <Link
             href="/mosca"
@@ -165,6 +200,9 @@ export default function OverviewPage() {
           </Link>
         </div>
       </div>
+
+      {/* Coverage Certificate & Mass Conservation Surface (v1.0 Milestone M1) */}
+      <CoverageCertificateCard scanId={scan.id} />
 
       {/* Primary Threat Bento Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
@@ -376,6 +414,23 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Proof & Tour Modals (M6) */}
+      <AttestationModal
+        isOpen={isAttestationOpen}
+        onClose={() => setIsAttestationOpen(false)}
+        scanId={scan.id}
+      />
+      <BenchmarkModal
+        isOpen={isBenchmarkOpen}
+        onClose={() => setIsBenchmarkOpen(false)}
+      />
+      <DemoTourModal
+        isOpen={isTourOpen}
+        onClose={() => setIsTourOpen(false)}
+        onOpenAttestation={() => setIsAttestationOpen(true)}
+        onOpenBenchmark={() => setIsBenchmarkOpen(true)}
+      />
     </div>
   );
 }
