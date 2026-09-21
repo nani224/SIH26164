@@ -161,7 +161,7 @@ def verify_runtime_imports() -> list[Violation]:
             visitor = AirGapVisitor(py_file)
             visitor.visit(tree)
             violations.extend(v for v in visitor.violations if v.rule == "BANNED_NETWORK_IMPORT")
-            rel = str(py_file.relative_to(BACKEND_DIR))
+            rel = py_file.relative_to(BACKEND_DIR).as_posix()
             if visitor.network_imports and not visitor.imports_guard and rel not in ALLOWED_UNGUARDED_NETWORK_FILES:
                 violations.append(
                     Violation(

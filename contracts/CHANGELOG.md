@@ -1,5 +1,33 @@
 # Contract Changelog
 
+## 1.0.0-cmc — 2026-09-21
+
+Major contract update for ECDAT v1.0 Crypto Mass Conservation (CMC) Engine & Track A1:
+- **Schemas added**:
+  - `CoverageCertificate`: Scan-level crypto mass conservation metrics (scanId, artifactCount, totalMass, attributedMass, excludedMass, residueMass, coverageRatio, residueClusterCount, computedAt).
+  - `ArtifactCoverage`: Per-file crypto mass breakdown (artifactHash, path, totalMass, attributed, excluded, residue, coverageRatio).
+  - `ResidueCluster`, `ResidueOccurrence`, `ResidueClusterPatch`, `ResidueClusterState`: Content-hash indexed crypto debt ledger clusters and state machine (open, promoted, excluded, accepted).
+  - `AssetCriticality`, `AssetFacing`, `CriticalitySource`, `CriticalityImportResponse`: PS clause (iii) business criticality classification, owner mapping, and CSV bulk import.
+  - `CloudKeyRecord`, `CloudKeysResponse`: PS clause (i) cloud key discovery (AWS KMS via LocalStack).
+  - `TargetCoverageSummary`, `EstateCoverage`: Estate-wide coverage aggregation and debt trend metrics.
+- **Schema extensions**:
+  - `ScanSnapshot`: added `coverageRatio: number | null` and `residueMass: number | null`.
+  - `DriftSummary`: added `coverageDelta: number | null` and `residueMassDelta: number | null`.
+  - `AlertType`: added `residue-rise` enum value.
+- **Paths added**:
+  - `GET /api/v1/scans/{scan_id}/coverage`
+  - `GET /api/v1/scans/{scan_id}/coverage/artifacts`
+  - `GET /api/v1/residue`
+  - `GET /api/v1/residue/{id}`
+  - `PATCH /api/v1/residue/{id}`
+  - `GET /api/v1/criticality`
+  - `PUT /api/v1/criticality`
+  - `POST /api/v1/criticality/import`
+  - `GET /api/v1/cloud/keys`
+  - `GET /api/v1/estate/coverage`
+- **Proposals updated**:
+  - RFC-003: ACCEPTED via LocalStack AWS KMS (zero external cost, air-gap safe).
+
 ## 0.3.0-continuous-operation — 2026-09-19
 
 Additive update for continuous operation (Track A1):

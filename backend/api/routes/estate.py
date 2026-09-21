@@ -8,8 +8,15 @@ from fastapi import APIRouter, Query
 from sqlmodel import col, select
 
 from api import db
-from api.db_models import AlertRecord, FindingRecord, ScanRecord, ScanSnapshotRecord, TargetRecord
-from api.models import EstateSummary, EstateTrend, EstateTrendPoint
+from api.db_models import (
+    AlertRecord,
+    AssetCriticalityRecord,
+    FindingRecord,
+    ScanRecord,
+    ScanSnapshotRecord,
+    TargetRecord,
+)
+from api.models import EstateCoverage, EstateSummary, EstateTrend, EstateTrendPoint
 
 router = APIRouter(tags=["estate"])
 
@@ -42,6 +49,14 @@ def get_estate_summary() -> EstateSummary:
         else:
             pqc_readiness = round(max(0.0, min(100.0, (pqc_findings / total_findings) * 100.0)), 1)
 
+        # v1.0 PS clause (i)/(iii): internal vs external facing reported as
+        # a first-class split, from the explicit AssetCriticality ledger --
+        # not inferred from Policy Context exposure (a separate, coarser
+        # signal that existed before v1.0).
+        criticalities = session.exec(select(AssetCriticalityRecord)).all()
+        internal_facing = sum(1 for c in criticalities if c.facing == "internal")
+        external_facing = sum(1 for c in criticalities if c.facing == "external")
+
         return EstateSummary(
             totalTargets=total_targets,
             totalScans=total_scans,
@@ -49,6 +64,8 @@ def get_estate_summary() -> EstateSummary:
             criticalFindings=critical_findings,
             pqcReadinessScore=pqc_readiness,
             activeAlerts=active_alerts,
+            internalFacingAssets=internal_facing,
+            externalFacingAssets=external_facing,
         )
 
 
@@ -110,3 +127,11 @@ def get_estate_trend(days: int = Query(default=30, ge=1, le=365)) -> EstateTrend
             )
 
         return EstateTrend(days=days, points=points)
+
+
+@router.get("/estate/coverage", response_model=EstateCoverage)
+def get_estate_coverage() -> EstateCoverage:
+    """Get aggregated crypto coverage and debt trends across the estate."""
+    from api import store
+    return store.get_estate_coverage()
+

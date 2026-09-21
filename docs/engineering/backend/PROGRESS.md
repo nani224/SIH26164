@@ -1698,4 +1698,321 @@ pnpm test:e2e (MSW off, real backend)  -> 29/33 passed (4 explained, see README)
 - `cryptography` HIGH CVEs unfixable today without an unverified `sslyze`
   compatibility gamble (ADR 017).
 
+---
+
+## 2026-09-21 — Session (v1.0 Crypto Mass Conservation, Track A1, `feature/cmc-api`)
+
+### Status: M1-M4 done (M1-M3 inherited from a parallel session on the same
+branch, verified and one real bug fixed; M4 implemented this session)
+
+### M1-M3: inherited, independently verified before building on top
+Found real, substantial work already pushed to `origin/feature/cmc-api`
+(M1 contract, M2 persistence, M3 debt ledger) when this session first
+tried to push its own M1 draft -- did not overwrite it. Checked it out,
+ran the full gate suite from scratch rather than trusting its own
+"zero drift" commit-message claims:
+```
+uv run ruff check .        -> All checks passed!
+uv run mypy --strict .     -> Success: no issues found in 106 source files
+uv run pytest --cov -q     -> 216 passed, 1 failed (before fix)
+uv run python scripts/contract_diff.py -> No contract drift.
+```
+The one real failure: `test_audit_log_records_scan_creation` (Phase 3,
+predates v1.0) asserted exactly 1 audit row per scan creation; M2's
+coverage persistence now legitimately writes a second row
+(`action=coverage.record`) every time, since persisting a coverage
+certificate is itself an auditable action. Fixed the assertion to match
+the real, correct new behavior (2 rows, in order) rather than weakening
+it. Re-ran: 217/217 passed. Also rebased the whole branch onto
+`chore/repo-hygiene`'s actual merge commit (`3b9ecad`) -- the branch had
+silently forked from a pre-hygiene `main` despite the mandate's own
+"rebase on main first" prerequisite; clean rebase, no conflicts, gates
+re-verified green after (218/218, the +1 being M4's own new test).
+
+### M4: coverage in drift and trend
+Found two real gaps while implementing: `ScanSnapshot.coverageRatio`/
+`residueMass` existed in the Python model and DB schema (M1/M2) but were
+never populated by `create_snapshot()`, and were never declared in
+`contracts/openapi.yaml` at all (a real blind spot in
+`scripts/contract_diff.py`, which only flags contract fields missing
+from the app, never the reverse -- noted, not fixed, out of this track's
+`contracts/openapi.yaml`-only ownership of that boundary).
+`DriftSummary.coverageDelta`/`residueMassDelta` were declared in the
+contract but never computed.
+
+Wired all of it: `create_snapshot()` now looks up the scan's
+already-persisted `CoverageCertificate` and carries it onto the
+snapshot; `db.snapshot_to_record()`/`record_to_snapshot()` pass the
+fields through; `calculate_drift()` computes the deltas from the two
+snapshots being compared. Added the missing `ScanSnapshot` properties to
+`contracts/openapi.yaml`.
+
+Also found and fixed a real, currently-dormant bug while wiring this:
+`save_coverage()` persisted a certificate keyed by `cert.scanId` (a
+caller-supplied field) instead of its own explicit `scan_id` parameter --
+harmless today only because nothing in `engine/` yet populates
+`ScanResult.coverage_certificate`, so the fallback path always
+self-consistently set `cert.scanId == scan_id`. Surfaced immediately by
+M4's own test (a manually-constructed certificate for the "before" and
+"after" snapshots): `get_coverage_certificate(scan_id)` returned `None`
+for a real scan whose cert had been silently saved under a different
+key. Fixed by forcing `cert.scanId = scan_id` inside `save_coverage()`
+itself.
+
+New test, real HTTP endpoint, not just the store function:
+`test_drift_reports_falling_coverage_when_unexplained_crypto_appears`
+(`tests/test_targets_scheduler.py`) -- two snapshots with real, different
+coverage certificates (1.0 -> 0.758 coverage, 0.0 -> 24.2 residue mass)
+produce a drift response whose `summary.coverageDelta` is negative and
+`residueMassDelta` is positive, proving the exit criteria: coverage
+falls even with **zero new Findings**, because unexplained residue is
+the real signal, not just finding count.
+
+### Real request/response evidence (2026-09-21, live server, port 8020)
+```
+$ curl -sS http://127.0.0.1:8020/api/v1/scans/scan_stub_001/coverage
+{"scanId":"scan_stub_001","artifactCount":482,"totalMass":100.0,
+ "attributedMass":100.0,"excludedMass":0.0,"residueMass":0.0,
+ "coverageRatio":1.0,"residueClusterCount":0,
+ "computedAt":"2026-09-21T01:35:45.761267Z"}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/residue
+[]
+
+$ curl -sS http://127.0.0.1:8020/api/v1/criticality
+[]
+
+$ curl -sS http://127.0.0.1:8020/api/v1/cloud/keys
+{"keys":[],"roadmap":"[Roadmap] AWS KMS via LocalStack is actively
+ supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/estate/coverage
+{"overallCoverageRatio":1.0,"totalMass":0.0,"attributedMass":0.0,
+ "excludedMass":0.0,"residueMass":0.0,"totalClusters":0,"targets":[]}
+```
+All real responses from a real running server against a fresh SQLite
+file, not mocked. `cloud/keys` correctly returns an empty set with the
+roadmap note visible (LocalStack not running in this quick check) rather
+than erroring -- M6 will prove the reachable-and-returns-real-keys case
+separately.
+
+### M5: PS gap: business criticality (PS clause iii & clause i)
+Closed the PS clause (iii) compliance gap where `AssetCriticality` was persisted
+in M1 but had zero effect on scoring, and the PS clause (i) gap where asset facing
+existed only within individual records with no aggregate estate view.
+
+- `store.resolve_policy(payload, target_id=...)` translates a target's explicit
+  `AssetCriticality` records into synthetic, higher-priority `ContextWithGlob`
+  entries prepended ahead of the policy's own contexts. This is the existing
+  Context-matching hook point -- no risk formula or weight touched -- so an
+  imported criticality CSV visibly changes a finding's K/E factors and score on
+  the next scan.
+- `scheduler/engine.py`'s `execute_target_scan` passes `target_id` through so
+  scheduled scans and `scan-now` pick this up automatically.
+- `EstateSummary` gained `internalFacingAssets` and `externalFacingAssets`
+  (contract + model + route), providing a first-class estate-wide split derived
+  from the `AssetCriticality` ledger's `facing` field.
+- New test `backend/tests/test_criticality_reranks_findings.py` exercises both
+  end-to-end through the real HTTP API against a real scan (MD5 finding, chosen
+  to avoid the unencrypted-private-key score floor masking the K/E movement).
+- Also fixed a real cross-file test-pollution issue in `test_estate_audit.py`
+  by having the test evict same-day `ScanSnapshotRecord` rows it doesn't own
+  before creating its own 5.
+
+### Real request/response evidence for M5 (2026-09-21, live server, port 8020)
+```
+# 1. Target creation for C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/targets \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Criticality Rerank Target","kind":"path","uri":"C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_","policyId":"policy_default","schedule":"0 0 * * *","enabled":true}'
+{
+  "id": "target_21100874f080",
+  "name": "Criticality Rerank Target",
+  "kind": "path",
+  "uri": "C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_",
+  "policyId": "policy_default",
+  "schedule": "0 0 * * *",
+  "enabled": true,
+  "lastScanId": null,
+  "lastScanAt": null,
+  "createdAt": "2026-09-21T01:53:03.139027Z"
+}
+
+# 2. Baseline scan: default context (internal, medium) -> K=0.6, E=0.6, score=18.0
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/targets/target_21100874f080/scan-now
+{"id":"scan_8c4d1f727e5c","target":"C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_","status":"done"}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/scans/scan_8c4d1f727e5c/findings
+{
+  "id": "finding_cd2c454b3a50",
+  "family": "MD5",
+  "score": 18.0,
+  "band": "medium",
+  "K": 0.6,
+  "E": 0.6,
+  "reason": "MD5 digest in a internal-exposed, medium-criticality context (shelf-life 5y, migration 3y, CRQC horizon 10y)."
+}
+
+# 3. CSV Criticality Import: bulk CMDB import setting target to mission-critical, external
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/criticality/import \
+  -F "file=@criticality.csv"
+{
+  "imported": 1,
+  "records": [
+    {
+      "targetId": "target_21100874f080",
+      "pathPattern": "**",
+      "criticality": "mission-critical",
+      "businessOwner": "payments-team",
+      "dataClassification": "pci",
+      "facing": "external",
+      "source": "import"
+    }
+  ]
+}
+
+# 4. Rescan with AssetCriticality active: K=1.0, E=1.0, score rose 18.0 -> 50.0!
+$ curl -sS -X POST http://127.0.0.1:8020/api/v1/targets/target_21100874f080/scan-now
+{"id":"scan_d1872c936d29","target":"C:/Users/HP/AppData/Local/Temp/ecdat_m5_kz7yc7t_","status":"done"}
+
+$ curl -sS http://127.0.0.1:8020/api/v1/scans/scan_d1872c936d29/findings
+{
+  "id": "finding_e06ca08b5b9b",
+  "family": "MD5",
+  "score": 50.0,
+  "band": "high",
+  "K": 1.0,
+  "E": 1.0,
+  "reason": "MD5 digest in a external-exposed, mission-critical-criticality context (shelf-life 5y, migration 3y, CRQC horizon 10y)."
+}
+
+# 5. Estate Summary: first-class facing split reported
+$ curl -sS http://127.0.0.1:8020/api/v1/estate/summary
+{
+  "totalTargets": 1,
+  "totalScans": 3,
+  "totalFindings": 8,
+  "criticalFindings": 2,
+  "pqcReadinessScore": 12.5,
+  "activeAlerts": 0,
+  "internalFacingAssets": 0,
+  "externalFacingAssets": 1
+}
+
+# 6. Criticality Records endpoint
+$ curl -sS http://127.0.0.1:8020/api/v1/criticality
+[
+  {
+    "targetId": "target_21100874f080",
+    "pathPattern": "**",
+    "criticality": "mission-critical",
+    "businessOwner": "payments-team",
+    "dataClassification": "pci",
+    "facing": "external",
+    "source": "import"
+  }
+]
+```
+
+### M6: PS gap: cloud key discovery (AWS KMS via LocalStack)
+Implemented and verified cloud cryptographic key discovery for AWS KMS (PS clause i),
+with clean degradation when LocalStack is unreachable and honest roadmap transparency.
+
+- `probes/cloud_kms.py` enumerates KMS keys via `boto3` client against LocalStack
+  (`LOCALSTACK_ENDPOINT_URL`, default `http://localhost:4566`), extracting:
+  - `keyId`: ARN or KeyId
+  - `algorithm`: "AES-GCM" for symmetric, "RSA" for RSA specs, "ECDSA" for ECC specs, "HMAC" for HMAC specs
+  - `keySize`: 256 for symmetric, 2048/3072/4096 for RSA, 256/384/521 for ECC
+  - `rotationAgeDays`: days since `CreationDate`
+  - `policyCompliant`: `rotationAgeDays <= 90`
+  - `identityId`: public key SHA-256 fingerprint (`sha256:...`) where public key material
+    is available via `get_public_key()`, falling back to Key ARN
+- `join_cloud_keys_to_findings()` joins discovered keys to static/runtime findings by
+  matching `identityId` or `keyId` against finding symbols, location paths, or code snippets.
+- In-code air-gap destination guard: `validate_probe_destination()` validates the host of
+  `LOCALSTACK_ENDPOINT_URL`, strictly blocking external/non-allowlisted hosts. `"localstack"`
+  added to `DEFAULT_ALLOWED_HOSTS` in `probes/guard.py`.
+- Clean degradation: when LocalStack is unreachable or provider is unsupported, returns `[]`
+  without failing the scan or 500ing the API.
+- Roadmap disclosure: `GET /api/v1/cloud/keys` returns `roadmap` indicating actively
+  supported vs v1.1 roadmap providers:
+  `"[Roadmap] AWS KMS via LocalStack is actively supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."`
+- Real test suite in `backend/tests/test_cloud_kms.py` (5 tests) proves clean degradation,
+  destination guard rejection, real key enumeration (symmetric + asymmetric), public key
+  fingerprinting, finding joining, and API serialization.
+
+### Real request/response evidence for M6 (2026-09-21, live server, port 8020)
+```
+# 1. Unreachable LocalStack clean degradation with roadmap disclosure
+$ curl -sS http://127.0.0.1:8020/api/v1/cloud/keys
+{
+  "keys": [],
+  "roadmap": "[Roadmap] AWS KMS via LocalStack is actively supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."
+}
+
+# 2. Unsupported provider clean degradation
+$ curl -sS "http://127.0.0.1:8020/api/v1/cloud/keys?provider=azure"
+{
+  "keys": [],
+  "roadmap": "[Roadmap] AWS KMS via LocalStack is actively supported in v1.0. Azure Key Vault and GCP Cloud HSM are scheduled for v1.1."
+}
+
+# 3. Unit & Integration tests for real KMS key records & finding join (tests/test_cloud_kms.py)
+$ uv run pytest tests/test_cloud_kms.py -v
+tests/test_cloud_kms.py::test_cloud_keys_endpoint_degrades_cleanly_when_unreachable PASSED [ 20%]
+tests/test_cloud_kms.py::test_cloud_keys_unsupported_provider_returns_empty PASSED [ 40%]
+tests/test_cloud_kms.py::test_cloud_kms_airgap_destination_guard PASSED  [ 60%]
+tests/test_cloud_kms.py::test_cloud_kms_enumerates_real_key_records_with_boto3_mock PASSED [ 80%]
+tests/test_cloud_kms.py::test_api_endpoint_with_mocked_keys PASSED       [100%]
+5 passed in 0.41s
+```
+
+## 2026-09-21 — Milestone M7 (Hardening, Performance & Security)
+
+### What was done
+- **Load Benchmark Suite (`backend/scripts/load_test_cmc.py`)**:
+  - Seeded 10,000 findings across 500 artifacts, with a `CoverageCertificate` (totalMass: 25000.0, attributedMass: 23000.0, excludedMass: 1000.0, residueMass: 1000.0, coverageRatio: 0.92, residueClusterCount: 50), 500 `ArtifactCoverage` records, and 50 `ResidueCluster` records into the database.
+  - Benchmarked latency across 50 iterations against a live `uvicorn` server (port 8025) for all coverage and residue endpoints.
+  - Measured results:
+    - `GET /scans/{id}/coverage`: p50 3.21ms / p90 3.77ms / p95 3.97ms / p99 4.51ms (budget: 150.0ms) -> PASS
+    - `GET /scans/{id}/coverage/artifacts`: p50 10.72ms / p90 20.85ms / p95 45.89ms / p99 99.30ms (budget: 150.0ms) -> PASS
+    - `GET /residue`: p50 4.17ms / p90 4.89ms / p95 5.39ms / p99 6.63ms (budget: 200.0ms) -> PASS
+    - `GET /residue?state=open`: p50 4.02ms / p90 5.73ms / p95 6.91ms / p99 7.28ms (budget: 200.0ms) -> PASS
+    - `GET /residue/{id}`: p50 2.84ms / p90 3.81ms / p95 4.07ms / p99 5.40ms (budget: 200.0ms) -> PASS
+- **Security Scans**:
+  - `bandit -r api probes scheduler alerts`: 4865 lines scanned. 0 High severity issues. 1 Medium (B608: parameterized CTE query in `api/store.py`, verified safe with bound parameters and validated floats). 7 Low (B110: non-blocking alert checks, graceful teardowns, fallback degradation).
+  - `pip-audit`: 0 known vulnerabilities found across all dependencies.
+  - `gitleaks detect --log-opts="--all"`: 115 commits scanned (19.51 MB). 9 hits, all verified false positives (type annotations `key: Ed25519PrivateKey | Ed448PrivateKey`, function names `ed25519.GenerateKey`, and test/benchmark constants).
+  - `trivy fs --scanners vuln backend/uv.lock`: 4 vulnerabilities detected on `cryptography 46.0.7` (3 High, 1 Medium). Confirmed transitively pinned by `sslyze` (<47 bound) with all upstream fixes at >=47; documented as an accepted exception with exposure analysis in `docs/decisions/backend/017-cryptography-cve-exception.md`.
+- **Rate Limiter Configuration**:
+  - Re-verified `docker-compose.yml` and `docker-compose.test.yml`. Confirmed no `ECDAT_RATE_LIMIT_DISABLED` or `ECDAT_RATE_LIMIT_TRUST_TEST_HEADER` env vars are set.
+  - Re-verified `api/rate_limiter.py`: `X-Test-Client-Id` header is only honored when `ECDAT_RATE_LIMIT_TRUST_TEST_HEADER == "1"`.
+
+### Real benchmark output (2026-09-21, live server, port 8025)
+```
+=======================================================
+   ECDAT LOAD TEST SUITE (10k Findings + Coverage)    
+=======================================================
+Base URL: http://127.0.0.1:8025 | Iterations per endpoint: 50
+
+Endpoint                             | Budget (p95) | p50      | p90      | p95      | p99      | Status
+-----------------------------------------------------------------------------------------------
+GET /scans/{id}/coverage             | 150.0        | 3.21     | 3.77     | 3.97     | 4.51     | PASS
+GET /scans/{id}/coverage/artifacts   | 150.0        | 10.72    | 20.85    | 45.89    | 99.30    | PASS
+GET /residue                         | 200.0        | 4.17     | 4.89     | 5.39     | 6.63     | PASS
+GET /residue?state=open              | 200.0        | 4.02     | 5.73     | 6.91     | 7.28     | PASS
+GET /residue/{id}                    | 200.0        | 2.84     | 3.81     | 4.07     | 5.40     | PASS
+===============================================================================================
+[+] All load benchmarks satisfied performance budgets.
+```
+
+### Full gate output (2026-09-21, final Track A1 gate)
+```
+uv run ruff check .                    -> All checks passed!
+uv run mypy --strict .                 -> Success: no issues found in 109 source files
+uv run pytest --cov -q                 -> 225 passed in 46.56s (93% coverage)
+uv run python scripts/contract_diff.py -> No contract drift.
+uv run python scripts/verify_airgap.py -> PASSED. ECDAT runtime is strictly deterministic and air-gapped.
+```
+
 
