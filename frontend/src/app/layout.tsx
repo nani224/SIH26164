@@ -120,6 +120,12 @@ export default function RootLayout({
                   Estate
                 </Link>
                 <Link
+                  href="/residue"
+                  className="px-2.5 py-1 rounded text-[var(--coverage-residue)] font-semibold hover:bg-[var(--surface-raised)] transition-all"
+                >
+                  Residue
+                </Link>
+                <Link
                   href="/trend"
                   className="px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-raised)] transition-all"
                 >

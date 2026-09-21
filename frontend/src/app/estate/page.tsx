@@ -11,8 +11,9 @@ import {
   deleteTarget,
   scanTargetNow,
   fetchPolicies,
+  fetchEstateCoverage,
 } from '../../lib/api';
-import type { Target, TargetKind, TargetCreate, TargetPatch, Policy } from '../../types/crypto';
+import type { Target, TargetKind, TargetCreate, TargetPatch, Policy, EstateCoverage, TargetCoverageSummary } from '../../types/crypto';
 import {
   Shield,
   Layers,
@@ -86,6 +87,12 @@ export default function EstatePage() {
   const { data: policies = [] } = useQuery({
     queryKey: ['policies'],
     queryFn: fetchPolicies,
+  });
+
+  const { data: estateCoverage } = useQuery<EstateCoverage>({
+    queryKey: ['estateCoverage'],
+    queryFn: fetchEstateCoverage,
+    refetchInterval: 30000,
   });
 
   // Mutations
@@ -572,6 +579,7 @@ export default function EstatePage() {
                   <th scope="col" className="py-3 px-3 font-semibold">Policy</th>
                   <th scope="col" className="py-3 px-3 font-semibold">Schedule</th>
                   <th scope="col" className="py-3 px-3 font-semibold">Last Scan</th>
+                  <th scope="col" className="py-3 px-3 font-semibold">Coverage</th>
                   <th scope="col" className="py-3 px-3 font-semibold">Status</th>
                   <th scope="col" className="py-3 px-4 font-semibold text-right">Actions</th>
                 </tr>
@@ -645,6 +653,60 @@ export default function EstatePage() {
                             <ExternalLink className="w-2.5 h-2.5" />
                           </Link>
                         )}
+                      </td>
+
+                      {/* Coverage Ratio & Stale/Declining Indicator */}
+                      <td className="py-3 px-3 text-[var(--text-secondary)]">
+                        {(() => {
+                          const targetCov = estateCoverage?.targets.find((t) => t.targetId === target.id);
+                          if (!targetCov) {
+                            return <span className="text-[10px] text-[var(--text-muted)]">No certificate</span>;
+                          }
+                          const isDeclining = targetCov.residueMass > 500 || targetCov.coverageRatio < 0.95;
+                          return (
+                            <div className="space-y-1 min-w-[120px]">
+                              <div className="flex items-center justify-between gap-1">
+                                <Link
+                                  href={`/drift?targetId=${target.id}`}
+                                  className="font-bold hover:underline flex items-center gap-1 font-mono text-[11px]"
+                                  title={`View drift for ${target.name}`}
+                                >
+                                  <span
+                                    className={
+                                      isDeclining
+                                        ? 'text-[var(--coverage-residue)]'
+                                        : 'text-[var(--coverage-attributed)]'
+                                    }
+                                  >
+                                    {(targetCov.coverageRatio * 100).toFixed(1)}%
+                                  </span>
+                                  <ExternalLink className="w-2.5 h-2.5 text-[var(--text-muted)]" />
+                                </Link>
+
+                                {isDeclining && (
+                                  <Link
+                                    href={`/residue?targetId=${target.id}`}
+                                    className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--coverage-residue-bg)] text-[var(--coverage-residue)] border border-[var(--coverage-residue-border)] hover:opacity-90"
+                                    title={`${targetCov.residueMass.toFixed(0)} unexplained residue mass — inspect`}
+                                  >
+                                    Residue
+                                  </Link>
+                                )}
+                              </div>
+
+                              <div className="w-full bg-[var(--surface-base)] rounded-full h-1 overflow-hidden flex border border-[var(--border-subtle)]">
+                                <div
+                                  className="bg-[var(--coverage-attributed)] h-full"
+                                  style={{ width: `${Math.min(100, targetCov.coverageRatio * 100)}%` }}
+                                />
+                                <div
+                                  className="bg-[var(--coverage-residue)] h-full"
+                                  style={{ width: `${Math.max(0, (1 - targetCov.coverageRatio) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Status */}

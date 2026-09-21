@@ -53,6 +53,11 @@ export function CommandPalette() {
 
   const routes = [
     { label: 'Overview Console', path: '/overview', icon: Layers, tag: 'Screen 2' },
+    { label: 'Continuous Estate Console', path: '/estate', icon: Network, tag: 'Screen 11' },
+    { label: 'Residue Explorer & Debt Ledger', path: '/residue', icon: Layers, tag: 'Screen 16 (CMC)' },
+    { label: 'Estate Cryptographic Trend', path: '/trend', icon: Layers, tag: 'Screen 12' },
+    { label: 'Cryptographic Drift Analysis', path: '/drift', icon: Layers, tag: 'Screen 13' },
+    { label: 'Security Alerts & Protocol Probes', path: '/alerts', icon: Layers, tag: 'Screen 14' },
     { label: 'Scan Launcher', path: '/launcher', icon: Terminal, tag: 'Screen 1' },
     { label: 'Mosca Quantum Risk Matrix', path: '/mosca', icon: Calculator, tag: 'Screen 3 (Signature)' },
     { label: 'Cryptographic Inventory', path: '/inventory', icon: ListFilter, tag: 'Screen 4' },

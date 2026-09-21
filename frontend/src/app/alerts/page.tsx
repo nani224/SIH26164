@@ -130,6 +130,8 @@ export default function AlertsPage() {
         return 'bg-[var(--crypto-grover-bg)] text-[var(--crypto-grover)] border-[var(--crypto-grover-border)]';
       case 'drift':
         return 'bg-[var(--crypto-pqc-bg)] text-[var(--crypto-pqc)] border-[var(--crypto-pqc-border)]';
+      case 'residue-rise':
+        return 'bg-[var(--coverage-residue-bg)] text-[var(--coverage-residue)] border-[var(--coverage-residue-border)]';
     }
   };
 
@@ -315,6 +317,7 @@ export default function AlertsPage() {
                 aria-label="Filter by alert type"
               >
                 <option value="all">All Alert Types</option>
+                <option value="residue-rise">Residue Rise Alerts</option>
                 <option value="probe-downgrade">Probe Downgrades</option>
                 <option value="new-critical">New Critical Findings</option>
                 <option value="cert-expiring">Expiring Certificates</option>
@@ -409,6 +412,19 @@ export default function AlertsPage() {
                             <ExternalLink className="w-2.5 h-2.5" />
                           </Link>
                         </div>
+
+                        {/* Residue Explorer Deep Link */}
+                        {alert.type === 'residue-rise' && (
+                          <div className="pt-1">
+                            <Link
+                              href={`/residue?targetId=${alert.targetId}`}
+                              className="inline-flex items-center gap-1 text-[11px] text-[var(--coverage-residue)] font-bold hover:underline"
+                            >
+                              <span>Inspect Unexplained Residue Clusters</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          </div>
+                        )}
                       </div>
 
                       {/* Action Button */}

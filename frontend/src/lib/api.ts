@@ -16,6 +16,15 @@ import type {
   ProbeResult,
   HsmInventory,
   AuditVerifyResponse,
+  CoverageCertificate,
+  ArtifactCoverage,
+  ResidueCluster,
+  ResidueClusterState,
+  ResidueClusterPatch,
+  AssetCriticality,
+  CriticalityImportResponse,
+  CloudKeysResponse,
+  EstateCoverage,
 } from '../types/crypto';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
@@ -267,5 +276,88 @@ export async function fetchEstateTrend(days?: number): Promise<EstateTrend> {
 export async function verifyAudit(): Promise<AuditVerifyResponse> {
   const res = await fetch(`${API_BASE}/api/v1/audit/verify`);
   return handleResponse<AuditVerifyResponse>(res);
+}
+
+// --- v1.0.0 Crypto Mass Conservation (CMC) API Functions ---
+
+export async function fetchScanCoverage(scanId: string): Promise<CoverageCertificate> {
+  const res = await fetch(`${API_BASE}/api/v1/scans/${scanId}/coverage`);
+  return handleResponse<CoverageCertificate>(res);
+}
+
+export async function fetchScanArtifactCoverage(scanId: string): Promise<ArtifactCoverage[]> {
+  const res = await fetch(`${API_BASE}/api/v1/scans/${scanId}/coverage/artifacts`);
+  return handleResponse<ArtifactCoverage[]>(res);
+}
+
+export async function fetchResidueClusters(params?: {
+  state?: ResidueClusterState;
+  targetId?: string;
+}): Promise<ResidueCluster[]> {
+  const query = new URLSearchParams();
+  if (params?.state) query.set('state', params.state);
+  if (params?.targetId) query.set('targetId', params.targetId);
+  const qs = query.toString();
+  const url = `${API_BASE}/api/v1/residue${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url);
+  return handleResponse<ResidueCluster[]>(res);
+}
+
+export async function fetchResidueCluster(id: string): Promise<ResidueCluster> {
+  const res = await fetch(`${API_BASE}/api/v1/residue/${id}`);
+  return handleResponse<ResidueCluster>(res);
+}
+
+export async function patchResidueCluster(
+  id: string,
+  patch: ResidueClusterPatch
+): Promise<ResidueCluster> {
+  const res = await fetch(`${API_BASE}/api/v1/residue/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return handleResponse<ResidueCluster>(res);
+}
+
+export async function fetchAssetCriticalities(targetId?: string): Promise<AssetCriticality[]> {
+  const url = `${API_BASE}/api/v1/criticality${targetId ? `?targetId=${targetId}` : ''}`;
+  const res = await fetch(url);
+  return handleResponse<AssetCriticality[]>(res);
+}
+
+export async function setAssetCriticality(criticality: AssetCriticality): Promise<AssetCriticality> {
+  const res = await fetch(`${API_BASE}/api/v1/criticality`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(criticality),
+  });
+  return handleResponse<AssetCriticality>(res);
+}
+
+export async function importCriticalityCsv(fileOrText: File | string): Promise<CriticalityImportResponse> {
+  const formData = new FormData();
+  if (typeof fileOrText === 'string') {
+    const blob = new Blob([fileOrText], { type: 'text/csv' });
+    formData.append('file', blob, 'criticality.csv');
+  } else {
+    formData.append('file', fileOrText);
+  }
+  const res = await fetch(`${API_BASE}/api/v1/criticality/import`, {
+    method: 'POST',
+    body: formData,
+  });
+  return handleResponse<CriticalityImportResponse>(res);
+}
+
+export async function fetchCloudKeys(provider?: string): Promise<CloudKeysResponse> {
+  const url = `${API_BASE}/api/v1/cloud/keys${provider ? `?provider=${provider}` : ''}`;
+  const res = await fetch(url);
+  return handleResponse<CloudKeysResponse>(res);
+}
+
+export async function fetchEstateCoverage(): Promise<EstateCoverage> {
+  const res = await fetch(`${API_BASE}/api/v1/estate/coverage`);
+  return handleResponse<EstateCoverage>(res);
 }
 

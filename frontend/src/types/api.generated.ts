@@ -502,6 +502,144 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scans/{scan_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get crypto mass conservation coverage certificate for a scan */
+        get: operations["getScanCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scans/{scan_id}/coverage/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get per-artifact crypto mass conservation coverage for a scan */
+        get: operations["getScanArtifactCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/residue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List crypto debt residue clusters across scans and targets */
+        get: operations["listResidueClusters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/residue/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get details of a specific crypto debt residue cluster */
+        get: operations["getResidueCluster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Transition state of a residue cluster (open -> promoted | excluded | accepted) */
+        patch: operations["patchResidueCluster"];
+        trace?: never;
+    };
+    "/api/v1/criticality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List asset business criticalities and ownership mappings */
+        get: operations["listAssetCriticalities"];
+        /** Set or update asset business criticality mapping */
+        put: operations["setAssetCriticality"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/criticality/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import asset business criticalities from CSV (CMDB bulk load) */
+        post: operations["importAssetCriticalityCsv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cloud/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover cryptographic keys from cloud providers (AWS KMS via LocalStack) */
+        get: operations["listCloudKeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/estate/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get aggregated crypto coverage and debt trends across the estate */
+        get: operations["getEstateCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -887,6 +1025,10 @@ export interface components {
             };
             totalFindings: number;
             stats: components["schemas"]["ScanStats"];
+            /** @description Crypto Mass Conservation coverage ratio at the time of this snapshot (v1.0). */
+            coverageRatio?: number | null;
+            /** @description Unexplained residue mass at the time of this snapshot (v1.0). */
+            residueMass?: number | null;
         };
         DriftChangedItem: {
             finding: components["schemas"]["Finding"];
@@ -898,6 +1040,8 @@ export interface components {
             resolvedCount: number;
             changedCount: number;
             netRiskDelta: number;
+            coverageDelta?: number | null;
+            residueMassDelta?: number | null;
         };
         Drift: {
             targetId: string;
@@ -909,7 +1053,7 @@ export interface components {
             summary: components["schemas"]["DriftSummary"];
         };
         /** @enum {string} */
-        AlertType: "new-critical" | "cert-expiring" | "drift" | "probe-downgrade";
+        AlertType: "new-critical" | "cert-expiring" | "drift" | "probe-downgrade" | "residue-rise";
         Alert: {
             id: string;
             type: components["schemas"]["AlertType"];
@@ -959,6 +1103,10 @@ export interface components {
             criticalFindings: number;
             pqcReadinessScore: number;
             activeAlerts: number;
+            /** @description Count of explicit AssetCriticality records with facing=internal (v1.0, PS clause i's internal/external split). */
+            internalFacingAssets: number;
+            /** @description Count of explicit AssetCriticality records with facing=external. */
+            externalFacingAssets: number;
         };
         EstateTrendPoint: {
             date: string;
@@ -976,6 +1124,99 @@ export interface components {
             recordCount: number;
             headHash: string;
             details?: string | null;
+        };
+        CoverageCertificate: {
+            scanId: string;
+            artifactCount: number;
+            totalMass: number;
+            attributedMass: number;
+            excludedMass: number;
+            residueMass: number;
+            coverageRatio: number;
+            residueClusterCount: number;
+            /** Format: date-time */
+            computedAt: string;
+        };
+        ArtifactCoverage: {
+            artifactHash: string;
+            path: string;
+            totalMass: number;
+            attributed: number;
+            excluded: number;
+            residue: number;
+            coverageRatio: number;
+        };
+        ResidueOccurrence: {
+            artifactHash: string;
+            path: string;
+            range: number[];
+        };
+        /** @enum {string} */
+        ResidueClusterState: "open" | "promoted" | "excluded" | "accepted";
+        ResidueCluster: {
+            id: string;
+            contentHash: string;
+            signalTypes: string[];
+            magnitude: number;
+            occurrences: components["schemas"]["ResidueOccurrence"][];
+            state: components["schemas"]["ResidueClusterState"];
+            justification?: string | null;
+            owner?: string | null;
+            /** Format: date-time */
+            firstSeen: string;
+            /** Format: date-time */
+            lastSeen: string;
+        };
+        ResidueClusterPatch: {
+            state: components["schemas"]["ResidueClusterState"];
+            justification?: string | null;
+            owner?: string | null;
+        };
+        /** @enum {string} */
+        AssetFacing: "internal" | "external";
+        /** @enum {string} */
+        CriticalitySource: "manual" | "import";
+        AssetCriticality: {
+            targetId: string;
+            pathPattern: string;
+            criticality: components["schemas"]["Criticality"];
+            businessOwner: string;
+            dataClassification: string;
+            facing: components["schemas"]["AssetFacing"];
+            source: components["schemas"]["CriticalitySource"];
+        };
+        CriticalityImportResponse: {
+            imported: number;
+            records: components["schemas"]["AssetCriticality"][];
+        };
+        CloudKeyRecord: {
+            provider: string;
+            keyId: string;
+            algorithm: string;
+            keySize: number;
+            rotationAgeDays: number;
+            policyCompliant: boolean;
+            identityId?: string | null;
+        };
+        CloudKeysResponse: {
+            keys: components["schemas"]["CloudKeyRecord"][];
+            roadmap: string;
+        };
+        TargetCoverageSummary: {
+            targetId: string;
+            targetName: string;
+            coverageRatio: number;
+            residueMass: number;
+            totalMass: number;
+        };
+        EstateCoverage: {
+            overallCoverageRatio: number;
+            totalMass: number;
+            attributedMass: number;
+            excludedMass: number;
+            residueMass: number;
+            totalClusters: number;
+            targets: components["schemas"]["TargetCoverageSummary"][];
         };
     };
     responses: {
@@ -1807,6 +2048,242 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditVerifyResponse"];
+                };
+            };
+        };
+    };
+    getScanCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: components["parameters"]["ScanId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageCertificate"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getScanArtifactCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: components["parameters"]["ScanId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactCoverage"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listResidueClusters: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["ResidueClusterState"];
+                targetId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResidueCluster"][];
+                };
+            };
+        };
+    };
+    getResidueCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResidueCluster"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    patchResidueCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResidueClusterPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResidueCluster"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAssetCriticalities: {
+        parameters: {
+            query?: {
+                targetId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetCriticality"][];
+                };
+            };
+        };
+    };
+    setAssetCriticality: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetCriticality"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetCriticality"];
+                };
+            };
+        };
+    };
+    importAssetCriticalityCsv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriticalityImportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    listCloudKeys: {
+        parameters: {
+            query?: {
+                provider?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloudKeysResponse"];
+                };
+            };
+        };
+    };
+    getEstateCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstateCoverage"];
                 };
             };
         };
