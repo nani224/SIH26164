@@ -3,7 +3,7 @@
 [![Airgap](https://img.shields.io/badge/Air--Gap-Strictly%20Enforced-emerald.svg)](#security--air-gap-invariants)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI%203.1-0%20Contract%20Drift-blue.svg)](contracts/openapi.yaml)
 [![CBOM](https://img.shields.io/badge/CBOM-CycloneDX%201.6-purple.svg)](#measured-verification-results)
-[![Tests](https://img.shields.io/badge/Backend-240%2B%20Pytest-brightgreen.svg)](#measured-verification-results)
+[![Tests](https://img.shields.io/badge/Backend-257%20Pytest-brightgreen.svg)](#measured-verification-results)
 [![Release](https://img.shields.io/badge/Release-v1.0.0-informational.svg)](CHANGELOG.md)
 
 **ECDAT** is an air-gapped cryptographic discovery, quantum-risk scoring, and PQC migration platform: it scans source code, binaries, and running infrastructure for cryptographic assets, scores their quantum risk against Mosca's inequality, recommends post-quantum replacements, and exports a CycloneDX 1.6 Cryptographic Bill of Materials (CBOM).
@@ -126,8 +126,8 @@ Every number below is a real command's real output from this repository, dated (
 | Gate | Command | Result |
 | :--- | :--- | :--- |
 | Lint | `uv run ruff check .` | `All checks passed!` |
-| Strict typing | `uv run mypy --strict .` | `Success: no issues found in 123 source files` |
-| Unit + integration suite | `uv run pytest` | `240+ passed, 0 failed` |
+| Strict typing | `uv run mypy --strict .` | `Success: no issues found in 134 source files` |
+| Unit + integration suite | `uv run pytest` | `257 passed, 0 failed` |
 | Kill Tests (K1–K4) | `uv run pytest tests/test_kill_tests.py` | `4/4 passed` (K1: 100%, K2: 0.00%, K3: exact, K4: delta -45/+3) |
 | Conservation invariant | `uv run pytest tests/test_attribution_calculus.py` | `4/4 passed` (33 corpus artifacts audited, 0 units lost) |
 | Contract sync | `uv run python scripts/contract_diff.py` | `No contract drift.` |
