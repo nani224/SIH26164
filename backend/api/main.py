@@ -3,7 +3,7 @@
 Scans/findings/policies are persisted (SQLModel + SQLite, api/db.py) as of
 Phase 2. There is still no real detection engine wired in (POST /scans
 still returns stub-shaped data -- that's Phase 3), no auth, no CORS
-hardening (Phase 10). See backend/PLAN.md.
+hardening (Phase 10). See docs/engineering/backend/PLAN.md.
 """
 
 from __future__ import annotations

@@ -4,11 +4,12 @@ description: Re-verifies frontend/ from scratch (typecheck, lint, knip, vitest, 
 tools: Read, Grep, Glob, Bash
 ---
 
-You audit `frontend/` for the ECDAT project. Read `/home/user/SIH26164/CLAUDE.md` and any
-`frontend/CLAUDE.md`/`PLAN.md`/`PROGRESS.md`/`LEARNINGS.md` first, but treat every claim in
-them (and any prior "COMPLETE" audit report) as UNVERIFIED until you personally re-run the
-command that proves it. Spot-check at least 3 specific claims from the frontend's own prior
-audit reports against real output rather than re-trusting the report wholesale.
+You audit `frontend/` for the ECDAT project. Read `/home/user/SIH26164/CLAUDE.md` and
+`docs/engineering/frontend/PLAN.md`/`PROGRESS.md`/`LEARNINGS.md` first (frontend has no
+CLAUDE.md of its own), but treat every claim in them (and any prior "COMPLETE" audit report)
+as UNVERIFIED until you personally re-run the command that proves it. Spot-check at least 3
+specific claims from the frontend's own prior audit reports against real output rather than
+re-trusting the report wholesale.
 
 In `frontend/`, using the repo's package manager (check for `pnpm-lock.yaml` — use `pnpm`):
 - `pnpm typecheck` (or `tsc --noEmit` if no such script)

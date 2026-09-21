@@ -10,9 +10,13 @@
 
 v0.3 is the "continuous operation" release: a real scheduler that scans a registered target unattended, real drift detection between scans, real alerting with webhook delivery, real live TLS/SSH/HSM/registry probes, and a tamper-evident audit log — proven end to end against a real running stack, not just unit tests. See [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) for a 7-minute walkthrough and [`CHANGELOG.md`](CHANGELOG.md) for the full v0.3.0 changelog.
 
+**Documentation**: [`docs/README.md`](docs/README.md) is the index — architecture, install, operations, API reference, benchmark protocol, security, and a Q&A pack, each with real dated numbers and the exact commands that produced them.
+
 ---
 
 ## Architecture
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full component diagram, data flow, and module ownership map. Summary:
 
 ```mermaid
 graph TD
@@ -68,6 +72,8 @@ graph TD
 - **Strictly air-gapped at runtime**: `probes/guard.py` enforces a real destination allowlist (localhost/approved test containers only) for every live probe; no external calls at runtime otherwise.
 - **Contract-first**: zero contract drift, checked in CI (`scripts/contract_diff.py`) and re-verified here on 2026-09-20 (below).
 
+See [`docs/SECURITY.md`](docs/SECURITY.md) for the full threat model and hardening detail.
+
 ---
 
 ## Quick Start
@@ -87,7 +93,7 @@ Brings up the whole real stack from a clean state: `api` (FastAPI), `web` (Next.
 make demo-down   # stop the stack
 ```
 
-> **Sandbox note**: building `api`/`web` needs ordinary internet access for `docker build`. Inside a TLS-intercepting sandbox without container-level CA trust — the environment this v0.3 pass itself ran in — the build step fails specifically for that reason (not a defect in `docker-compose.yml`/`Dockerfile`); see [`docs/decisions/backend/021-g2-real-stack-verification.md`](docs/decisions/backend/021-g2-real-stack-verification.md) for the exact workaround and why it isn't baked into the committed files. This pass's own G2–G4 verification instead ran `api`/`web` natively (Option 2 below) against real SoftHSM2, a host-launched weak-TLS container, and a local registry container — every number in this README came from that real, non-mocked stack.
+> **Sandbox note**: building `api`/`web` needs ordinary internet access for `docker build`. Inside a TLS-intercepting sandbox without container-level CA trust — the environment this v0.3 pass itself ran in — the build step fails specifically for that reason (not a defect in `docker-compose.yml`/`Dockerfile`); see [`docs/decisions/backend/022-real-stack-verification.md`](docs/decisions/backend/022-real-stack-verification.md) for the exact workaround and why it isn't baked into the committed files. This pass's own G2–G4 verification instead ran `api`/`web` natively (Option 2 below) against real SoftHSM2, a host-launched weak-TLS container, and a local registry container — every number in this README came from that real, non-mocked stack.
 
 ### Option 2 — Native (no Docker)
 
@@ -166,7 +172,7 @@ This is **not** the brief's full 150-usage Loop B1 DEV/HOLD split — it's a rea
 
 | Metric | Budget | Result |
 | :--- | :--- | :--- |
-| Rescore 10,000 findings | < 200ms | 149.26ms cold / ~84ms warm (see `docs/decisions/backend/` Track A1 P7 for the cold/warm explanation) |
+| Rescore 10,000 findings | < 200ms | 149.26ms cold / ~84ms warm (see `docs/engineering/backend/PROGRESS.md`'s Track A1 P1-P7 entry for the cold/warm explanation) |
 | `GET /findings`, 10,000-finding scan, default page | p95 < 150ms | **Before fix: p50 710ms, p95 773ms. After fix: p50 8.34ms, p95 10.97ms** (see CHANGELOG) |
 | Estate graph FPS (5,000+ nodes, real GPU) | ≥ 55 FPS | 60.1–60.4 FPS on real GPU hardware; a ~1.0–1.2 FPS figure seen in this sandbox is a confirmed software-rasterizer artifact (no hardware GPU here), diagnosed in an earlier session pass — not re-litigated in this one |
 
@@ -175,7 +181,7 @@ This is **not** the brief's full 150-usage Loop B1 DEV/HOLD split — it's a rea
 | Scanner | Scope | Result |
 | :--- | :--- | :--- |
 | `gitleaks` (`--log-opts="--all"`, full history, 75 commits) | Whole repo | 8 hits, **all verified false positives** on manual review (type annotations, an algorithm constant, and fabricated test/mock key material with literal `"..."`/`"SECRET"` placeholders) — no real secret ever committed |
-| `trivy fs --scanners vuln,secret` | `backend/uv.lock`, `frontend/pnpm-lock.yaml` | 5 real HIGH CVEs found. `postcss` (2 CVEs, Next.js's own internal pin) **fixed** via a `pnpm.overrides`. `cryptography` (3 CVEs) **not fixable today** — transitively pinned below the fix by `sslyze`'s own `<47` constraint; documented as an accepted, upstream-blocked exception with an exposure assessment in `docs/decisions/backend/022-cryptography-cve-blocked-by-sslyze.md` |
+| `trivy fs --scanners vuln,secret` | `backend/uv.lock`, `frontend/pnpm-lock.yaml` | 5 real HIGH CVEs found. `postcss` (2 CVEs, Next.js's own internal pin) **fixed** via a `pnpm.overrides`. `cryptography` (3 CVEs) **not fixable today** — transitively pinned below the fix by `sslyze`'s own `<47` constraint; documented as an accepted, upstream-blocked exception with an exposure assessment in `docs/decisions/backend/017-cryptography-cve-exception.md` |
 | `trivy image` | `nginx:alpine` (demo weak-TLS target) | 0 findings |
 | `trivy image` | `registry:2` (demo local registry, third-party base image) | 27 HIGH/CRITICAL findings baked into the upstream Go binary — **upstream's issue**, not an ECDAT-built artifact; this image exists only as demo scaffolding for the local-registry probe scenario |
 | `bandit` | `backend/` | All findings reviewed; genuine false positives annotated with `# nosec` + justification (parameterized SQL, pre-validated zip extraction); one multi-line CTE finding left unsuppressed due to a bandit tooling limitation, documented via a comment block |
@@ -194,9 +200,10 @@ Proven end to end against a real running stack (real scheduler, real drift, real
 
 Honestly listed, not silently dropped:
 
-- **External-repo CI proof**: the reusable GitHub Action workflow has only been proven calling itself *within* this repo, not from a genuinely external consuming repository — blocked on a one-time human action (creating that external repo), documented in `docs/decisions/backend/020-m8a-external-repo-proof-blocked.md`.
+- **External-repo CI proof**: the reusable GitHub Action workflow has only been proven calling itself *within* this repo, not from a genuinely external consuming repository — blocked on a one-time human action (creating that external repo), documented in `docs/decisions/backend/021-external-repo-proof-blocked.md`.
 - **Loop B1 DEV/HOLD corpus**: the real-world benchmark (56 usages, 4 languages) is real and honestly measured, but far short of the brief's 150+-usage, 3-unseen-project target.
 - **`cryptography` HIGH CVEs**: 3 CVEs unfixable today without an unverified `sslyze` compatibility gamble — see the security table above.
 - **Custom container image scanning**: `api`/`web` images were never built in this sandbox (documented CA-trust limitation), so they were never vulnerability-scanned either — only the demo's third-party base images were.
 - **3 Playwright tests coupled to MSW-only fixture literals** (`alerts.spec.ts`, `drift.spec.ts`, `estate.spec.ts`) fail when run against the real backend instead of MSW — a test-authoring gap, not an app defect.
 - **Not yet built**: multi-tenant RBAC/SSO, cloud KMS integration, Kubernetes cluster discovery, SIEM export, ticketing-system integration, an agent fleet for distributed scanning. None of these are implied to exist anywhere else in this README.
+- **No LICENSE file**: this repository has no declared licence (`package.json`/`pyproject.toml` are both silent on it). Not something to guess at — needs an explicit decision from the project owner before this can be treated as open-source or redistributable under any specific terms.

@@ -1,7 +1,7 @@
 """Builds the Estate Graph (system -> file -> asset) from a scan's real,
 persisted findings. Previously `GET /scans/{id}/graph` always returned the
 same Phase 0 canned stub regardless of which scan was requested -- see
-docs/decisions/backend/011-real-graph-from-findings.md for why this exists.
+docs/decisions/backend/013-real-graph-from-findings.md for why this exists.
 """
 
 from __future__ import annotations

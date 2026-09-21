@@ -84,7 +84,7 @@ edit.
 
 ## Known bookkeeping hazard
 
-`backend/PROGRESS.md` has gone stale before (described Phase 0 state while
+`docs/engineering/backend/PROGRESS.md` has gone stale before (described Phase 0 state while
 `main` had commits through "Phase 10"). **Update PROGRESS.md and PLAN.md
 every session**, with what's actually true, not what a commit title
 claims. Never mark an item done in these files without the command output

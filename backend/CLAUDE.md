@@ -1,7 +1,7 @@
 # ECDAT Backend — session rules (condensed from the SIH26164 brief)
 
-Read this at the start of every session, along with PLAN.md, PROGRESS.md,
-LEARNINGS.md, and TOOLBELT.md.
+Read this at the start of every session, along with
+`docs/engineering/backend/{PLAN,PROGRESS,LEARNINGS,TOOLBELT}.md`.
 
 ## Mission
 

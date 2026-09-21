@@ -18,3 +18,10 @@ uv.lock.bak
 *.db-wal
 backend/bench/demo_corpus/
 
+# e2e specs write here on every Playwright run (page.screenshot() +
+# fs.existsSync assertions, not pixel-diff visual baselines -- no
+# toHaveScreenshot() usage in this repo). The canonical, documentation-
+# worthy captures live in docs/screenshots/ instead; this directory is
+# regenerated output, not a fixture.
+frontend/public/screenshots/
+

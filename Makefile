@@ -14,7 +14,7 @@ help:
 
 # Brings up api+web+demo-weak-tls+demo-registry (the `demo` compose profile,
 # see docker-compose.yml) -- the whole real stack from a clean state, no
-# stub/mock data. NOTE (docs/decisions/backend/021-g2-real-stack-verification.md):
+# stub/mock data. NOTE (docs/decisions/backend/022-real-stack-verification.md):
 # building `api`/`web` needs the internet access `--build` implies; a
 # TLS-intercepting sandbox without container-level CA trust (this repo's own
 # CI dev sandbox included) will fail the build step specifically -- not a
