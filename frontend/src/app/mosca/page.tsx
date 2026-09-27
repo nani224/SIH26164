@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
 import { fetchScanFindings } from '../../lib/api';
 import { MoscaMatrixView } from './MoscaMatrixView';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import { RefreshCw } from 'lucide-react';
 
 function MoscaMatrixContent() {
@@ -13,7 +15,7 @@ function MoscaMatrixContent() {
   const searchParams = useSearchParams();
   const state = searchParams.get('state');
 
-  const { data: findingsData, isLoading, error: queryError } = useQuery({
+  const { data: findingsData, isLoading, error: queryError, refetch } = useQuery({
     queryKey: ['findings', activeScanId],
     queryFn: () => fetchScanFindings(activeScanId),
     enabled: state !== 'empty' && state !== 'error',
@@ -33,6 +35,14 @@ function MoscaMatrixContent() {
   }
 
   if (state === 'error' || queryError) {
+    if (isUnauthorizedError(queryError)) {
+      return (
+        <UnauthorizedState
+          onRetry={() => refetch()}
+          context="Screen 3 · Mosca Quantum Risk Matrix"
+        />
+      );
+    }
     return (
       <MoscaMatrixView
         findings={[]}

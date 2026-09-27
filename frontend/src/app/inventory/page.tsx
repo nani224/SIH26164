@@ -10,6 +10,8 @@ import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { CbomExportButton } from '../../components/CbomExportButton';
 import { CriticalityModal } from '../../components/CriticalityModal';
 import { CloudKeysModal } from '../../components/CloudKeysModal';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import { classifyAlgorithm } from '../../types/crypto';
 import {
   ListFilter,
@@ -239,6 +241,11 @@ export default function InventoryPage() {
           <RefreshCw className="w-5 h-5 animate-spin text-[var(--crypto-pqc)] mx-auto mb-2" />
           <span className="text-xs text-[var(--text-muted)]">LOADING DISCOVERED ASSET INVENTORY...</span>
         </div>
+      ) : isUnauthorizedError(error) ? (
+        <UnauthorizedState
+          onRetry={() => refetch()}
+          context="Screen 4 · Cryptographic Inventory"
+        />
       ) : error ? (
         <div className="p-8 text-center border border-[var(--band-critical)] rounded-lg bg-[var(--surface-card)]">
           <p className="text-xs text-[var(--band-critical)] mb-2">Failed to query asset inventory from API endpoint.</p>

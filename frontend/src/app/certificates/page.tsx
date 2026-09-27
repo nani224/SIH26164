@@ -7,6 +7,8 @@ import { fetchScanFindings } from '../../lib/api';
 import { FileCheck, ShieldAlert, AlertTriangle, Clock, Calendar, CheckCircle2, Shield, RefreshCw } from 'lucide-react';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 
 interface CertItem {
   id: string;
@@ -27,7 +29,7 @@ export default function CertificatesPage() {
   const currentYear = 2026;
   const crqcYear = currentYear + crqcZ;
 
-  const { data: findingsData, isLoading, error } = useQuery({
+  const { data: findingsData, isLoading, error, refetch } = useQuery({
     queryKey: ['findings', activeScanId],
     queryFn: () => fetchScanFindings(activeScanId),
   });
@@ -146,6 +148,11 @@ export default function CertificatesPage() {
           <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
           <span>QUERYING CERTIFICATE FINDINGS FROM DISCOVERY DAEMON...</span>
         </div>
+      ) : isUnauthorizedError(error) ? (
+        <UnauthorizedState
+          onRetry={() => refetch()}
+          context="Screen 8 · Cryptographic Certificates Console"
+        />
       ) : error ? (
         <div className="p-8 text-center text-xs border border-[var(--band-critical)] rounded-lg bg-[var(--surface-card)]">
           <p className="text-[var(--band-critical)]">Failed to query certificate telemetry from API endpoint.</p>

@@ -7,6 +7,8 @@ import {
   fetchTargets,
   patchResidueCluster,
 } from '../../lib/api';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import type {
   ResidueCluster,
   ResidueClusterState,
@@ -78,6 +80,7 @@ export default function ResidueExplorerPage() {
     data: clusters = [],
     isLoading,
     isError,
+    error,
     refetch,
   } = useQuery<ResidueCluster[]>({
     queryKey: ['residue-clusters', selectedTargetId, selectedState],
@@ -500,19 +503,26 @@ metadata:
 
           {/* Error State */}
           {isError && (
-            <div className="p-6 rounded-lg bg-[var(--surface-card)] border border-red-500/30 text-center space-y-2">
-              <AlertTriangle className="w-8 h-8 text-red-400 mx-auto" />
-              <div className="font-bold text-[var(--text-primary)]">Failed to load residue clusters</div>
-              <p className="text-[var(--text-muted)] text-[11px]">
-                Could not retrieve debt ledger from the CMC API.
-              </p>
-              <button
-                onClick={() => refetch()}
-                className="px-3 py-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:bg-[var(--surface-card-hover)] text-[var(--text-primary)] mt-2"
-              >
-                Retry Connection
-              </button>
-            </div>
+            isUnauthorizedError(error) ? (
+              <UnauthorizedState
+                onRetry={() => refetch()}
+                context="Cryptographic Residue Ledger"
+              />
+            ) : (
+              <div className="p-6 rounded-lg bg-[var(--surface-card)] border border-red-500/30 text-center space-y-2">
+                <AlertTriangle className="w-8 h-8 text-red-400 mx-auto" />
+                <div className="font-bold text-[var(--text-primary)]">Failed to load residue clusters</div>
+                <p className="text-[var(--text-muted)] text-[11px]">
+                  Could not retrieve debt ledger from the CMC API.
+                </p>
+                <button
+                  onClick={() => refetch()}
+                  className="px-3 py-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border-subtle)] hover:bg-[var(--surface-card-hover)] text-[var(--text-primary)] mt-2"
+                >
+                  Retry Connection
+                </button>
+              </div>
+            )
           )}
 
           {/* Zero-residue or Empty State */}

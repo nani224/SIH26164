@@ -4,13 +4,15 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../lib/store';
 import { fetchScanFindings } from '../../lib/api';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import { Grid, RefreshCw } from 'lucide-react';
 
 export default function HeatmapPage() {
   const router = useRouter();
   const { activeScanId } = useAppStore();
 
-  const { data: findingsData, isLoading, error } = useQuery({
+  const { data: findingsData, isLoading, error, refetch } = useQuery({
     queryKey: ['findings', activeScanId],
     queryFn: () => fetchScanFindings(activeScanId),
   });
@@ -75,6 +77,11 @@ export default function HeatmapPage() {
           <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
           <span>LOADING EXPOSURE MATRIX TELEMETRY...</span>
         </div>
+      ) : isUnauthorizedError(error) ? (
+        <UnauthorizedState
+          onRetry={() => refetch()}
+          context="Screen 7 · Attack Surface Exposure Heatmap"
+        />
       ) : error ? (
         <div className="p-8 text-center text-xs border border-[var(--band-critical)] rounded-lg bg-[var(--surface-card)]">
           <p className="text-[var(--band-critical)]">Failed to query exposure telemetry from API endpoint.</p>

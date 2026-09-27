@@ -6,6 +6,8 @@ import { useAppStore } from '../../lib/store';
 import { fetchScanPlan } from '../../lib/api';
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import { classifyAlgorithm, type RemediationPlanItem } from '../../types/crypto';
 import {
   FileText,
@@ -24,7 +26,7 @@ export default function MigrationPlanPage() {
   const { activeScanId } = useAppStore();
   const [downloaded, setDownloaded] = useState(false);
 
-  const { data: planItems, isLoading, error } = useQuery({
+  const { data: planItems, isLoading, error, refetch } = useQuery({
     queryKey: ['plan', activeScanId],
     queryFn: () => fetchScanPlan(activeScanId),
   });
@@ -106,6 +108,11 @@ export default function MigrationPlanPage() {
           <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
           <span>QUERYING REMEDIATION PLAN FROM API...</span>
         </div>
+      ) : isUnauthorizedError(error) ? (
+        <UnauthorizedState
+          onRetry={() => refetch()}
+          context="Screen 9 · Cryptographic Migration Plan"
+        />
       ) : error ? (
         <div className="p-8 text-center text-xs border border-[var(--band-critical)] rounded-lg bg-[var(--surface-card)]">
           <p className="text-[var(--band-critical)]">Failed to load migration plan from API.</p>

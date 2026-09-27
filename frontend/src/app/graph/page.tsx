@@ -8,6 +8,8 @@ import { classifyAlgorithm, type Finding, type GraphNode, type RiskBand } from '
 import { CryptoBadge } from '../../components/CryptoBadge';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
 import { Network, Sparkles, Layers, RefreshCw, Eye, Info, ZoomIn } from 'lucide-react';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import * as THREE from 'three';
 
 export default function CryptoEstateGraphPage() {
@@ -30,7 +32,12 @@ export default function CryptoEstateGraphPage() {
     }
   }, []);
 
-  const { data: graphData, isLoading: isGraphLoading, error: graphError } = useQuery({
+  const {
+    data: graphData,
+    isLoading: isGraphLoading,
+    error: graphError,
+    refetch: refetchGraph,
+  } = useQuery({
     queryKey: ['graph', activeScanId],
     queryFn: () => fetchScanGraph(activeScanId),
   });
@@ -253,6 +260,13 @@ export default function CryptoEstateGraphPage() {
           <div className="flex h-full items-center justify-center text-xs text-[var(--text-muted)] gap-2">
             <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
             <span>INITIALIZING WEBGL SPATIAL MESH FROM API...</span>
+          </div>
+        ) : isUnauthorizedError(graphError) ? (
+          <div className="flex h-full items-center justify-center p-8">
+            <UnauthorizedState
+              onRetry={() => refetchGraph()}
+              context="Screen 6 · Cryptographic Estate Graph"
+            />
           </div>
         ) : graphError ? (
           <div className="flex h-full items-center justify-center p-8 text-center text-xs text-[var(--band-critical)]">

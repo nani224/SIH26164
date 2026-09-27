@@ -8,6 +8,8 @@ import { fetchTargets, fetchTargetDrift } from '../../lib/api';
 import { useAppStore } from '../../lib/store';
 import type { Finding, RiskBand, DriftChangedItem } from '../../types/crypto';
 import { RiskBandBadge } from '../../components/RiskBandBadge';
+import { UnauthorizedState } from '../../components/UnauthorizedState';
+import { isUnauthorizedError } from '../../lib/auth';
 import {
   GitCompare,
   PlusCircle,
@@ -37,7 +39,12 @@ function DriftContent() {
   const [searchFilter, setSearchFilter] = useState('');
 
   // Fetch targets for dropdown
-  const { data: targets = [], isLoading: targetsLoading } = useQuery({
+  const {
+    data: targets = [],
+    isLoading: targetsLoading,
+    error: targetsError,
+    refetch: refetchTargets,
+  } = useQuery({
     queryKey: ['targets'],
     queryFn: fetchTargets,
   });
@@ -50,6 +57,7 @@ function DriftContent() {
   const {
     data: drift,
     isLoading: driftLoading,
+    error: driftError,
     refetch: refetchDrift,
   } = useQuery({
     queryKey: ['drift', activeTargetId],
@@ -102,6 +110,18 @@ function DriftContent() {
   }, [changed, searchFilter]);
 
   const isLoading = targetsLoading || driftLoading;
+
+  if (isUnauthorizedError(targetsError) || isUnauthorizedError(driftError)) {
+    return (
+      <UnauthorizedState
+        onRetry={() => {
+          refetchTargets();
+          refetchDrift();
+        }}
+        context="Cryptographic Target Drift Analysis"
+      />
+    );
+  }
 
   if (isLoading && !drift) {
     return (
