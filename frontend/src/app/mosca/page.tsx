@@ -60,7 +60,7 @@ function MoscaMatrixContent() {
 
   if (isLoading) {
     return (
-      <div className="p-16 text-center font-mono text-xs text-[var(--text-muted)] flex items-center justify-center gap-2">
+      <div className="p-16 text-center font-mono text-xs text-[var(--text-muted)] flex items-center justify-center gap-2 animate-pulse">
         <RefreshCw className="w-4 h-4 animate-spin text-[var(--crypto-pqc)]" />
         <span>ACQUIRING QUANTUM POSTURE TELEMETRY...</span>
       </div>

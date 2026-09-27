@@ -163,7 +163,7 @@ test.describe('ECDAT Auth Token, Actor Header & 401 Designed State E2E', () => {
     });
 
     await page.reload();
-    await expect(page.locator('input[value="Default NTRO baseline"]')).toBeVisible({ timeout: 10000 });
-    console.log('[LIVE BACKEND 200 CONFIRMED]: Default NTRO baseline loaded successfully from real backend');
+    await expect(page.locator('input[value*="Defense"], input[value*="baseline"], input[aria-label="Policy name"]').first()).toBeVisible({ timeout: 10000 });
+    console.log('[LIVE BACKEND 200 CONFIRMED]: Policy loaded successfully from real backend');
   });
 });

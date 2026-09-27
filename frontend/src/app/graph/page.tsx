@@ -71,9 +71,9 @@ export default function CryptoEstateGraphPage() {
     const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
     camera.position.z = 24;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(1);
 
     // Ambient & Directional Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -106,11 +106,8 @@ export default function CryptoEstateGraphPage() {
     const count = childNodes.length;
 
     // High-performance instanced rendering: 5,000+ nodes rendered in 1 single draw call
-    const instanceGeo = new THREE.SphereGeometry(0.7, 12, 12);
-    const instanceMat = new THREE.MeshStandardMaterial({
-      roughness: 0.4,
-      metalness: 0.5,
-    });
+    const instanceGeo = new THREE.SphereGeometry(0.7, 10, 10);
+    const instanceMat = new THREE.MeshLambertMaterial();
     const instancedMesh = new THREE.InstancedMesh(instanceGeo, instanceMat, Math.max(count, 1));
     const matrix = new THREE.Matrix4();
     const color = new THREE.Color();

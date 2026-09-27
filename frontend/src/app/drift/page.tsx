@@ -126,21 +126,25 @@ function DriftContent() {
   if (isLoading && !drift) {
     return (
       <div className="space-y-6 font-mono animate-pulse" aria-label="Loading drift comparison">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-subtle)] pb-4 min-h-[72px]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--border-subtle)] pb-4 min-h-[72px]">
           <div>
             <div className="h-3 w-48 bg-[var(--surface-raised)] rounded mb-2" />
-            <div className="h-6 w-72 bg-[var(--surface-raised)] rounded" />
+            <div className="h-7 w-72 bg-[var(--surface-raised)] rounded" />
           </div>
-          <div className="h-8 w-44 bg-[var(--surface-raised)] rounded" />
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-36 bg-[var(--surface-raised)] rounded" />
+            <div className="h-8 w-44 bg-[var(--surface-raised)] rounded" />
+          </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 min-h-[110px]">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 min-h-[110px]">
+          {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
               className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-4 rounded-lg h-[110px]"
             />
           ))}
         </div>
+        <div className="h-12 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-3" />
         <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg p-4 h-[350px]" />
       </div>
     );
@@ -372,7 +376,7 @@ function DriftContent() {
           <Link
             id="drift-to-residue-link"
             href={`/residue?targetId=${activeTargetId}`}
-            className="px-3 py-1.5 rounded bg-[var(--coverage-residue)] text-white font-bold flex items-center justify-center gap-1.5 hover:opacity-90 flex-shrink-0 shadow-sm"
+            className="px-3 py-1.5 rounded bg-[var(--coverage-residue)] text-[var(--surface-base)] font-bold flex items-center justify-center gap-1.5 hover:opacity-90 flex-shrink-0 shadow-sm"
           >
             <span>Review New Residue</span>
             <ArrowRight className="w-3.5 h-3.5" />

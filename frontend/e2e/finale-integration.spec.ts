@@ -12,6 +12,8 @@ for (const theme of themes) {
       await page.addInitScript((mode) => {
         document.documentElement.className = mode;
         (window as any).__DISABLE_MSW__ = true;
+        localStorage.setItem('ecdat_api_token', 'ecdat-dev-insecure-token');
+        localStorage.setItem('ecdat_actor', 'e2e-operator');
       }, theme);
       await page.route('**/api/v1/**', async (route) => {
         const targetUrl = route.request().url().replace('http://localhost:3000', 'http://localhost:8000');
@@ -59,7 +61,12 @@ for (const theme of themes) {
       const activeScanId = scanIdMatch ? scanIdMatch[0] : 'scan-7f8e1a';
 
       // Fetch scan directly from API to compare
-      const scanRes = await request.get(`http://localhost:8000/api/v1/scans/${activeScanId}`);
+      const scanRes = await request.get(`http://localhost:8000/api/v1/scans/${activeScanId}`, {
+        headers: {
+          Authorization: 'Bearer ecdat-dev-insecure-token',
+          'X-ECDAT-Actor': 'e2e-operator',
+        },
+      });
       expect(scanRes.ok()).toBeTruthy();
       const activeScan = await scanRes.json();
 
@@ -121,12 +128,12 @@ for (const theme of themes) {
       await page.waitForTimeout(600);
 
       // Click finding row
-      const sboxRow = page.locator('text=AES S-box constant in stripped binary').first();
+      const sboxRow = page.locator('text=/AES S-box constant/i').first();
       await expect(sboxRow).toBeVisible({ timeout: 10000 });
       await sboxRow.click();
 
       // Verify FindingDrawer is open with details
-      await expect(page.locator('text=AES S-box constant in stripped binary').first()).toBeVisible();
+      await expect(page.locator('text=/AES S-box constant/i').first()).toBeVisible();
       await expect(page.locator('text=AES_SBOX').first()).toBeVisible();
 
       // Triage it: click Accepted Risk button
@@ -143,7 +150,12 @@ for (const theme of themes) {
       await expect(page.locator('text=TRIAGE SAVED')).toBeVisible({ timeout: 8000 });
 
       // 5. Export CBOM and confirm schema-valid
-      const cbomRes = await request.get(`http://localhost:8000/api/v1/scans/${activeScan.id}/cbom`);
+      const cbomRes = await request.get(`http://localhost:8000/api/v1/scans/${activeScan.id}/cbom`, {
+        headers: {
+          Authorization: 'Bearer ecdat-dev-insecure-token',
+          'X-ECDAT-Actor': 'e2e-operator',
+        },
+      });
       expect(cbomRes.ok()).toBeTruthy();
       const cbom = await cbomRes.json();
       expect(cbom.bomFormat).toBe('CycloneDX');

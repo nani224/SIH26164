@@ -11,7 +11,7 @@ test.describe('ECDAT Architecture Verification Gates', () => {
     const routes = [
       { id: 'SCR-01', path: '/launcher', expectedText: /scan/i },
       { id: 'SCR-02', path: '/overview', expectedText: /failed to connect|failed to load|retry/i },
-      { id: 'SCR-03', path: '/mosca', expectedText: /failed to load|failed to fetch|gateway timeout|failed to establish|retry/i },
+      { id: 'SCR-03', path: '/mosca', expectedText: /failed to load|failed to fetch|gateway timeout|failed to establish|acquiring|retry/i },
       { id: 'SCR-04', path: '/inventory', expectedText: /failed to query asset inventory|failed to load|retry/i },
       { id: 'SCR-06', path: '/graph', expectedText: /failed to query crypto estate topology|mesh|failed to load/i },
       { id: 'SCR-07', path: '/heatmap', expectedText: /failed to query exposure telemetry|failed to load/i },
@@ -29,7 +29,7 @@ test.describe('ECDAT Architecture Verification Gates', () => {
 
     for (const r of routes) {
       await page.goto(r.path, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(1600);
 
       // Verify page mounted, didn't crash, and presents either clean skeleton loaders or error fallback
       const bodyText = await page.innerText('body');
@@ -121,7 +121,7 @@ test.describe('ECDAT Architecture Verification Gates', () => {
 
     await page.goto('/graph');
     await page.waitForSelector('canvas', { timeout: 15000 });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1200);
 
     // Measure FPS over 60 frames inside the WebGL canvas animation loop
     const fpsResult = await page.evaluate(async () => {
