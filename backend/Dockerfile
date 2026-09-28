@@ -8,6 +8,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     ECDAT_AIRGAP=1
 
+# Install build dependencies for C extensions (e.g. tree-sitter, python-pkcs11)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv for fast, reliable, reproducible dependency installation
 COPY --from=ghcr.io/astral-sh/uv:0.6.14 /uv /bin/uv
 
@@ -16,13 +23,6 @@ COPY pyproject.toml uv.lock ./
 
 # Install dependencies into virtual environment
 RUN uv sync --frozen --no-dev --no-install-project
-
-# Copy backend application source
-COPY api ./api
-COPY engine ./engine
-COPY bench ./bench
-COPY scripts ./scripts
-COPY README.md ./
 
 # Final runtime image
 FROM python:3.12-slim AS runner
@@ -38,11 +38,13 @@ COPY --from=builder /app/.venv /app/.venv
 COPY api ./api
 COPY engine ./engine
 COPY bench ./bench
+COPY scheduler ./scheduler
+COPY probes ./probes
 COPY scripts ./scripts
-
-# Run database initialization and demo seed
-RUN python scripts/demo_seed.py
+COPY README.md ./
+COPY ecdat.db* ./
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python scripts/demo_seed.py || true; uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+
