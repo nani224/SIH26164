@@ -1,0 +1,35 @@
+services:
+  # 1. FastAPI Backend Service (Docker)
+  - type: web
+    name: ecdat-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    envVars:
+      - key: ECDAT_AIRGAP
+        value: "1"
+      - key: ECDAT_DEV_MODE
+        value: "1"
+      - key: ECDAT_API_TOKEN
+        value: "ecdat-dev-insecure-token"
+      - key: PORT
+        value: "8000"
+
+  # 2. Next.js Frontend Service
+  - type: web
+    name: ecdat-frontend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: "production"
+      - key: NEXT_PUBLIC_ENABLE_MSW
+        value: "true"
+      - key: NEXT_PUBLIC_ECDAT_API_TOKEN
+        value: "ecdat-dev-insecure-token"
