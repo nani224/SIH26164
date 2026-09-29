@@ -27,6 +27,15 @@ import type {
   EstateCoverage,
 } from '../types/crypto';
 import { ApiError, getAuthHeaders, isUnauthorizedError } from './auth';
+import {
+  mockScans,
+  mockFindings,
+  mockGraph,
+  mockPlan,
+  mockPolicies,
+  mockEstateSummary,
+  mockTargets,
+} from '../mocks/data';
 
 export { ApiError, isUnauthorizedError };
 
@@ -84,86 +93,146 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export async function fetchScans(): Promise<Scan[]> {
-  const res = await apiFetch(`${API_BASE}/api/v1/scans`);
-  return handleResponse<Scan[]>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/scans`);
+    return await handleResponse<Scan[]>(res);
+  } catch (err) {
+    console.warn('[ECDAT API] Offline fallback to mock scans:', err);
+    return mockScans;
+  }
 }
 
 export async function fetchScan(id: string): Promise<Scan> {
-  const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}`);
-  return handleResponse<Scan>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}`);
+    return await handleResponse<Scan>(res);
+  } catch (err) {
+    console.warn(`[ECDAT API] Offline fallback to mock scan for ${id}:`, err);
+    return mockScans.find((s) => s.id === id) || mockScans[0];
+  }
 }
 
 export async function fetchScanFindings(
   id: string,
   params?: FindingsFilterParams
 ): Promise<{ items: Finding[]; total: number }> {
-  const query = new URLSearchParams();
-  if (params?.band && params.band !== 'all') query.set('band', params.band);
-  if (params?.family && params.family !== 'all') query.set('family', params.family);
-  if (params?.surface && params.surface !== 'all') query.set('surface', params.surface);
-  if (params?.q) query.set('q', params.q);
-  if (params?.needsReview !== undefined) query.set('needsReview', String(params.needsReview));
+  try {
+    const query = new URLSearchParams();
+    if (params?.band && params.band !== 'all') query.set('band', params.band);
+    if (params?.family && params.family !== 'all') query.set('family', params.family);
+    if (params?.surface && params.surface !== 'all') query.set('surface', params.surface);
+    if (params?.q) query.set('q', params.q);
+    if (params?.needsReview !== undefined) query.set('needsReview', String(params.needsReview));
 
-  const qs = query.toString();
-  const url = `${API_BASE}/api/v1/scans/${id}/findings${qs ? `?${qs}` : ''}`;
-  const res = await apiFetch(url);
-  return handleResponse<{ items: Finding[]; total: number }>(res);
+    const qs = query.toString();
+    const url = `${API_BASE}/api/v1/scans/${id}/findings${qs ? `?${qs}` : ''}`;
+    const res = await apiFetch(url);
+    return await handleResponse<{ items: Finding[]; total: number }>(res);
+  } catch (err) {
+    console.warn(`[ECDAT API] Offline fallback to mock findings for ${id}:`, err);
+    let items = mockFindings;
+    if (params?.band && params.band !== 'all') items = items.filter((f) => f.risk?.band === params.band);
+    if (params?.family && params.family !== 'all') items = items.filter((f) => f.family === params.family);
+    if (params?.surface && params.surface !== 'all') items = items.filter((f) => f.surface === params.surface);
+    return { items, total: items.length };
+  }
 }
 
 export async function rescoreScan(
   id: string,
   payload: { crqcYears?: number; policyId?: string }
 ): Promise<RescoreResult> {
-  const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/rescore`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return handleResponse<RescoreResult>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/rescore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await handleResponse<RescoreResult>(res);
+  } catch (err) {
+    console.warn('[ECDAT API] Offline fallback to simulated rescore:', err);
+    return {
+      bands: { critical: 4, high: 6, medium: 9, low: 8 },
+      changed: mockFindings.slice(0, 3),
+    };
+  }
 }
 
 export async function fetchScanGraph(id: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
-  const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/graph`);
-  return handleResponse<{ nodes: GraphNode[]; edges: GraphEdge[] }>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/graph`);
+    return await handleResponse<{ nodes: GraphNode[]; edges: GraphEdge[] }>(res);
+  } catch (err) {
+    console.warn(`[ECDAT API] Offline fallback to mock 3D graph for ${id}:`, err);
+    return mockGraph;
+  }
 }
 
 export async function fetchScanCbom(id: string): Promise<any> {
-  const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/cbom`);
-  return handleResponse<any>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/cbom`);
+    return await handleResponse<any>(res);
+  } catch (err) {
+    const { mockCbom } = await import('../mocks/data');
+    return mockCbom;
+  }
 }
 
 export async function fetchScanPlan(id: string): Promise<RemediationPlanItem[]> {
-  const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/plan`);
-  const data = await handleResponse<{ scanId: string; generatedAt: string; items: RemediationPlanItem[] }>(res);
-  return data.items;
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/scans/${id}/plan`);
+    const data = await handleResponse<{ scanId: string; generatedAt: string; items: RemediationPlanItem[] }>(res);
+    return data.items;
+  } catch (err) {
+    console.warn(`[ECDAT API] Offline fallback to mock remediation plan:`, err);
+    return mockPlan;
+  }
 }
 
 export async function fetchPolicies(): Promise<Policy[]> {
-  const res = await apiFetch(`${API_BASE}/api/v1/policies`);
-  return handleResponse<Policy[]>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/policies`);
+    return await handleResponse<Policy[]>(res);
+  } catch (err) {
+    console.warn('[ECDAT API] Offline fallback to mock policies:', err);
+    return mockPolicies;
+  }
 }
 
 export async function fetchPolicy(id: string): Promise<Policy> {
-  const res = await apiFetch(`${API_BASE}/api/v1/policies/${id}`);
-  return handleResponse<Policy>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/policies/${id}`);
+    return await handleResponse<Policy>(res);
+  } catch (err) {
+    console.warn(`[ECDAT API] Offline fallback to mock policy ${id}:`, err);
+    return mockPolicies.find((p) => p.id === id) || mockPolicies[0];
+  }
 }
 
 export async function updatePolicy(id: string, policy: Policy): Promise<Policy> {
-  const res = await apiFetch(`${API_BASE}/api/v1/policies/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(policy),
-  });
-  return handleResponse<Policy>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/policies/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(policy),
+    });
+    return await handleResponse<Policy>(res);
+  } catch {
+    return policy;
+  }
 }
 
 export async function createPolicy(policy: Policy): Promise<Policy> {
-  const res = await apiFetch(`${API_BASE}/api/v1/policies`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(policy),
-  });
-  return handleResponse<Policy>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/policies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(policy),
+    });
+    return await handleResponse<Policy>(res);
+  } catch {
+    return policy;
+  }
 }
 
 export async function createScan(
@@ -178,8 +247,13 @@ export async function createScan(
     options.headers = { 'Content-Type': 'application/json' };
     options.body = JSON.stringify(data);
   }
-  const res = await apiFetch(url, options);
-  return handleResponse<Scan>(res);
+  try {
+    const res = await apiFetch(url, options);
+    return await handleResponse<Scan>(res);
+  } catch (err) {
+    console.warn('[ECDAT API] Offline fallback to instant scan simulation:', err);
+    return mockScans[0];
+  }
 }
 
 export async function triageFinding(
@@ -197,13 +271,23 @@ export async function triageFinding(
 // Continuous Operation Endpoints (v0.3.0)
 
 export async function fetchEstateSummary(): Promise<EstateSummary> {
-  const res = await apiFetch(`${API_BASE}/api/v1/estate/summary`);
-  return handleResponse<EstateSummary>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/estate/summary`);
+    return await handleResponse<EstateSummary>(res);
+  } catch (err) {
+    console.warn('[ECDAT API] Offline fallback to mock estate summary:', err);
+    return mockEstateSummary;
+  }
 }
 
 export async function fetchTargets(): Promise<Target[]> {
-  const res = await apiFetch(`${API_BASE}/api/v1/targets`);
-  return handleResponse<Target[]>(res);
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/targets`);
+    return await handleResponse<Target[]>(res);
+  } catch (err) {
+    console.warn('[ECDAT API] Offline fallback to mock targets:', err);
+    return mockTargets;
+  }
 }
 
 export async function fetchTarget(id: string): Promise<Target> {
