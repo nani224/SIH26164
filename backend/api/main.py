@@ -109,8 +109,22 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(scans.ws_router, prefix="/api/v1")
 
 
+@app.get("/", include_in_schema=False)
+async def root_endpoint() -> dict[str, str]:
+    return {
+        "title": "ECDAT API — Enterprise Cryptographic Discovery & Analysis Tool",
+        "competition": "Smart India Hackathon 2026",
+        "problem_statement": "SIH26164 (NTRO)",
+        "version": "1.0.1",
+        "status": "healthy",
+        "docs": "/docs",
+        "health": "/api/v1/health",
+    }
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
     detail_str = str(exc.detail) if exc.detail else ""
     content = {"error": exc.__class__.__name__, "message": detail_str, "detail": detail_str}
     return JSONResponse(status_code=exc.status_code, content=content)
+
