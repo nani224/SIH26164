@@ -28,12 +28,12 @@ export default function ScanLauncherPage() {
   const { crqcZ, setCrqcZ, setActiveScanId } = useAppStore();
 
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: number; hash: string } | null>({
-    name: 'ntro-core-infrastructure-snapshot.tar.gz',
-    size: 28450190,
+    name: 'benchmark_corpus.tar.gz',
+    size: 66487,
     hash: '8f92a31d4e7b6c501192e4ab912cd3ef681b4029415c48b78990e1f721ab3091',
   });
   const [actualFileObj, setActualFileObj] = useState<File | null>(null);
-  const [targetPath, setTargetPath] = useState('/opt/ntro/deployments/core-mesh');
+  const [targetPath, setTargetPath] = useState('bench/benchmark_corpus.tar.gz');
   const [selectedPolicy, setSelectedPolicy] = useState('policy-default-defense');
   const [isScanning, setIsScanning] = useState(false);
   const [scanStage, setScanStage] = useState<'idle' | 'ingesting' | 'scanning' | 'scoring' | 'done'>('idle');
