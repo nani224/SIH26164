@@ -25,3 +25,9 @@ backend/bench/demo_corpus/
 # regenerated output, not a fixture.
 frontend/public/screenshots/
 
+# Local Scratch, Agent & Presentation Backups
+backup/
+.agents/
+.playwright-mcp/
+*.tmp
+
