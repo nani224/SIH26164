@@ -1,5 +1,11 @@
 # ECDAT Frontend — "Cipher Observatory"
 
+[![Live Production](https://img.shields.io/badge/Live%20Demo-ecdat--cipher--observatory.vercel.app-000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://ecdat-cipher-observatory.vercel.app)
+[![API Documentation](https://img.shields.io/badge/Live%20API-Swagger%20UI-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://ecdat-backend-2bn6.onrender.com/docs)
+
+> 🚀 **Live Production Link**: **[https://ecdat-cipher-observatory.vercel.app](https://ecdat-cipher-observatory.vercel.app)**  
+> 🌐 **Alternative Edge Domain**: **[https://ecdat-cipher-observatory-tehe.vercel.app](https://ecdat-cipher-observatory-tehe.vercel.app)**
+
 Enterprise Cryptographic Discovery & Analysis Tool (ECDAT)
 Smart India Hackathon PS SIH26164 (NTRO).
 

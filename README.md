@@ -1,10 +1,16 @@
 # ECDAT — Enterprise Cryptographic Discovery & Analysis Tool (SIH26164)
 
+[![Live Production](https://img.shields.io/badge/Live%20Demo-ecdat--cipher--observatory.vercel.app-000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://ecdat-cipher-observatory.vercel.app)
+[![API Documentation](https://img.shields.io/badge/Live%20API-Swagger%20UI-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://ecdat-backend-2bn6.onrender.com/docs)
 [![Airgap](https://img.shields.io/badge/Air--Gap-Strictly%20Enforced-emerald.svg)](#security--air-gap-invariants)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI%203.1-0%20Contract%20Drift-blue.svg)](contracts/openapi.yaml)
 [![CBOM](https://img.shields.io/badge/CBOM-CycloneDX%201.6-purple.svg)](#measured-verification-results)
 [![Tests](https://img.shields.io/badge/Backend-283%20Pytest-brightgreen.svg)](#measured-verification-results)
 [![Release](https://img.shields.io/badge/Release-v1.0.0-informational.svg)](CHANGELOG.md)
+
+> 🚀 **Live Production Deployment**: **[https://ecdat-cipher-observatory.vercel.app](https://ecdat-cipher-observatory.vercel.app)**  
+> ⚡ **Live Interactive API Documentation**: **[https://ecdat-backend-2bn6.onrender.com/docs](https://ecdat-backend-2bn6.onrender.com/docs)**  
+> 🛡️ **Operational Health Check**: `https://ecdat-backend-2bn6.onrender.com/api/v1/health`
 
 **ECDAT** is an air-gapped cryptographic discovery, quantum-risk scoring, and PQC migration platform: it scans source code, binaries, and running infrastructure for cryptographic assets, scores their quantum risk against Mosca's inequality, recommends post-quantum replacements, and exports a CycloneDX 1.6 Cryptographic Bill of Materials (CBOM).
 
